@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q - 任务管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent;transition:all .2s}
+.nav a:hover{color:#1890ff}
+.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.toolbar h2{font-size:20px;color:#333}
+.btn{padding:8px 20px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:background .2s;text-decoration:none;display:inline-block}
+.btn:hover{background:#40a9ff}
+.btn-danger{background:#ff4d4f}
+.btn-danger:hover{background:#ff7875}
+.btn-success{background:#52c41a}
+.btn-success:hover{background:#73d13d}
+.btn-sm{padding:5px 12px;font-size:13px}
+.btn-ghost{background:transparent;color:#1890ff;border:1px solid #1890ff}
+.btn-ghost:hover{background:#e6f7ff}
+.task-table{width:100%;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden}
+.task-table table{width:100%;border-collapse:collapse}
+.task-table th{background:#fafafa;padding:14px 16px;text-align:left;font-size:14px;color:#666;font-weight:500;border-bottom:1px solid #f0f0f0}
+.task-table td{padding:14px 16px;font-size:14px;border-bottom:1px solid #f0f0f0}
+.task-table tr:last-child td{border-bottom:none}
+.task-table tr:hover td{background:#fafafa}
+.status-on{color:#52c41a;font-weight:500}
+.status-off{color:#999}
+.actions{display:flex;gap:8px}
+.source-tags{display:flex;gap:4px;flex-wrap:wrap}
+.source-tag{background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:12px;color:#666}
+.empty{text-align:center;padding:60px;color:#999;font-size:16px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:28px;width:520px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.modal h3{font-size:18px;margin-bottom:20px;color:#333}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:14px;color:#555;margin-bottom:6px;font-weight:500}
+.form-group input,.form-group select{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:#1890ff}
+.form-group .hint{font-size:12px;color:#999;margin-top:4px}
+.checkbox-group{display:flex;gap:16px;flex-wrap:wrap}
+.checkbox-group label{display:flex;align-items:center;gap:4px;font-size:14px;color:#333;font-weight:normal;cursor:pointer}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+.toast{position:fixed;top:20px;right:20px;padding:12px 24px;border-radius:8px;color:#fff;font-size:14px;z-index:2000;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.toast-success{background:#52c41a}
+.toast-error{background:#ff4d4f}
+.toast-info{background:#1890ff}
+.note-box{background:#fffbe6;border:1px solid #ffe58f;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#ad8b00}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#128202; D8Q &#26234;&#33021;&#36164;&#35759;&#24037;&#21378;</h1>
+  <p>Intelligent Engine DataFactory</p>
+</div>
+<div class="nav">
+  <a href="/">&#128240; &#36164;&#35759;&#27983;&#35272;</a>
+  <a href="/tasks" class="active">&#9881;&#65039; &#20219;&#21153;&#31649;&#29702;</a>
+</div>
+<div class="container">
+  <div class="note-box">&#128161; &#32534;&#36753;&#20219;&#21153;&#30340;&#35843;&#24230;&#26102;&#38388;&#21518;&#65292;&#26032;&#30340;&#35843;&#24230;&#35745;&#21010;&#23558;&#22312;&#31532;&#20108;&#22825;&#29983;&#25928;&#12290;&#20854;&#20182;&#20462;&#25913;&#65288;&#20027;&#39064;&#12289;&#26469;&#28304;&#31561;&#65289;&#23558;&#31435;&#21363;&#29983;&#25928;&#12290;</div>
+  <div class="toolbar">
+    <h2>&#128203; &#37319;&#38598;&#20219;&#21153;&#21015;&#34920;</h2>
+    <button class="btn" onclick="openModal()">&#10133; &#26032;&#24314;&#20219;&#21153;</button>
+  </div>
+  <div class="task-table" id="taskTable"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modalTitle">&#26032;&#24314;&#20219;&#21153;</h3>
+    <input type="hidden" id="editTaskId">
+    <div class="form-group">
+      <label>&#37319;&#38598;&#20027;&#39064; *</label>
+      <input type="text" id="taskSubject" placeholder="&#20363;&#22914;&#65306;AI&#12289;&#20855;&#36523;&#26234;&#33021;&#12289;&#26032;&#33021;&#28304;">
+    </div>
+    <div class="form-group">
+      <label>&#25968;&#25454;&#26469;&#28304;</label>
+      <div class="checkbox-group" id="sourcesGroup">
+        <label><input type="checkbox" value="cailianshe" checked> &#36130;&#32852;&#31038;</label>
+        <label><input type="checkbox" value="nbd" checked> &#27599;&#32463;&#32593;</label>
+        <label><input type="checkbox" value="36kr" checked> 36&#27686;</label>
+        <label><input type="checkbox" value="weibo" checked> &#24494;&#21338;</label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>&#35843;&#24230;&#39057;&#29575;</label>
+      <select id="taskSchedule">
+        <option value="0 */1 * * *">&#27599;&#38548;1&#23567;&#26102;</option>
+        <option value="0 */2 * * *" selected>&#27599;&#38548;2&#23567;&#26102;</option>
+        <option value="0 */3 * * *">&#27599;&#38548;3&#23567;&#26102;</option>
+        <option value="0 */4 * * *">&#27599;&#38548;4&#23567;&#26102;</option>
+        <option value="0 */6 * * *">&#27599;&#38548;6&#23567;&#26102;</option>
+        <option value="0 */8 * * *">&#27599;&#38548;8&#23567;&#26102;</option>
+        <option value="0 */12 * * *">&#27599;&#38548;12&#23567;&#26102;</option>
+        <option value="0 8,12,18 * * *">&#27599;&#22825;3&#27425;&#65288;8&#28857;&#12289;12&#28857;&#12289;18&#28857;&#65289;</option>
+        <option value="0 8,20 * * *">&#27599;&#22825;2&#27425;&#65288;8&#28857;&#12289;20&#28857;&#65289;</option>
+        <option value="0 9 * * *">&#27599;&#22825;1&#27425;&#65288;9&#28857;&#65289;</option>
+        <option value="0 9 * * 1-5">&#24037;&#20316;&#26085;&#27599;&#22825;1&#27425;&#65288;9&#28857;&#65289;</option>
+        <option value="0 9 * * 0">&#27599;&#21608;&#26085;1&#27425;&#65288;9&#28857;&#65289;</option>
+      </select>
+      <div class="hint">&#20462;&#25913;&#35843;&#24230;&#39057;&#29575;&#23558;&#22312;&#31532;&#20108;&#22825;&#29983;&#25928;&#12290;</div>
+    </div>
+    <div class="form-group">
+      <label>&#27599;&#27425;&#26368;&#22823;&#37319;&#38598;&#25968;</label>
+      <input type="number" id="taskMaxResults" value="20" min="1" max="100">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">&#21462;&#28040;</button>
+      <button class="btn" onclick="saveTask()">&#20445;&#23384;</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var ALL_SOURCES=["cailianshe","nbd","36kr","weibo"];
+var SOURCE_NAMES={"cailianshe":"财联社","nbd":"每经网","36kr":"36氪","weibo":"微博"};
+
+function apiJson(url,opts){
+  opts=opts||{};
+  opts.headers={"Content-Type":"application/json"};
+  return fetch(url,opts).then(function(r){return r.json()})
+}
+
+function loadTasks(){
+  apiJson("/api/tasks").then(function(tasks){
+    if(!tasks||!tasks.length){
+      document.getElementById("taskTable").innerHTML='<div class="empty">暂无采集任务，点击上方"新建任务"创建</div>';
+      return
+    }
+    var html='<table><tr><th>主题</th><th>数据来源</th><th>调度规则</th><th>最大采集数</th><th>状态</th><th>操作</th></tr>';
+    for(var i=0;i<tasks.length;i++){
+      var t=tasks[i];
+      var srcHtml="";
+      var sources=t.sources||[];
+      for(var j=0;j<sources.length;j++){
+        srcHtml+='<span class="source-tag">'+(SOURCE_NAMES[sources[j]]||sources[j])+'</span>'
+      }
+      html+='<tr>'+
+        '<td><strong>'+esc(t.subject)+'</strong></td>'+
+        '<td><div class="source-tags">'+srcHtml+'</div></td>'+
+        '<td>'+describeCron(t.cron_expr)+'</td>'+
+        '<td>'+t.max_results+'</td>'+
+        '<td>'+(t.enabled?'<span class="status-on">&#9679; 运行中</span>':'<span class="status-off">&#9679; 已停止</span>')+'</td>'+
+        '<td><div class="actions">'+
+          '<button class="btn btn-sm btn-ghost" onclick="editTask(\''+esc(t.id)+'\')">编辑</button>'+
+          '<button class="btn btn-sm btn-success" onclick="runTask(\''+esc(t.id)+'\')">执行</button>'+
+          '<button class="btn btn-sm btn-danger" onclick="deleteTask(\''+esc(t.id)+'\',\''+esc(t.subject)+'\')">删除</button>'+
+        '</div></td></tr>'
+    }
+    html+='</table>';
+    document.getElementById("taskTable").innerHTML=html
+  })
+}
+
+var CRON_LABELS={
+  "0 */1 * * *":"每隔1小时","0 */2 * * *":"每隔2小时","0 */3 * * *":"每隔3小时",
+  "0 */4 * * *":"每隔4小时","0 */6 * * *":"每隔6小时","0 */8 * * *":"每隔8小时",
+  "0 */12 * * *":"每隔12小时","0 8,12,18 * * *":"每天3次(8、12、18点)",
+  "0 8,20 * * *":"每天2次(8、20点)","0 9 * * *":"每天1次(9点)",
+  "0 9 * * 1-5":"工作日每天1次(9点)",
+  "0 9 * * 0":"每周日1次(9点)"
+};
+
+function describeCron(expr){
+  return CRON_LABELS[expr]||expr
+}
+
+function openModal(task){
+  document.getElementById("editTaskId").value=task?task.id:"";
+  document.getElementById("modalTitle").textContent=task?"编辑任务":"新建任务";
+  document.getElementById("taskSubject").value=task?task.subject:"";
+  document.getElementById("taskSchedule").value=task?task.cron_expr:"0 */2 * * *";
+  document.getElementById("taskMaxResults").value=task?task.max_results:20;
+  var checks=document.querySelectorAll("#sourcesGroup input");
+  var taskSources=task?task.sources:ALL_SOURCES;
+  for(var i=0;i<checks.length;i++){
+    checks[i].checked=taskSources.indexOf(checks[i].value)>-1
+  }
+  document.getElementById("modal").classList.add("show")
+}
+
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+
+function getSelectedSources(){
+  var checks=document.querySelectorAll("#sourcesGroup input:checked");
+  var arr=[];
+  for(var i=0;i<checks.length;i++)arr.push(checks[i].value);
+  return arr
+}
+
+function saveTask(){
+  var subject=document.getElementById("taskSubject").value.trim();
+  if(!subject){showToast("请输入采集主题","error");return}
+  var sources=getSelectedSources();
+  if(!sources.length){showToast("请至少选择一个数据来源","error");return}
+  var body={
+    subject:subject,
+    sources:sources,
+    cron_expr:document.getElementById("taskSchedule").value,
+    max_results:parseInt(document.getElementById("taskMaxResults").value)||20
+  };
+  var editId=document.getElementById("editTaskId").value;
+  if(editId){
+    // Edit: delete old then create new
+    apiJson("/api/tasks/"+editId,{method:"DELETE"}).then(function(){
+      return apiJson("/api/tasks",{method:"POST",body:JSON.stringify(body)})
+    }).then(function(){
+      closeModal();showToast("任务已更新，调度时间变更将在第二天生效","success");loadTasks()
+    }).catch(function(){showToast("更新失败","error")})
+  }else{
+    apiJson("/api/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){
+      closeModal();showToast("任务创建成功","success");loadTasks()
+    }).catch(function(){showToast("创建失败","error")})
+  }
+}
+
+function editTask(id){
+  apiJson("/api/tasks").then(function(tasks){
+    for(var i=0;i<tasks.length;i++){
+      if(tasks[i].id===id){openModal(tasks[i]);return}
+    }
+  })
+}
+
+function deleteTask(id,subject){
+  if(!confirm("确定删除任务「"+subject+"」？")){return}
+  apiJson("/api/tasks/"+id,{method:"DELETE"}).then(function(){
+    showToast("任务已删除","success");loadTasks()
+  }).catch(function(){showToast("删除失败","error")})
+}
+
+function runTask(id){
+  showToast("正在执行任务...","info");
+  apiJson("/api/tasks/"+id+"/run",{method:"POST"}).then(function(r){
+    showToast("执行完成，采集 "+(r.total_count||0)+" 条数据","success")
+  }).catch(function(){showToast("执行失败","error")})
+}
+
+function showToast(msg,type){
+  var el=document.getElementById("toast");
+  el.textContent=msg;
+  el.className="toast toast-"+(type||"info")+" show";
+  setTimeout(function(){el.classList.remove("show")},3000)
+}
+
+function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+
+loadTasks()
+</script>
+</body>
+</html>

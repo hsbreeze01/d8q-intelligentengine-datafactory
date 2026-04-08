@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q 智能资讯工厂</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent;transition:all .2s}
+.nav a:hover{color:#1890ff}
+.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.filters{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.filters label{font-weight:500;font-size:14px;color:#555}
+.filters select,.filters input{padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;outline:none;transition:border .2s}
+.filters select:focus,.filters input:focus{border-color:#1890ff}
+.filters button,.btn{padding:8px 20px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:background .2s}
+.filters button:hover,.btn:hover{background:#40a9ff}
+.stats{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.stat-card{flex:1;min-width:140px;background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+.stat-card .num{font-size:28px;font-weight:700;color:#1890ff}
+.stat-card .label{font-size:13px;color:#888;margin-top:4px}
+.news-list{display:flex;flex-direction:column;gap:16px}
+.news-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.08);transition:box-shadow .2s}
+.news-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.news-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
+.tag{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:500}
+.tag-subject{background:#e6f7ff;color:#1890ff}
+.tag-source{background:#f6ffed;color:#52c41a}
+.news-card h3{font-size:18px;margin-bottom:8px;line-height:1.5}
+.news-card h3 a{color:#333;text-decoration:none}
+.news-card h3 a:hover{color:#1890ff}
+.news-content{color:#666;font-size:14px;line-height:1.8;margin-bottom:12px;max-height:120px;overflow:hidden}
+.news-content.expanded{max-height:none}
+.toggle-btn{color:#1890ff;cursor:pointer;font-size:13px;border:none;background:none;padding:0}
+.news-footer{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#999;margin-top:8px}
+.news-footer a{color:#1890ff;text-decoration:none}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:24px}
+.pagination button{padding:6px 14px;border:1px solid #d9d9d9;border-radius:6px;background:#fff;cursor:pointer;font-size:14px}
+.pagination button.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.empty{text-align:center;padding:60px;color:#999;font-size:16px}
+@media(max-width:600px){.filters{flex-direction:column}.stats{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#128202; D8Q &#26234;&#33021;&#36164;&#35759;&#24037;&#21378;</h1>
+  <p>Intelligent Engine DataFactory</p>
+</div>
+<div class="nav">
+  <a href="/" class="active">&#128240; &#36164;&#35759;&#27983;&#35272;</a>
+  <a href="/tasks">&#9881;&#65039; &#20219;&#21153;&#31649;&#29702;</a>
+</div>
+<div class="container">
+  <div class="filters">
+    <label>&#20027;&#39064;</label>
+    <select id="subject"><option value="">&#20840;&#37096;&#20027;&#39064;</option></select>
+    <label>&#26469;&#28304;</label>
+    <select id="source"><option value="">&#20840;&#37096;&#26469;&#28304;</option></select>
+    <label>&#26085;&#26399;</label>
+    <input type="date" id="date">
+    <button onclick="loadNews()">&#128269; &#26597;&#35810;</button>
+    <button onclick="resetFilters()" style="background:#f5f5f5;color:#666">&#37325;&#32622;</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="news-list" id="newsList"></div>
+  <div class="pagination" id="pagination"></div>
+</div>
+<script>
+var currentPage=1,pageSize=10,totalCount=0;
+function api(url){return fetch(url).then(function(r){return r.json()})}
+function init(){
+  api("/api/meta").then(function(m){
+    var subSel=document.getElementById("subject"),srcSel=document.getElementById("source");
+    m.subjects.forEach(function(s){var o=document.createElement("option");o.value=s;o.textContent=s;subSel.appendChild(o)});
+    m.sources.forEach(function(s){var o=document.createElement("option");o.value=s;o.textContent=s;srcSel.appendChild(o)});
+    loadNews()
+  })
+}
+function loadNews(){
+  var subject=document.getElementById("subject").value;
+  var source=document.getElementById("source").value;
+  var date=document.getElementById("date").value;
+  var url="/api/news?page="+currentPage+"&size="+pageSize;
+  if(subject)url+="&subject="+encodeURIComponent(subject);
+  if(source)url+="&source="+encodeURIComponent(source);
+  if(date)url+="&date="+date;
+  api(url).then(function(d){totalCount=d.total;renderStats(d);renderList(d.items);renderPagination()})
+}
+function renderStats(d){
+  document.getElementById("stats").innerHTML=
+    '<div class="stat-card"><div class="num">'+d.total+'</div><div class="label">资讯总数</div></div>'+
+    '<div class="stat-card"><div class="num">'+(d.subjects||"-")+'</div><div class="label">主题数</div></div>'+
+    '<div class="stat-card"><div class="num">'+(d.sources||"-")+'</div><div class="label">来源数</div></div>'
+}
+function renderList(items){
+  var el=document.getElementById("newsList");
+  if(!items.length){el.innerHTML='<div class="empty">暂无资讯数据</div>';return}
+  var html="";
+  for(var i=0;i<items.length;i++){
+    var n=items[i];
+    html+='<div class="news-card"><div class="news-meta">'+
+      '<span class="tag tag-subject">&#128204; '+esc(n.subject)+'</span>'+
+      '<span class="tag tag-source">&#128225; '+esc(n.source)+'</span>'+
+      '<span style="color:#999">&#128336; '+(n.publish_time||n.created_at||"未知")+'</span></div>'+
+      '<h3>'+(n.url?'<a href="'+esc(n.url)+'" target="_blank">'+esc(n.title)+'</a>':esc(n.title))+'</h3>'+
+      '<div class="news-content" id="content-'+i+'">'+esc(n.content)+'</div>'+
+      '<button class="toggle-btn" onclick="toggleContent('+i+')">展开全文</button>'+
+      '<div class="news-footer"><span>来源：'+esc(n.source)+(n.author?(" | 作者："+esc(n.author)):"")+'</span>'+
+      (n.url?'<a href="'+esc(n.url)+'" target="_blank">查看原文 &#8594;</a>':"")+'</div></div>'
+  }
+  el.innerHTML=html
+}
+function toggleContent(i){var el=document.getElementById("content-"+i);el.classList.toggle("expanded");el.nextElementSibling.textContent=el.classList.contains("expanded")?"收起":"展开全文"}
+function renderPagination(){
+  var pages=Math.ceil(totalCount/pageSize)||1,el=document.getElementById("pagination");
+  var h='<button '+(currentPage<=1?"disabled":"")+' onclick="goPage('+(currentPage-1)+')">上一页</button>';
+  for(var p=1;p<=pages&&p<=10;p++)h+='<button class="'+(p===currentPage?"active":"")+'" onclick="goPage('+p+')">'+p+'</button>';
+  if(pages>10)h+='<span>... 共'+pages+'页</span>';
+  h+='<button '+(currentPage>=pages?"disabled":"")+' onclick="goPage('+(currentPage+1)+')">下一页</button>';
+  el.innerHTML=h
+}
+function goPage(p){currentPage=p;loadNews()}
+function resetFilters(){document.getElementById("subject").value="";document.getElementById("source").value="";document.getElementById("date").value="";currentPage=1;loadNews()}
+function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+init()
+</script>
+</body>
+</html>
