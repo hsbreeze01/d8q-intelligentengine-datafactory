@@ -1,11 +1,13 @@
 """D8Q 智能资讯工厂 - 前后端一体 Web 应用 v2 (含任务管理)"""
 import sqlite3, json, os
 import urllib.request
+import urllib.parse
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
 
 app = Flask(__name__)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
+SHARK_API = "http://localhost:5000"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 
@@ -17,7 +19,7 @@ def get_db():
 
 def agent_request(method, path, data=None):
     """Proxy request to agent API"""
-    url = AGENT_API + path
+    url = AGENT_API + urllib.parse.quote(path, safe='/:?=&')
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, method=method)
     req.add_header("Content-Type", "application/json")
@@ -123,6 +125,80 @@ def delete_task(task_id):
 def run_task(task_id):
     data, code = agent_request("POST", "/api/tasks/" + task_id + "/run")
     return jsonify(data), code
+
+
+
+def shark_request(method, path, data=None):
+    """Proxy request to StockShark API"""
+    url = SHARK_API + urllib.parse.quote(path, safe='/:?=&')
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return json.loads(resp.read()), resp.status
+    except urllib.error.HTTPError as e:
+        return json.loads(e.read()), e.code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
+@app.route("/stock")
+def stock_page():
+    with open(os.path.join(TMPL_DIR, "stock.html"), encoding="utf-8") as f:
+        return f.read()
+
+
+# --- Stock Analysis API (proxy to StockShark) ---
+@app.route("/api/stock/comprehensive", methods=["POST"])
+def stock_comprehensive():
+    data, code = shark_request("POST", "/api/analysis/stock/comprehensive", request.json)
+    return jsonify(data), code
+
+
+@app.route("/api/stock/announcements", methods=["GET"])
+def stock_announcements():
+    sc = request.args.get("stock_code", "")
+    days = request.args.get("days", "30")
+    data, status = shark_request("GET", "/api/announcement/stock/" + sc + "?days=" + days)
+    return jsonify(data), status
+
+
+@app.route("/api/stock/reports", methods=["GET"])
+def stock_reports():
+    keyword = request.args.get("keyword", "")
+    data, status = shark_request("GET", "/api/report/search?keyword=" + keyword + "&limit=20")
+    return jsonify(data), status
+
+
+@app.route("/api/stock/quote", methods=["GET"])
+def stock_quote():
+    symbol = request.args.get("symbol", "")
+    data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + symbol)
+    return jsonify(data), status
+
+
+
+@app.route("/report")
+def report_page():
+    with open(os.path.join(TMPL_DIR, "report.html"), encoding="utf-8") as f:
+        return f.read()
+
+
+@app.route("/api/report/stock", methods=["POST"])
+def report_stock_query():
+    """批量查询股票研报 - 代理到 StockShark"""
+    body = request.json or {}
+    keywords = body.get("keywords", [])
+    days = body.get("days", 7)
+    results = []
+    for kw in keywords[:20]:  # 限制最多20个
+        data, code = shark_request("GET", "/api/report/stock/" + kw + "?days=" + str(days) + "&stock_name=" + kw)
+        if code == 200:
+            results.append(data)
+        else:
+            results.append({"stock_code": kw, "stock_name": kw, "reports": [], "announcements": [], "error": str(data)})
+    return jsonify({"results": results}), 200
 
 
 if __name__ == "__main__":

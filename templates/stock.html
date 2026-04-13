@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q 智能资讯工厂 - 股票分析</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent;transition:all .2s}
+.nav a:hover{color:#1890ff}
+.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.search-box{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;gap:12px;align-items:center}
+.search-box input{flex:1;padding:10px 16px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;outline:none;transition:border .2s}
+.search-box input:focus{border-color:#1890ff;box-shadow:0 0 0 2px rgba(24,144,255,.1)}
+.btn{padding:10px 24px;background:#1890ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:background .2s}
+.btn:hover{background:#40a9ff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{background:#fff;color:#1890ff;border:1px solid #1890ff}
+.btn-outline:hover{background:#e6f7ff}
+.loading{text-align:center;padding:60px;color:#999}
+.loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid #e8e8e8;border-top-color:#1890ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.result-card{background:#fff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.result-card h2{font-size:20px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.score-badge{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;font-size:22px;font-weight:700;color:#fff}
+.score-high{background:linear-gradient(135deg,#52c41a,#73d13d)}
+.score-mid{background:linear-gradient(135deg,#faad14,#ffc53d)}
+.score-low{background:linear-gradient(135deg,#ff4d4f,#ff7875)}
+.risk-tag{display:inline-block;padding:3px 12px;border-radius:12px;font-size:13px;font-weight:500}
+.risk-low{background:#f6ffed;color:#52c41a}
+.risk-mid{background:#fffbe6;color:#faad14}
+.risk-high{background:#fff2f0;color:#ff4d4f}
+.term-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin:16px 0}
+.term-card{border:1px solid #f0f0f0;border-radius:10px;padding:16px}
+.term-card h3{font-size:15px;margin-bottom:8px;color:#1890ff}
+.signal{display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;margin-left:8px}
+.signal-bullish{background:#f6ffed;color:#52c41a}
+.signal-bearish{background:#fff2f0;color:#ff4d4f}
+.signal-neutral{background:#f5f5f5;color:#999}
+.term-card p{font-size:14px;color:#555;line-height:1.7;margin-bottom:8px}
+.factor-list{list-style:none;padding:0}
+.factor-list li{font-size:13px;color:#666;padding:3px 0}
+.factor-list li::before{content:"▸ ";color:#1890ff}
+.risk-alerts{margin:12px 0}
+.risk-alerts li{font-size:14px;color:#ff4d4f;padding:4px 0}
+.risk-alerts li::before{content:"⚠ "}
+.summary-text{font-size:15px;line-height:1.8;color:#333;padding:12px 16px;background:#f9f9f9;border-radius:8px;border-left:4px solid #1890ff}
+.meta-info{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:#999}
+.meta-info span{display:flex;align-items:center;gap:4px}
+.cached-badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:500}
+.cached-yes{background:#e6f7ff;color:#1890ff}
+.cached-no{background:#f6ffed;color:#52c41a}
+/* Tabs for reference data */
+.ref-tabs{display:flex;gap:0;border-bottom:1px solid #e8e8e8;margin-bottom:16px}
+.ref-tab{padding:10px 20px;font-size:14px;color:#666;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.ref-tab:hover{color:#1890ff}
+.ref-tab.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.ref-panel{display:none}
+.ref-panel.active{display:block}
+.ann-item,.rpt-item{padding:12px 0;border-bottom:1px solid #f5f5f5;font-size:14px}
+.ann-item:last-child,.rpt-item:last-child{border-bottom:none}
+.ann-date,.rpt-date{color:#999;font-size:12px;margin-right:10px}
+.ann-title,.rpt-title{color:#333}
+.rpt-org{color:#1890ff;font-size:12px;margin-left:8px}
+.rpt-cat{display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;background:#f0f0f0;color:#666;margin-left:6px}
+.ann-item a,.rpt-item a{color:#333;text-decoration:none}
+.ann-item a:hover,.rpt-item a:hover{color:#1890ff}
+.empty{text-align:center;padding:40px;color:#999;font-size:14px}
+@media(max-width:600px){.term-grid{grid-template-columns:1fr}.search-box{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 D8Q 智能资讯工厂</h1>
+  <p>Intelligent Engine DataFactory</p>
+</div>
+<div class="nav">
+  <a href="/">📰 资讯浏览</a>
+  <a href="/tasks">⚙️ 任务管理</a>
+  <a href="/stock" class="active">📈 股票分析</a>
+  <a href="/report">📑 研报分析</a>
+</div>
+<div class="container">
+  <div class="search-box">
+    <input type="text" id="stockInput" placeholder="输入股票代码或名称，如 603009、北汽蓝谷" onkeydown="if(event.key==='Enter')doAnalyze()">
+    <button class="btn" id="analyzeBtn" onclick="doAnalyze()">🔍 智能评估</button>
+    <button class="btn btn-outline" onclick="doAnalyze(true)">🔄 强制刷新</button>
+  </div>
+  <div id="resultArea"></div>
+</div>
+<script>
+var SIGNAL_MAP={"看多":"bullish","看空":"bearish","中性":"neutral"};
+var RISK_MAP={"低":"low","中":"mid","高":"high"};
+
+function doAnalyze(force){
+  var input=document.getElementById("stockInput").value.trim();
+  if(!input)return;
+  var btn=document.getElementById("analyzeBtn");
+  btn.disabled=true;btn.textContent="分析中...";
+  document.getElementById("resultArea").innerHTML='<div class="loading"><div class="spinner"></div><p style="margin-top:12px">正在采集数据并进行智能分析，请稍候...</p></div>';
+  fetch("/api/stock/comprehensive",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({stock_code:input,scope:"all",force_refresh:!!force})})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    btn.disabled=false;btn.textContent="🔍 智能评估";
+    if(d.error){document.getElementById("resultArea").innerHTML='<div class="result-card"><p style="color:#ff4d4f">❌ '+esc(d.error)+'</p></div>';return}
+    renderResult(d);
+    loadRefData(d.stock_code,d.stock_name||input);
+  })
+  .catch(function(e){btn.disabled=false;btn.textContent="🔍 智能评估";document.getElementById("resultArea").innerHTML='<div class="result-card"><p style="color:#ff4d4f">请求失败: '+esc(e.message)+'</p></div>'})
+}
+
+function renderResult(d){
+  var score=d.score||0;
+  var sc=score>=70?"high":score>=40?"mid":"low";
+  var rl=RISK_MAP[d.risk_level]||"mid";
+  var html='<div class="result-card"><h2><span class="score-badge score-'+sc+'">'+score+'</span>'+esc(d.stock_name||d.stock_code)+' ('+esc(d.stock_code)+') <span class="risk-tag risk-'+rl+'">风险: '+esc(d.risk_level)+'</span></h2>';
+  // Summary
+  if(d.summary)html+='<div class="summary-text">'+esc(d.summary)+'</div>';
+  // Term analysis
+  html+='<div class="term-grid">';
+  var terms=[["short_term","短期(1-4周)"],["mid_term","中期(1-6月)"],["long_term","长期(1-3年)"]];
+  for(var i=0;i<terms.length;i++){
+    var t=d[terms[i][0]];
+    if(!t)continue;
+    var sig=SIGNAL_MAP[t.signal]||"neutral";
+    html+='<div class="term-card"><h3>'+terms[i][1]+'<span class="signal signal-'+sig+'">'+esc(t.signal)+'</span></h3><p>'+esc(t.outlook)+'</p>';
+    if(t.key_factors&&t.key_factors.length){html+='<ul class="factor-list">';for(var j=0;j<t.key_factors.length;j++)html+='<li>'+esc(t.key_factors[j])+'</li>';html+='</ul>'}
+    html+='</div>';
+  }
+  html+='</div>';
+  // Risk alerts
+  if(d.risk_alerts&&d.risk_alerts.length){html+='<ul class="risk-alerts">';for(var k=0;k<d.risk_alerts.length;k++)html+='<li>'+esc(d.risk_alerts[k])+'</li>';html+='</ul>'}
+  // Meta
+  html+='<div class="meta-info">';
+  html+='<span>📅 分析时间: '+(d.analyzed_at||d.cached_at||"-")+'</span>';
+  if(d.cached!==undefined)html+='<span class="cached-badge '+(d.cached?"cached-yes":"cached-no")+'">'+(d.cached?"缓存结论":"最新分析")+'</span>';
+  if(d.trigger_reason&&d.trigger_reason!=="none")html+='<span>触发原因: '+esc(d.trigger_reason)+'</span>';
+  if(d.data_sources){var ds=d.data_sources;html+='<span>数据源: AkShare '+(ds.akshare?"✓":"✗")+' | 公告 '+(ds.cninfo_announcements||0)+'条 | 研报 '+(ds.djyanbao_reports||0)+'篇</span>'}
+  html+='</div></div>';
+  // Reference data area
+  html+='<div class="result-card" id="refCard"><div class="ref-tabs"><span class="ref-tab active" onclick="switchTab(this,\'annPanel\')">📋 近期公告</span><span class="ref-tab" onclick="switchTab(this,\'rptPanel\')">📑 研究报告</span></div><div class="ref-panel active" id="annPanel"><div class="loading"><div class="spinner"></div></div></div><div class="ref-panel" id="rptPanel"><div class="loading"><div class="spinner"></div></div></div></div>';
+  document.getElementById("resultArea").innerHTML=html;
+}
+
+function switchTab(el,panelId){
+  var tabs=el.parentElement.children;
+  for(var i=0;i<tabs.length;i++)tabs[i].classList.remove("active");
+  el.classList.add("active");
+  var panels=el.parentElement.parentElement.querySelectorAll(".ref-panel");
+  for(var j=0;j<panels.length;j++)panels[j].classList.remove("active");
+  document.getElementById(panelId).classList.add("active");
+}
+
+function loadRefData(code,name){
+  // Load announcements
+  fetch("/api/stock/announcements?stock_code="+encodeURIComponent(code)+"&days=30")
+  .then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById("annPanel");
+    var anns=(d.announcements||d.data&&d.data.announcements||[]);
+    if(!anns.length){el.innerHTML='<div class="empty">暂无近期公告</div>';return}
+    var h="";
+    for(var i=0;i<anns.length;i++){
+      var a=anns[i];
+      h+='<div class="ann-item"><span class="ann-date">'+esc(a.date)+'</span>';
+      if(a.detail_url)h+='<a href="'+esc(a.detail_url)+'" target="_blank" class="ann-title">'+esc(a.title)+'</a>';
+      else h+='<span class="ann-title">'+esc(a.title)+'</span>';
+      h+='</div>';
+    }
+    el.innerHTML=h;
+  }).catch(function(){document.getElementById("annPanel").innerHTML='<div class="empty">公告加载失败</div>'});
+  // Load reports
+  fetch("/api/stock/reports?keyword="+encodeURIComponent(name||code))
+  .then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById("rptPanel");
+    var rpts=(d.reports||d.data&&d.data.reports||[]);
+    if(!rpts.length){el.innerHTML='<div class="empty">暂无相关研报</div>';return}
+    var h="";
+    for(var i=0;i<rpts.length;i++){
+      var r=rpts[i];
+      h+='<div class="rpt-item"><span class="rpt-date">'+esc(r.date)+'</span>';
+      if(r.detail_url)h+='<a href="'+esc(r.detail_url)+'" target="_blank" class="rpt-title">'+esc(r.title)+'</a>';
+      else h+='<span class="rpt-title">'+esc(r.title)+'</span>';
+      if(r.org)h+='<span class="rpt-org">'+esc(r.org)+'</span>';
+      if(r.category)h+='<span class="rpt-cat">'+esc(r.category)+'</span>';
+      h+='</div>';
+    }
+    el.innerHTML=h;
+  }).catch(function(){document.getElementById("rptPanel").innerHTML='<div class="empty">研报加载失败</div>'});
+}
+
+function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
+</script>
+</body>
+</html>

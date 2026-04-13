@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q 智能资讯工厂 - 研报分析</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent;transition:all .2s}
+.nav a:hover{color:#1890ff}
+.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+.search-box{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.search-row{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.search-row input[type=text]{flex:1;padding:10px 16px;border:1px solid #d9d9d9;border-radius:8px;font-size:15px;outline:none}
+.search-row input:focus{border-color:#1890ff;box-shadow:0 0 0 2px rgba(24,144,255,.1)}
+.search-row select{padding:10px 12px;border:1px solid #d9d9d9;border-radius:8px;font-size:14px;outline:none}
+.btn{padding:10px 20px;background:#1890ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500;transition:background .2s;white-space:nowrap}
+.btn:hover{background:#40a9ff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-green{background:#52c41a}.btn-green:hover{background:#73d13d}
+.btn-outline{background:#fff;color:#1890ff;border:1px solid #1890ff}
+.btn-outline:hover{background:#e6f7ff}
+.batch-area{display:flex;gap:12px;align-items:center;font-size:13px;color:#888}
+.batch-area label{cursor:pointer;padding:8px 16px;border:1px dashed #d9d9d9;border-radius:8px;transition:all .2s}
+.batch-area label:hover{border-color:#1890ff;color:#1890ff}
+.batch-area input[type=file]{display:none}
+.batch-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.batch-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#f0f5ff;border:1px solid #adc6ff;border-radius:12px;font-size:12px;color:#1890ff}
+.batch-tag .remove{cursor:pointer;font-weight:700;margin-left:2px}
+.loading{text-align:center;padding:40px;color:#999}
+.loading .spinner{display:inline-block;width:28px;height:28px;border:3px solid #e8e8e8;border-top-color:#1890ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.result-section{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.result-section h3{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.result-section h3 .count{font-size:13px;color:#999;font-weight:400}
+.src-badge{display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:500}
+.src-djyanbao{background:#e6f7ff;color:#1890ff}
+.src-hibor{background:#fff7e6;color:#fa8c16}
+.src-cninfo{background:#f6ffed;color:#52c41a}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:10px 8px;border-bottom:2px solid #f0f0f0;color:#888;font-weight:500;font-size:13px}
+td{padding:10px 8px;border-bottom:1px solid #f5f5f5;vertical-align:top}
+tr:hover td{background:#fafafa}
+td a{color:#333;text-decoration:none}
+td a:hover{color:#1890ff}
+.empty{text-align:center;padding:40px;color:#999;font-size:14px}
+.export-bar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:16px}
+.progress-text{font-size:13px;color:#1890ff;margin-left:12px}
+@media(max-width:600px){.search-row{flex-direction:column}.batch-area{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 D8Q 智能资讯工厂</h1>
+  <p>Intelligent Engine DataFactory</p>
+</div>
+<div class="nav">
+  <a href="/">📰 资讯浏览</a>
+  <a href="/tasks">⚙️ 任务管理</a>
+  <a href="/stock">📈 股票分析</a>
+  <a href="/report" class="active">📑 研报分析</a>
+</div>
+<div class="container">
+  <div class="search-box">
+    <div class="search-row">
+      <input type="text" id="queryInput" placeholder="输入公司名称或股票代码，多个用逗号分隔，如：贵州茅台,宁德时代,603019">
+      <select id="daysSelect">
+        <option value="7">近一周</option>
+        <option value="14">近两周</option>
+        <option value="30" selected>近一月</option>
+      </select>
+      <button class="btn" id="searchBtn" onclick="doSearch()">🔍 查询研报</button>
+    </div>
+    <div class="batch-area">
+      <label>📄 上传列表 (txt/csv)<input type="file" id="fileInput" accept=".txt,.csv" onchange="handleFile(this)"></label>
+      <span id="fileInfo"></span>
+    </div>
+    <div class="batch-tags" id="tagArea"></div>
+  </div>
+  <div class="export-bar" id="exportBar" style="display:none">
+    <button class="btn btn-green" onclick="exportCSV()">📥 导出CSV</button>
+  </div>
+  <div id="resultArea"></div>
+</div>
+<script>
+var allResults=[];
+var keywords=[];
+
+function doSearch(){
+  var input=document.getElementById("queryInput").value.trim();
+  if(!input&&!keywords.length)return;
+  var inputKws=input?input.split(/[,，\s]+/).filter(function(s){return s.trim()}):[]; 
+  var merged=keywords.concat(inputKws);
+  // dedupe
+  var seen={},unique=[];
+  for(var i=0;i<merged.length;i++){var k=merged[i].trim();if(k&&!seen[k]){seen[k]=1;unique.push(k)}}
+  if(!unique.length)return;
+  var days=document.getElementById("daysSelect").value;
+  var btn=document.getElementById("searchBtn");
+  btn.disabled=true;btn.textContent="查询中...";
+  document.getElementById("resultArea").innerHTML='<div class="loading"><div class="spinner"></div><p style="margin-top:12px">正在从洞见研报、慧博投研、巨潮资讯三个数据源查询，请稍候...<span class="progress-text" id="progressText"></span></p></div>';
+  document.getElementById("exportBar").style.display="none";
+  allResults=[];
+  fetch("/api/report/stock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({keywords:unique,days:parseInt(days)})})
+  .then(function(r){return r.json()})
+  .then(function(d){
+    btn.disabled=false;btn.textContent="🔍 查询研报";
+    allResults=d.results||[];
+    renderResults(allResults);
+    if(allResults.length)document.getElementById("exportBar").style.display="flex";
+  })
+  .catch(function(e){btn.disabled=false;btn.textContent="🔍 查询研报";document.getElementById("resultArea").innerHTML='<div class="empty">查询失败: '+esc(e.message)+'</div>'});
+}
+
+function handleFile(input){
+  var file=input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var lines=text.split(/[\r\n,，]+/).map(function(s){return s.trim()}).filter(function(s){return s&&s.length<20});
+    keywords=lines;
+    renderTags();
+    document.getElementById("fileInfo").textContent=file.name+" ("+lines.length+"个)";
+  };
+  reader.readAsText(file);
+}
+
+function renderTags(){
+  var html="";
+  for(var i=0;i<keywords.length;i++){
+    html+='<span class="batch-tag">'+esc(keywords[i])+' <span class="remove" onclick="removeTag('+i+')">×</span></span>';
+  }
+  document.getElementById("tagArea").innerHTML=html;
+}
+
+function removeTag(i){keywords.splice(i,1);renderTags()}
+
+function renderResults(results){
+  if(!results.length){document.getElementById("resultArea").innerHTML='<div class="empty">未查询到研报数据</div>';return}
+  var html="";
+  for(var i=0;i<results.length;i++){
+    var r=results[i];
+    var name=r.stock_name||r.stock_code||"";
+    var reports=r.reports||[];
+    var anns=r.announcements||[];
+    var ss=r.sources_summary||{};
+    html+='<div class="result-section"><h3>'+esc(name)+(r.stock_code&&r.stock_code!==name?" ("+esc(r.stock_code)+")":"")+'<span class="count">研报 '+reports.length+'篇 | 公告 '+anns.length+'条';
+    if(ss.djyanbao)html+=' | <span class="src-badge src-djyanbao">洞见 '+ss.djyanbao+'</span>';
+    if(ss.hibor)html+=' | <span class="src-badge src-hibor">慧博 '+ss.hibor+'</span>';
+    html+='</span></h3>';
+    if(reports.length){
+      html+='<table><thead><tr><th style="width:50%">研报名称</th><th>研报单位</th><th>日期</th><th>来源</th></tr></thead><tbody>';
+      for(var j=0;j<reports.length;j++){
+        var rpt=reports[j];
+        var src=rpt.source||"";
+        var srcCls="src-"+src;
+        html+='<tr><td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank">'+esc(rpt.title)+'</a>':esc(rpt.title))+'</td>';
+        html+='<td>'+esc(rpt.org||"-")+'</td><td>'+esc(rpt.date||"-")+'</td>';
+        html+='<td><span class="src-badge '+srcCls+'">'+esc(src)+'</span></td></tr>';
+      }
+      html+='</tbody></table>';
+    }
+    if(anns.length){
+      html+='<details style="margin-top:12px"><summary style="cursor:pointer;color:#1890ff;font-size:13px">📋 公告 ('+anns.length+'条)</summary><table><thead><tr><th>公告标题</th><th>日期</th></tr></thead><tbody>';
+      for(var k=0;k<anns.length;k++){
+        var a=anns[k];
+        html+='<tr><td>'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank">'+esc(a.title)+'</a>':esc(a.title))+'</td><td>'+esc(a.date||"-")+'</td></tr>';
+      }
+      html+='</tbody></table></details>';
+    }
+    if(!reports.length&&!anns.length)html+='<div class="empty">该股票暂无研报和公告数据</div>';
+    html+='</div>';
+  }
+  document.getElementById("resultArea").innerHTML=html;
+}
+
+function exportCSV(){
+  if(!allResults.length)return;
+  var rows=[["公司/股票","研报名称","研报单位","研报日期","研报概要","研报地址","来源"]];
+  for(var i=0;i<allResults.length;i++){
+    var r=allResults[i];
+    var name=r.stock_name||r.stock_code||"";
+    var reports=r.reports||[];
+    var anns=r.announcements||[];
+    for(var j=0;j<reports.length;j++){
+      var rpt=reports[j];
+      rows.push([name,rpt.title||"",rpt.org||"",rpt.date||"",rpt.summary||rpt.title||"",rpt.detail_url||"",rpt.source||""]);
+    }
+    for(var k=0;k<anns.length;k++){
+      var a=anns[k];
+      rows.push([name,a.title||"","巨潮资讯",a.date||"",a.title||"",a.detail_url||"","cninfo"]);
+    }
+  }
+  var csv="\uFEFF";
+  for(var r=0;r<rows.length;r++){
+    csv+=rows[r].map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(",")+"\n";
+  }
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;a.download="研报分析_"+new Date().toISOString().slice(0,10)+".csv";
+  a.click();URL.revokeObjectURL(url);
+}
+
+function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
+
+document.getElementById("queryInput").addEventListener("keydown",function(e){if(e.key==="Enter")doSearch()});
+</script>
+</body>
+</html>
