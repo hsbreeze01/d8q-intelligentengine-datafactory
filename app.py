@@ -8,6 +8,7 @@ app = Flask(__name__)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
+PUBLISHER_API = "http://localhost:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 
@@ -128,6 +129,21 @@ def run_task(task_id):
 
 
 
+def _publisher_request(method, path, data=None):
+    """Proxy request to InfoPublisher API"""
+    url = PUBLISHER_API + path
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            return json.loads(resp.read()), resp.status
+    except urllib.error.HTTPError as e:
+        return json.loads(e.read()), e.code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
 def shark_request(method, path, data=None):
     """Proxy request to StockShark API"""
     url = SHARK_API + urllib.parse.quote(path, safe='/:?=&')
@@ -135,7 +151,7 @@ def shark_request(method, path, data=None):
     req = urllib.request.Request(url, data=body, method=method)
     req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
         return json.loads(e.read()), e.code
@@ -318,7 +334,7 @@ def run_content_task(task_id):
         )
         return jsonify(result), 200
     elif task_type == "publish":
-        # 读取最新文章并返回发布数据
+        # 读取最新文章，调用 infopublisher 服务发布
         subject = task.get("subject", "")
         subject_dir = os.path.join(ARTICLES_DIR, subject)
         if not os.path.exists(subject_dir):
@@ -331,14 +347,17 @@ def run_content_task(task_id):
                 if files:
                     fp = os.path.join(dp, sorted(files)[-1])
                     with open(fp, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    return jsonify({
-                        "status": "ready",
-                        "subject": subject,
-                        "file": files[-1],
-                        "content_preview": content[:500],
-                        "channel": task.get("channel", "xiaohongshu"),
-                    }), 200
+                        md_content = f.read()
+                    # 从markdown提取标题和正文
+                    lines = md_content.strip().split("\n")
+                    title = lines[0].lstrip("# ").strip()[:20] if lines else subject
+                    body = "\n".join(l for l in lines[1:] if not l.startswith(">") and l.strip())[:1000]
+                    # 调用 infopublisher API
+                    pub_data = {"platform": task.get("channel", "xiaohongshu"), "title": title, "content": body}
+                    pub_result, pub_code = _publisher_request("POST", "/api/publish", pub_data)
+                    pub_result["file"] = files[-1]
+                    pub_result["subject"] = subject
+                    return jsonify(pub_result), 200
         return jsonify({"error": "无文章可发布"}), 404
 
     return jsonify({"error": "未知任务类型"}), 400
