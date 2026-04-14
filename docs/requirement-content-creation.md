@@ -63,4 +63,4 @@ articles/
 | T-002 | 文章目录管理 API | DONE |
 | T-003 | 任务管理页面扩展（创作+发布任务） | DONE |
 | T-004 | 后端创作/发布任务 API | DONE |
-| T-005 | 发布任务对接 infopublisher | TODO |
+| T-005 | 发布任务对接 infopublisher | DONE |
