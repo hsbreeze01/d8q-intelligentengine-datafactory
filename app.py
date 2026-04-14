@@ -201,5 +201,148 @@ def report_stock_query():
     return jsonify({"results": results}), 200
 
 
+
+# --- Content Creation API ---
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+
+ARTICLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "articles")
+
+
+@app.route("/api/content/create", methods=["POST"])
+def content_create():
+    """手动触发内容创作"""
+    from datafactory.content.creator import create_article
+    body = request.json or {}
+    subject = body.get("subject", "")
+    style = body.get("style", "news_brief")
+    freq = body.get("freq", "daily")
+    if not subject:
+        return jsonify({"error": "subject必填"}), 400
+    result = create_article(subject, style=style, freq=freq)
+    return jsonify(result), 200
+
+
+@app.route("/api/content/articles", methods=["GET"])
+def content_articles():
+    """查看已生成的文章列表"""
+    articles = []
+    if os.path.exists(ARTICLES_DIR):
+        for subject in sorted(os.listdir(ARTICLES_DIR)):
+            sp = os.path.join(ARTICLES_DIR, subject)
+            if not os.path.isdir(sp):
+                continue
+            for date_dir in sorted(os.listdir(sp), reverse=True):
+                dp = os.path.join(sp, date_dir)
+                if not os.path.isdir(dp):
+                    continue
+                for f in sorted(os.listdir(dp)):
+                    if f.endswith(".md"):
+                        fp = os.path.join(dp, f)
+                        articles.append({
+                            "subject": subject,
+                            "date": date_dir,
+                            "filename": f,
+                            "path": os.path.relpath(fp, ARTICLES_DIR),
+                            "size": os.path.getsize(fp),
+                        })
+    return jsonify({"articles": articles, "total": len(articles)}), 200
+
+
+@app.route("/api/content/article", methods=["GET"])
+def content_article_read():
+    """读取文章内容"""
+    path = request.args.get("path", "")
+    fp = os.path.join(ARTICLES_DIR, path)
+    if not os.path.exists(fp) or not fp.startswith(ARTICLES_DIR):
+        return jsonify({"error": "文章不存在"}), 404
+    with open(fp, "r", encoding="utf-8") as f:
+        return jsonify({"content": f.read(), "path": path}), 200
+
+
+# --- Creation/Publish Task Scheduler ---
+TASK_STORE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "content_tasks.json")
+
+
+def _load_content_tasks():
+    if os.path.exists(TASK_STORE_PATH):
+        with open(TASK_STORE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def _save_content_tasks(tasks):
+    os.makedirs(os.path.dirname(TASK_STORE_PATH), exist_ok=True)
+    with open(TASK_STORE_PATH, "w", encoding="utf-8") as f:
+        json.dump(tasks, f, ensure_ascii=False, indent=2)
+
+
+@app.route("/api/content/tasks", methods=["GET"])
+def list_content_tasks():
+    return jsonify(_load_content_tasks()), 200
+
+
+@app.route("/api/content/tasks", methods=["POST"])
+def create_content_task():
+    import uuid
+    body = request.json or {}
+    body["id"] = str(uuid.uuid4())[:8]
+    body["created_at"] = __import__("datetime").datetime.now().isoformat()
+    tasks = _load_content_tasks()
+    tasks.append(body)
+    _save_content_tasks(tasks)
+    return jsonify(body), 201
+
+
+@app.route("/api/content/tasks/<task_id>", methods=["DELETE"])
+def delete_content_task(task_id):
+    tasks = [t for t in _load_content_tasks() if t.get("id") != task_id]
+    _save_content_tasks(tasks)
+    return jsonify({"ok": True}), 200
+
+
+@app.route("/api/content/tasks/<task_id>/run", methods=["POST"])
+def run_content_task(task_id):
+    tasks = _load_content_tasks()
+    task = next((t for t in tasks if t.get("id") == task_id), None)
+    if not task:
+        return jsonify({"error": "任务不存在"}), 404
+
+    task_type = task.get("type", "creation")
+    if task_type == "creation":
+        from datafactory.content.creator import create_article
+        result = create_article(
+            task.get("subject", ""),
+            style=task.get("style", "news_brief"),
+            freq=task.get("freq", "daily"),
+        )
+        return jsonify(result), 200
+    elif task_type == "publish":
+        # 读取最新文章并返回发布数据
+        subject = task.get("subject", "")
+        subject_dir = os.path.join(ARTICLES_DIR, subject)
+        if not os.path.exists(subject_dir):
+            return jsonify({"error": "无文章可发布"}), 404
+        dates = sorted(os.listdir(subject_dir), reverse=True)
+        for d in dates:
+            dp = os.path.join(subject_dir, d)
+            if os.path.isdir(dp):
+                files = [f for f in os.listdir(dp) if f.endswith(".md")]
+                if files:
+                    fp = os.path.join(dp, sorted(files)[-1])
+                    with open(fp, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    return jsonify({
+                        "status": "ready",
+                        "subject": subject,
+                        "file": files[-1],
+                        "content_preview": content[:500],
+                        "channel": task.get("channel", "xiaohongshu"),
+                    }), 200
+        return jsonify({"error": "无文章可发布"}), 404
+
+    return jsonify({"error": "未知任务类型"}), 400
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8088)
