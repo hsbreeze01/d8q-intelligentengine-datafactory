@@ -68,7 +68,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 
 <!-- 采集任务弹窗 -->
 <div class="modal-overlay" id="collectModal"><div class="modal">
-  <h3>新建采集任务</h3>
+  <h3 id="cModalTitle">新建采集任务</h3>
+  <input type="hidden" id="cEditId">
   <div class="form-group"><label>采集主题 *</label><input type="text" id="cSubject" placeholder="如：AI、具身智能"></div>
   <div class="form-group"><label>数据来源</label><div class="checkbox-group" id="cSources">
     <label><input type="checkbox" value="cailianshe" checked> 财联社</label>
@@ -77,16 +78,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <label><input type="checkbox" value="weibo" checked> 微博</label>
   </div></div>
   <div class="form-group"><label>调度频率</label><select id="cCron">
-    <option value="0 */2 * * *" selected>每隔2小时</option><option value="0 */4 * * *">每隔4小时</option>
-    <option value="0 8,12,18 * * *">每天3次</option><option value="0 9 * * *">每天1次(9点)</option>
-  </select></div>
+    <option value="0 */1 * * *">每隔1小时</option>
+    <option value="0 */2 * * *" selected>每隔2小时</option>
+    <option value="0 */3 * * *">每隔3小时</option>
+    <option value="0 */4 * * *">每隔4小时</option>
+    <option value="0 */6 * * *">每隔6小时</option>
+    <option value="0 */8 * * *">每隔8小时</option>
+    <option value="0 */12 * * *">每隔12小时</option>
+    <option value="0 8,12,18 * * *">每天3次（8、12、18点）</option>
+    <option value="0 8,20 * * *">每天2次（8、20点）</option>
+    <option value="0 9 * * *">每天1次（9点）</option>
+    <option value="0 9 * * 1-5">工作日每天1次（9点）</option>
+    <option value="0 9 * * 0">每周日1次（9点）</option>
+  </select>
+  <div class="hint">修改调度频率将在第二天生效。</div></div>
   <div class="form-group"><label>每次最大采集数</label><input type="number" id="cMax" value="20" min="1" max="100"></div>
   <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAll()">取消</button><button class="btn" onclick="saveCollect()">保存</button></div>
 </div></div>
 
 <!-- 创作任务弹窗 -->
 <div class="modal-overlay" id="creationModal"><div class="modal">
-  <h3>新建创作任务</h3>
+  <h3 id="crModalTitle">新建创作任务</h3>
+  <input type="hidden" id="crEditId">
   <div class="form-group"><label>主题 *</label><select id="crSubject"></select></div>
   <div class="form-group"><label>文章风格</label><select id="crStyle">
     <option value="news_brief">📋 资讯速递（简洁列表）</option>
@@ -97,24 +110,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <option value="daily">每日（过去24小时资讯）</option>
     <option value="weekly">每周（过去7天资讯）</option>
     <option value="monthly">每月（过去30天资讯）</option>
-  </select></div>
+  </select>
+  <div class="hint">修改频率将在下一个任务周期生效。</div></div>
   <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAll()">取消</button><button class="btn btn-purple" onclick="saveCreation()">保存</button></div>
 </div></div>
 
 <!-- 发布任务弹窗 -->
 <div class="modal-overlay" id="publishModal"><div class="modal">
-  <h3>新建发布任务</h3>
+  <h3 id="pubModalTitle">新建发布任务</h3>
+  <input type="hidden" id="pubEditId">
   <div class="form-group"><label>主题 *</label><select id="pubSubject"></select></div>
   <div class="form-group"><label>发布渠道</label><select id="pubChannel"><option value="xiaohongshu">小红书</option></select></div>
   <div class="form-group"><label>发布频率</label><select id="pubFreq">
     <option value="daily">每日</option><option value="weekly">每周</option><option value="monthly">每月</option>
-  </select></div>
+  </select>
+  <div class="hint">修改频率将在下一个任务周期生效。</div></div>
   <div class="form-group"><label>发布账号</label><input type="text" value="内置账号（未来材料研究所）" disabled><div class="hint">当前使用内置账号</div></div>
   <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAll()">取消</button><button class="btn btn-orange" onclick="savePublish()">保存</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
 <script>
+var ALL_SOURCES=["cailianshe","nbd","36kr","weibo"];
 var STYLE_NAMES={"news_brief":"资讯速递","deep_analysis":"深度分析","investment_weekly":"投资周报"};
 var STYLE_CLS={"news_brief":"style-news","deep_analysis":"style-deep","investment_weekly":"style-invest"};
 var FREQ_NAMES={"daily":"每日","weekly":"每周","monthly":"每月"};
@@ -123,7 +140,6 @@ function api(u,o){o=o||{};o.headers={"Content-Type":"application/json"};return f
 function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
 function toast(m,t){var e=document.getElementById("toast");e.textContent=m;e.className="toast toast-"+(t||"info")+" show";setTimeout(function(){e.classList.remove("show")},3000)}
 function closeAll(){document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("show")})}
-
 function loadSubjects(id){
   api("/api/meta").then(function(d){
     var s=document.getElementById(id);s.innerHTML="";
@@ -131,7 +147,7 @@ function loadSubjects(id){
   })
 }
 
-// 采集任务
+// ========== 采集任务 ==========
 function loadCollect(){
   api("/api/tasks").then(function(tasks){
     if(!tasks||!tasks.length){document.getElementById("collectTable").innerHTML='<div class="empty">暂无采集任务</div>';return}
@@ -140,23 +156,49 @@ function loadCollect(){
       var src="";(t.sources||[]).forEach(function(s){src+='<span class="source-tag">'+(SOURCE_NAMES[s]||s)+'</span>'});
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+src+'</td><td>'+esc(t.cron_expr)+'</td><td>'+t.max_results+'</td>';
       h+='<td>'+(t.enabled?'<span class="status-on">● 运行中</span>':'<span class="status-off">● 停止</span>')+'</td>';
-      h+='<td><div class="actions"><button class="btn btn-sm btn-success" onclick="runCollect(\''+esc(t.id)+'\')">执行</button>';
-      h+='<button class="btn btn-sm btn-danger" onclick="delCollect(\''+esc(t.id)+'\')">删除</button></div></td></tr>'
+      h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm btn-ghost" onclick="editCollect(\''+esc(t.id)+'\')">编辑</button>';
+      h+='<button class="btn btn-sm btn-success" onclick="runCollect(\''+esc(t.id)+'\')">执行</button>';
+      h+='<button class="btn btn-sm btn-danger" onclick="delCollect(\''+esc(t.id)+'\')">删除</button>';
+      h+='</div></td></tr>'
     });
     document.getElementById("collectTable").innerHTML=h+'</table>'
   })
 }
-function openCollectModal(){document.getElementById("collectModal").classList.add("show")}
+function openCollectModal(task){
+  document.getElementById("cEditId").value=task?task.id:"";
+  document.getElementById("cModalTitle").textContent=task?"编辑采集任务":"新建采集任务";
+  document.getElementById("cSubject").value=task?task.subject:"";
+  document.getElementById("cCron").value=task?task.cron_expr:"0 */2 * * *";
+  document.getElementById("cMax").value=task?task.max_results:20;
+  var checks=document.querySelectorAll("#cSources input");
+  var taskSrc=task?task.sources:ALL_SOURCES;
+  checks.forEach(function(c){c.checked=taskSrc.indexOf(c.value)>-1});
+  document.getElementById("collectModal").classList.add("show")
+}
+function editCollect(id){
+  api("/api/tasks").then(function(tasks){
+    for(var i=0;i<tasks.length;i++){if(tasks[i].id===id){openCollectModal(tasks[i]);return}}
+  })
+}
 function saveCollect(){
   var s=document.getElementById("cSubject").value.trim();if(!s){toast("请输入主题","error");return}
   var src=[];document.querySelectorAll("#cSources input:checked").forEach(function(c){src.push(c.value)});
-  api("/api/tasks",{method:"POST",body:JSON.stringify({subject:s,sources:src,cron_expr:document.getElementById("cCron").value,max_results:parseInt(document.getElementById("cMax").value)||20})})
-  .then(function(){closeAll();toast("采集任务已创建","success");loadCollect()})
+  if(!src.length){toast("请至少选择一个数据来源","error");return}
+  var body={subject:s,sources:src,cron_expr:document.getElementById("cCron").value,max_results:parseInt(document.getElementById("cMax").value)||20};
+  var editId=document.getElementById("cEditId").value;
+  if(editId){
+    api("/api/tasks/"+editId,{method:"DELETE"}).then(function(){
+      return api("/api/tasks",{method:"POST",body:JSON.stringify(body)})
+    }).then(function(){closeAll();toast("采集任务已更新，调度变更将在第二天生效","success");loadCollect()})
+  }else{
+    api("/api/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){closeAll();toast("采集任务已创建","success");loadCollect()})
+  }
 }
 function runCollect(id){toast("执行中...","info");api("/api/tasks/"+id+"/run",{method:"POST"}).then(function(r){toast("完成，采集"+(r.total_count||0)+"条","success")})}
 function delCollect(id){if(!confirm("确定删除？"))return;api("/api/tasks/"+id,{method:"DELETE"}).then(function(){toast("已删除","success");loadCollect()})}
 
-// 创作任务
+// ========== 创作任务 ==========
 function loadCreation(){
   api("/api/content/tasks").then(function(tasks){
     var ct=tasks.filter(function(t){return t.type==="creation"});
@@ -167,23 +209,51 @@ function loadCreation(){
       h+='<td><span class="style-tag '+(STYLE_CLS[t.style]||"")+'">'+(STYLE_NAMES[t.style]||t.style)+'</span></td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
       h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
-      h+='<td><div class="actions"><button class="btn btn-sm btn-success" onclick="runCreation(\''+esc(t.id)+'\')">立即生成</button>';
-      h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button></div></td></tr>'
+      h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm btn-ghost" onclick="editCreation(\''+esc(t.id)+'\')">编辑</button>';
+      h+='<button class="btn btn-sm btn-success" onclick="runCreation(\''+esc(t.id)+'\')">立即生成</button>';
+      h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button>';
+      h+='</div></td></tr>'
     });
     document.getElementById("creationTable").innerHTML=h+'</table>'
   })
 }
-function openCreationModal(){loadSubjects("crSubject");document.getElementById("creationModal").classList.add("show")}
+function openCreationModal(task){
+  loadSubjects("crSubject");
+  document.getElementById("crEditId").value=task?task.id:"";
+  document.getElementById("crModalTitle").textContent=task?"编辑创作任务":"新建创作任务";
+  if(task){
+    setTimeout(function(){document.getElementById("crSubject").value=task.subject},300);
+    document.getElementById("crStyle").value=task.style||"news_brief";
+    document.getElementById("crFreq").value=task.freq||"daily";
+  }else{
+    document.getElementById("crStyle").value="news_brief";
+    document.getElementById("crFreq").value="daily";
+  }
+  document.getElementById("creationModal").classList.add("show")
+}
+function editCreation(id){
+  api("/api/content/tasks").then(function(tasks){
+    for(var i=0;i<tasks.length;i++){if(tasks[i].id===id){openCreationModal(tasks[i]);return}}
+  })
+}
 function saveCreation(){
   var s=document.getElementById("crSubject").value;if(!s){toast("请选择主题","error");return}
-  api("/api/content/tasks",{method:"POST",body:JSON.stringify({type:"creation",subject:s,style:document.getElementById("crStyle").value,freq:document.getElementById("crFreq").value})})
-  .then(function(){closeAll();toast("创作任务已创建","success");loadCreation()})
+  var body={type:"creation",subject:s,style:document.getElementById("crStyle").value,freq:document.getElementById("crFreq").value};
+  var editId=document.getElementById("crEditId").value;
+  if(editId){
+    api("/api/content/tasks/"+editId,{method:"DELETE"}).then(function(){
+      return api("/api/content/tasks",{method:"POST",body:JSON.stringify(body)})
+    }).then(function(){closeAll();toast("创作任务已更新，将在下一个周期生效","success");loadCreation()})
+  }else{
+    api("/api/content/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){closeAll();toast("创作任务已创建","success");loadCreation()})
+  }
 }
 function runCreation(id){toast("生成中...","info");api("/api/content/tasks/"+id+"/run",{method:"POST"}).then(function(r){
   if(r.error)toast(r.error,"error");else toast("已生成: "+r.title+" ("+r.news_count+"条资讯)","success")
 })}
 
-// 发布任务
+// ========== 发布任务 ==========
 function loadPublish(){
   api("/api/content/tasks").then(function(tasks){
     var pt=tasks.filter(function(t){return t.type==="publish"});
@@ -193,17 +263,45 @@ function loadPublish(){
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+esc(t.channel||"小红书")+'</td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
       h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
-      h+='<td><div class="actions"><button class="btn btn-sm btn-orange" onclick="runPublish(\''+esc(t.id)+'\')">立即发布</button>';
-      h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button></div></td></tr>'
+      h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm btn-ghost" onclick="editPublish(\''+esc(t.id)+'\')">编辑</button>';
+      h+='<button class="btn btn-sm btn-orange" onclick="runPublish(\''+esc(t.id)+'\')">立即发布</button>';
+      h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button>';
+      h+='</div></td></tr>'
     });
     document.getElementById("publishTable").innerHTML=h+'</table>'
   })
 }
-function openPublishModal(){loadSubjects("pubSubject");document.getElementById("publishModal").classList.add("show")}
+function openPublishModal(task){
+  loadSubjects("pubSubject");
+  document.getElementById("pubEditId").value=task?task.id:"";
+  document.getElementById("pubModalTitle").textContent=task?"编辑发布任务":"新建发布任务";
+  if(task){
+    setTimeout(function(){document.getElementById("pubSubject").value=task.subject},300);
+    document.getElementById("pubChannel").value=task.channel||"xiaohongshu";
+    document.getElementById("pubFreq").value=task.freq||"daily";
+  }else{
+    document.getElementById("pubChannel").value="xiaohongshu";
+    document.getElementById("pubFreq").value="daily";
+  }
+  document.getElementById("publishModal").classList.add("show")
+}
+function editPublish(id){
+  api("/api/content/tasks").then(function(tasks){
+    for(var i=0;i<tasks.length;i++){if(tasks[i].id===id){openPublishModal(tasks[i]);return}}
+  })
+}
 function savePublish(){
   var s=document.getElementById("pubSubject").value;if(!s){toast("请选择主题","error");return}
-  api("/api/content/tasks",{method:"POST",body:JSON.stringify({type:"publish",subject:s,channel:document.getElementById("pubChannel").value,freq:document.getElementById("pubFreq").value})})
-  .then(function(){closeAll();toast("发布任务已创建","success");loadPublish()})
+  var body={type:"publish",subject:s,channel:document.getElementById("pubChannel").value,freq:document.getElementById("pubFreq").value};
+  var editId=document.getElementById("pubEditId").value;
+  if(editId){
+    api("/api/content/tasks/"+editId,{method:"DELETE"}).then(function(){
+      return api("/api/content/tasks",{method:"POST",body:JSON.stringify(body)})
+    }).then(function(){closeAll();toast("发布任务已更新，将在下一个周期生效","success");loadPublish()})
+  }else{
+    api("/api/content/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){closeAll();toast("发布任务已创建","success");loadPublish()})
+  }
 }
 function runPublish(id){toast("准备发布...","info");api("/api/content/tasks/"+id+"/run",{method:"POST"}).then(function(r){
   if(r.error)toast(r.error,"error");else toast("状态: "+r.status,"success")
