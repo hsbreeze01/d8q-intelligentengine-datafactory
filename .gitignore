@@ -2,3 +2,4 @@ __pycache__/
 articles/
 app.py.bak
 data/content_tasks.json
+venv/
