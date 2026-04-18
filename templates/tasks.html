@@ -203,13 +203,15 @@ function loadCreation(){
   api("/api/content/tasks").then(function(tasks){
     var ct=tasks.filter(function(t){return t.type==="creation"});
     if(!ct.length){document.getElementById("creationTable").innerHTML='<div class="empty">暂无创作任务</div>';return}
-    var h='<table><tr><th>主题</th><th>风格</th><th>频率</th><th>创建时间</th><th>操作</th></tr>';
+    var h='<table><tr><th>主题</th><th>风格</th><th>频率</th><th>状态</th><th>创建时间</th><th>操作</th></tr>';
     ct.forEach(function(t){
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td>';
       h+='<td><span class="style-tag '+(STYLE_CLS[t.style]||"")+'">'+(STYLE_NAMES[t.style]||t.style)+'</span></td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
+      h+='<td>'+(t.status==="paused"?'<span class="status-off">● 已暂停</span>':'<span class="status-on">● 运行中</span>')+'</td>';
       h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
       h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm '+(t.status==="paused"?'btn-success" onclick="toggleTask(\''+esc(t.id)+'\',\'creation\')">启用':'btn-ghost" onclick="toggleTask(\''+esc(t.id)+'\',\'creation\')">暂停')+'</button>';
       h+='<button class="btn btn-sm btn-ghost" onclick="editCreation(\''+esc(t.id)+'\')">编辑</button>';
       h+='<button class="btn btn-sm btn-success" onclick="runCreation(\''+esc(t.id)+'\')">立即生成</button>';
       h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button>';
@@ -258,12 +260,14 @@ function loadPublish(){
   api("/api/content/tasks").then(function(tasks){
     var pt=tasks.filter(function(t){return t.type==="publish"});
     if(!pt.length){document.getElementById("publishTable").innerHTML='<div class="empty">暂无发布任务</div>';return}
-    var h='<table><tr><th>主题</th><th>渠道</th><th>频率</th><th>创建时间</th><th>操作</th></tr>';
+    var h='<table><tr><th>主题</th><th>渠道</th><th>频率</th><th>状态</th><th>创建时间</th><th>操作</th></tr>';
     pt.forEach(function(t){
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+esc(t.channel||"小红书")+'</td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
+      h+='<td>'+(t.status==="paused"?'<span class="status-off">● 已暂停</span>':'<span class="status-on">● 运行中</span>')+'</td>';
       h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
       h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm '+(t.status==="paused"?'btn-success" onclick="toggleTask(\''+esc(t.id)+'\',\'publish\')">启用':'btn-ghost" onclick="toggleTask(\''+esc(t.id)+'\',\'publish\')">暂停')+'</button>';
       h+='<button class="btn btn-sm btn-ghost" onclick="editPublish(\''+esc(t.id)+'\')">编辑</button>';
       h+='<button class="btn btn-sm btn-orange" onclick="runPublish(\''+esc(t.id)+'\')">立即发布</button>';
       h+='<button class="btn btn-sm btn-danger" onclick="delContent(\''+esc(t.id)+'\')">删除</button>';
@@ -309,6 +313,12 @@ function runPublish(id){toast("准备发布...","info");api("/api/content/tasks/
 
 function delContent(id){if(!confirm("确定删除？"))return;api("/api/content/tasks/"+id,{method:"DELETE"}).then(function(){toast("已删除","success");loadCreation();loadPublish()})}
 
+function toggleTask(id,type){
+  api("/api/content/tasks/"+id+"/toggle",{method:"POST"}).then(function(r){
+    toast(r.status==="active"?"已启用":"已暂停","success");
+    if(type==="creation")loadCreation();else loadPublish();
+  })
+}
 loadCollect();loadCreation();loadPublish()
 </script>
 </body>
