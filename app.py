@@ -343,12 +343,14 @@ def run_content_task(task_id):
 
     task_type = task.get("type", "creation")
     if task_type == "creation":
-        from datafactory.content.creator import create_article
-        result = create_article(
-            task.get("subject", ""),
-            style=task.get("style", "news_brief"),
-            freq=task.get("freq", "daily"),
-        )
+        from datafactory.content.llm_creator import STYLE_CREATORS
+        style = task.get("style", "news_brief")
+        creator = STYLE_CREATORS.get(style)
+        if creator:
+            result = creator(task.get("subject", ""), freq=task.get("freq", "daily"))
+        else:
+            from datafactory.content.creator import create_article
+            result = create_article(task.get("subject", ""), style=style, freq=task.get("freq", "daily"))
         return jsonify(result), 200
     elif task_type == "publish":
         # 读取最新文章，调用 infopublisher 服务发布
@@ -378,6 +380,32 @@ def run_content_task(task_id):
         return jsonify({"error": "无文章可发布"}), 404
 
     return jsonify({"error": "未知任务类型"}), 400
+
+
+
+# --- LLM内容配置API ---
+@app.route("/api/llm-config", methods=["GET"])
+def get_llm_config():
+    from datafactory.content.llm_config import load_config
+    return jsonify(load_config()), 200
+
+@app.route("/api/llm-config", methods=["PUT"])
+def update_llm_config():
+    from datafactory.content.llm_config import load_config, save_config
+    cfg = load_config()
+    updates = request.json or {}
+    for k, v in updates.items():
+        if isinstance(v, dict) and k in cfg:
+            cfg[k].update(v)
+        else:
+            cfg[k] = v
+    save_config(cfg)
+    return jsonify({"status": "ok"}), 200
+
+@app.route("/settings")
+def settings_page():
+    with open(os.path.join(TMPL_DIR, "settings.html"), encoding="utf-8") as f:
+        return f.read()
 
 
 # 启动调度器（gunicorn preload模式下只启动一次）
