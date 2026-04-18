@@ -1,0 +1,38 @@
+[
+  {
+    "type": "creation",
+    "subject": "人工智能",
+    "style": "news_brief",
+    "freq": "daily",
+    "id": "1067d48e",
+    "created_at": "2026-04-15T00:02:42.066662",
+    "status": "paused"
+  },
+  {
+    "type": "publish",
+    "subject": "人工智能",
+    "channel": "xiaohongshu",
+    "freq": "daily",
+    "id": "5d3cba25",
+    "created_at": "2026-04-15T00:02:42.127723",
+    "status": "paused"
+  },
+  {
+    "type": "creation",
+    "subject": "具身智能",
+    "style": "investment_weekly",
+    "freq": "weekly",
+    "id": "e90e6f8d",
+    "created_at": "2026-04-15T00:10:39.211561",
+    "status": "paused"
+  },
+  {
+    "type": "publish",
+    "subject": "具身智能",
+    "channel": "xiaohongshu",
+    "freq": "weekly",
+    "id": "27510762",
+    "created_at": "2026-04-15T00:10:39.313195",
+    "status": "paused"
+  }
+]

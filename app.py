@@ -323,6 +323,17 @@ def delete_content_task(task_id):
     return jsonify({"ok": True}), 200
 
 
+@app.route("/api/content/tasks/<task_id>/toggle", methods=["POST"])
+def toggle_content_task(task_id):
+    tasks = _load_content_tasks()
+    for t in tasks:
+        if t.get("id") == task_id:
+            t["status"] = "active" if t.get("status") == "paused" else "paused"
+            _save_content_tasks(tasks)
+            return jsonify({"id": task_id, "status": t["status"]}), 200
+    return jsonify({"error": "任务不存在"}), 404
+
+
 @app.route("/api/content/tasks/<task_id>/run", methods=["POST"])
 def run_content_task(task_id):
     tasks = _load_content_tasks()
@@ -368,6 +379,10 @@ def run_content_task(task_id):
 
     return jsonify({"error": "未知任务类型"}), 400
 
+
+# 启动调度器（gunicorn preload模式下只启动一次）
+from scheduler import start_scheduler
+start_scheduler()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8088)
