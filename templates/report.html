@@ -84,6 +84,7 @@ td a:hover{color:#1890ff}
   </div>
   <div class="export-bar" id="exportBar" style="display:none">
     <button class="btn btn-green" onclick="exportCSV()">📥 导出CSV</button>
+    <button class="btn btn-outline" onclick="exportPDF()">📄 导出PDF</button>
   </div>
   <div id="resultArea"></div>
 </div>
@@ -155,14 +156,16 @@ function renderResults(results){
     if(ss.hibor)html+=' | <span class="src-badge src-hibor">慧博 '+ss.hibor+'</span>';
     html+='</span></h3>';
     if(reports.length){
-      html+='<table><thead><tr><th style="width:50%">研报名称</th><th>研报单位</th><th>日期</th><th>来源</th></tr></thead><tbody>';
+      html+='<table><thead><tr><th style="width:30%">研报名称</th><th>摘要</th><th>研报单位</th><th>日期</th><th>来源</th><th>详情链接</th></tr></thead><tbody>';
       for(var j=0;j<reports.length;j++){
         var rpt=reports[j];
         var src=rpt.source||"";
         var srcCls="src-"+src;
         html+='<tr><td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank">'+esc(rpt.title)+'</a>':esc(rpt.title))+'</td>';
+        html+='<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(rpt.summary||"")+'">'+esc(rpt.summary||"-")+'</td>';
         html+='<td>'+esc(rpt.org||"-")+'</td><td>'+esc(rpt.date||"-")+'</td>';
-        html+='<td><span class="src-badge '+srcCls+'">'+esc(src)+'</span></td></tr>';
+        html+='<td><span class="src-badge '+srcCls+'">'+esc(src)+'</span></td>';
+        html+='<td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#1890ff;font-size:12px">查看</a>':'-')+'</td></tr>';
       }
       html+='</tbody></table>';
     }
@@ -206,6 +209,50 @@ function exportCSV(){
   var a=document.createElement("a");
   a.href=url;a.download="研报分析_"+new Date().toISOString().slice(0,10)+".csv";
   a.click();URL.revokeObjectURL(url);
+}
+
+
+function exportPDF(){
+  if(!allResults.length)return;
+  var w=window.open('','_blank');
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>研报分析报告</title><style>';
+  h+='body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;padding:30px;color:#333;font-size:13px}';
+  h+='h1{text-align:center;font-size:22px;margin-bottom:5px}';
+  h+='.subtitle{text-align:center;color:#888;font-size:13px;margin-bottom:25px}';
+  h+='h2{font-size:16px;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #1890ff}';
+  h+='table{width:100%;border-collapse:collapse;margin-bottom:20px;page-break-inside:auto}';
+  h+='th{background:#f5f7fa;padding:8px 6px;border:1px solid #e0e0e0;font-size:12px;text-align:left}';
+  h+='td{padding:7px 6px;border:1px solid #e0e0e0;font-size:12px;word-break:break-all}';
+  h+='a{color:#1890ff;text-decoration:none}';
+  h+='.stats{color:#666;font-size:12px;margin-bottom:8px}';
+  h+='@media print{body{padding:15px}h1{font-size:18px}}</style></head><body>';
+  h+='<h1>研报分析报告</h1><div class="subtitle">生成时间：'+new Date().toLocaleString('zh-CN')+'</div>';
+  for(var i=0;i<allResults.length;i++){
+    var r=allResults[i];var name=r.stock_name||r.stock_code||"";
+    var reports=r.reports||[];var anns=r.announcements||[];
+    var ss=r.sources_summary||{};
+    h+='<h2>'+esc(name)+(r.stock_code&&r.stock_code!==name?' ('+esc(r.stock_code)+')':'')+'</h2>';
+    h+='<div class="stats">研报 '+reports.length+'篇 | 公告 '+anns.length+'条';
+    if(ss.djyanbao)h+=' | 洞见 '+ss.djyanbao;if(ss.hibor)h+=' | 慧博 '+ss.hibor;
+    h+='</div>';
+    if(reports.length){
+      h+='<table><tr><th style="width:25%">研报名称</th><th style="width:25%">摘要</th><th>研报单位</th><th>日期</th><th>来源</th><th style="width:20%">详情链接</th></tr>';
+      for(var j=0;j<reports.length;j++){var rpt=reports[j];
+        h+='<tr><td>'+esc(rpt.title)+'</td><td>'+esc(rpt.summary||"-")+'</td><td>'+esc(rpt.org||"-")+'</td><td>'+esc(rpt.date||"-")+'</td><td>'+esc(rpt.source||"")+'</td>';
+        h+='<td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'">'+esc(rpt.detail_url)+'</a>':'-')+'</td></tr>';
+      }h+='</table>';
+    }
+    if(anns.length){
+      h+='<table><tr><th>公告标题</th><th>日期</th><th>详情链接</th></tr>';
+      for(var k=0;k<anns.length;k++){var a=anns[k];
+        h+='<tr><td>'+esc(a.title)+'</td><td>'+esc(a.date||"-")+'</td>';
+        h+='<td>'+(a.detail_url?'<a href="'+esc(a.detail_url)+'">'+esc(a.detail_url)+'</a>':'-')+'</td></tr>';
+      }h+='</table>';
+    }
+  }
+  h+='</body></html>';
+  w.document.write(h);w.document.close();
+  setTimeout(function(){w.print()},500);
 }
 
 function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
