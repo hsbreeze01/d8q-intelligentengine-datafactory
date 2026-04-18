@@ -203,17 +203,23 @@ def report_page():
 
 @app.route("/api/report/stock", methods=["POST"])
 def report_stock_query():
-    """批量查询股票研报 - 代理到 StockShark"""
+    """批量查询股票研报 - 并行代理到 StockShark"""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     body = request.json or {}
     keywords = body.get("keywords", [])
     days = body.get("days", 7)
-    results = []
-    for kw in keywords[:20]:  # 限制最多20个
+
+    def _query_one(kw):
         data, code = shark_request("GET", "/api/report/stock/" + kw + "?days=" + str(days) + "&stock_name=" + kw)
         if code == 200:
-            results.append(data)
-        else:
-            results.append({"stock_code": kw, "stock_name": kw, "reports": [], "announcements": [], "error": str(data)})
+            return data
+        return {"stock_code": kw, "stock_name": kw, "reports": [], "announcements": [], "error": str(data)}
+
+    results = [None] * min(len(keywords), 20)
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_query_one, kw): i for i, kw in enumerate(keywords[:20])}
+        for f in as_completed(futures):
+            results[futures[f]] = f.result()
     return jsonify({"results": results}), 200
 
 
