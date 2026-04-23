@@ -52,6 +52,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .toast-success{background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
 .toast-error{background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7}
 .toast-info{background:#e6f7ff;color:#1890ff;border:1px solid #91d5ff}
+
+.kw-panel{margin-top:8px;max-height:0;overflow:hidden;transition:max-height .3s}
+.kw-panel.open{max-height:500px;overflow-y:auto}
+.kw-toggle{font-size:12px;color:#1890ff;cursor:pointer;margin-left:8px}
+.kw-cat{margin-bottom:10px}
+.kw-cat-title{font-size:13px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.kw-cat-desc{font-size:11px;color:#999;margin-bottom:4px}
+.kw-chips{display:flex;flex-wrap:wrap;gap:5px}
+.kw-chip{display:inline-block;padding:3px 10px;background:#f5f5f5;border:1px solid #e8e8e8;border-radius:14px;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.kw-chip:hover{background:#e6f7ff;border-color:#91d5ff;color:#1890ff}
+.kw-chip .kw-hint{color:#999;font-size:10px;margin-left:3px}
 </style>
 </head>
 <body>
@@ -70,7 +81,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <div class="modal-overlay" id="collectModal"><div class="modal">
   <h3 id="cModalTitle">新建采集任务</h3>
   <input type="hidden" id="cEditId">
-  <div class="form-group"><label>采集主题 *</label><input type="text" id="cSubject" placeholder="如：AI、具身智能"></div>
+  <div class="form-group"><label>采集主题 * <span class="kw-toggle" onclick="toggleKwPanel('cKwPanel')">💡 关键词推荐</span></label><input type="text" id="cSubject" placeholder="如：碳纤维、固态电池、光刻胶" onfocus="toggleKwPanel('cKwPanel',true)"><div class="kw-panel" id="cKwPanel"></div></div>
   <div class="form-group"><label>数据来源</label><div class="checkbox-group" id="cSources">
     <label><input type="checkbox" value="cailianshe" checked> 财联社</label>
     <label><input type="checkbox" value="nbd" checked> 每经网</label>
@@ -100,7 +111,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <div class="modal-overlay" id="creationModal"><div class="modal">
   <h3 id="crModalTitle">新建创作任务</h3>
   <input type="hidden" id="crEditId">
-  <div class="form-group"><label>主题 *</label><select id="crSubject"></select></div>
+  <div class="form-group"><label>主题 * <span class="kw-toggle" onclick="toggleKwPanel('crKwPanel')">💡 关键词推荐</span></label><select id="crSubject"></select><div class="kw-panel" id="crKwPanel"></div></div>
   <div class="form-group"><label>文章风格</label><select id="crStyle">
     <option value="news_brief">📋 资讯速递（简洁列表）</option>
     <option value="deep_analysis">🔍 深度分析（带观点）</option>
@@ -119,7 +130,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <div class="modal-overlay" id="publishModal"><div class="modal">
   <h3 id="pubModalTitle">新建发布任务</h3>
   <input type="hidden" id="pubEditId">
-  <div class="form-group"><label>主题 *</label><select id="pubSubject"></select></div>
+  <div class="form-group"><label>主题 * <span class="kw-toggle" onclick="toggleKwPanel('pubKwPanel')">💡 关键词推荐</span></label><select id="pubSubject"></select><div class="kw-panel" id="pubKwPanel"></div></div>
   <div class="form-group"><label>发布渠道</label><select id="pubChannel"><option value="xiaohongshu">小红书</option></select></div>
   <div class="form-group"><label>发布频率</label><select id="pubFreq">
     <option value="daily">每日</option><option value="weekly">每周</option><option value="monthly">每月</option>
@@ -319,6 +330,49 @@ function toggleTask(id,type){
     if(type==="creation")loadCreation();else loadPublish();
   })
 }
+
+var kwData=null;
+function loadKwSuggestions(){
+  if(kwData)return Promise.resolve(kwData);
+  return api("/api/keyword-suggestions").then(function(d){kwData=d;return d})
+}
+function renderKwPanel(panelId,targetId,isSelect){
+  loadKwSuggestions().then(function(d){
+    var cats=d.categories||[];
+    var h="";
+    cats.forEach(function(cat){
+      h+='<div class="kw-cat"><div class="kw-cat-title">'+esc(cat.name)+'</div>';
+      if(cat.desc)h+='<div class="kw-cat-desc">'+esc(cat.desc)+'</div>';
+      h+='<div class="kw-chips">';
+      (cat.keywords||[]).forEach(function(kw){
+        var label=kw.zh+(kw.en?' / '+kw.en:'');
+        h+='<span class="kw-chip" onclick="pickKw(\''+esc(kw.zh)+'\',\''+targetId+'\','+isSelect+')" title="'+esc(kw.hint||'')+'">'+esc(kw.zh)+'<span class="kw-hint">'+esc(kw.hint||'')+'</span></span>';
+      });
+      h+='</div></div>';
+    });
+    document.getElementById(panelId).innerHTML=h;
+  })
+}
+function toggleKwPanel(panelId,forceOpen){
+  var el=document.getElementById(panelId);
+  if(!el.innerHTML)renderKwPanel(panelId,panelId.replace("KwPanel","Subject"),panelId!=="cKwPanel");
+  if(forceOpen)el.classList.add("open");
+  else el.classList.toggle("open");
+}
+function pickKw(kw,targetId,isSelect){
+  var el=document.getElementById(targetId);
+  if(isSelect){
+    // 如果select中没有该选项，添加一个
+    var found=false;
+    for(var i=0;i<el.options.length;i++){if(el.options[i].value===kw){found=true;break}}
+    if(!found){var o=document.createElement("option");o.value=kw;o.textContent=kw;el.appendChild(o)}
+    el.value=kw;
+  }else{
+    el.value=kw;
+  }
+  el.focus();
+}
+
 loadCollect();loadCreation();loadPublish()
 </script>
 </body>

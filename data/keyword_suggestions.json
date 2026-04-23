@@ -1,0 +1,58 @@
+{
+  "categories": [
+    {
+      "name": "🏗️ 战略新材料",
+      "desc": "十五五规划重点，政策驱动",
+      "keywords": [
+        {"zh": "碳纤维", "en": "carbon fiber", "hint": "航空航天、风电叶片"},
+        {"zh": "碳化硅", "en": "SiC", "hint": "新能源车功率器件"},
+        {"zh": "氮化镓", "en": "GaN", "hint": "5G射频、快充"},
+        {"zh": "稀土永磁", "en": "rare earth magnets", "hint": "电机、风电"},
+        {"zh": "高温合金", "en": "superalloy", "hint": "航发、燃气轮机"}
+      ]
+    },
+    {
+      "name": "🔋 新能源材料",
+      "desc": "最热投资赛道",
+      "keywords": [
+        {"zh": "固态电池", "en": "solid state battery", "hint": "下一代动力电池"},
+        {"zh": "钠离子电池", "en": "sodium ion battery", "hint": "储能降本"},
+        {"zh": "钙钛矿", "en": "perovskite", "hint": "光伏革命"},
+        {"zh": "正极材料", "en": "cathode material", "hint": "锂电核心"},
+        {"zh": "电解液", "en": "electrolyte", "hint": "电池安全性"},
+        {"zh": "氢燃料电池", "en": "hydrogen fuel cell", "hint": "氢能产业链"}
+      ]
+    },
+    {
+      "name": "💎 半导体材料",
+      "desc": "国产替代核心",
+      "keywords": [
+        {"zh": "光刻胶", "en": "photoresist", "hint": "芯片制造核心"},
+        {"zh": "电子特气", "en": "electronic gas", "hint": "晶圆制造"},
+        {"zh": "靶材", "en": "sputtering target", "hint": "薄膜沉积"},
+        {"zh": "大硅片", "en": "silicon wafer", "hint": "晶圆衬底"},
+        {"zh": "CMP抛光液", "en": "CMP slurry", "hint": "芯片平坦化"}
+      ]
+    },
+    {
+      "name": "🔬 前沿材料",
+      "desc": "科研→产业化信号",
+      "keywords": [
+        {"zh": "石墨烯", "en": "graphene", "hint": "导热、导电、复合材料"},
+        {"zh": "气凝胶", "en": "aerogel", "hint": "隔热、新能源"},
+        {"zh": "生物基材料", "en": "bio-based materials", "hint": "可降解、碳中和"},
+        {"zh": "3D打印材料", "en": "additive manufacturing", "hint": "钛合金粉末"},
+        {"zh": "量子材料", "en": "quantum materials", "hint": "量子计算基础"}
+      ]
+    },
+    {
+      "name": "📡 科技产业",
+      "desc": "已有采集主题",
+      "keywords": [
+        {"zh": "人工智能", "en": "AI", "hint": "大模型、算力、应用"},
+        {"zh": "具身智能", "en": "embodied AI", "hint": "机器人、自动驾驶"},
+        {"zh": "半导体", "en": "semiconductor", "hint": "芯片、封装、设备"}
+      ]
+    }
+  ]
+}

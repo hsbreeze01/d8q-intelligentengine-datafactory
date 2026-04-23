@@ -383,6 +383,20 @@ def run_content_task(task_id):
 
 
 
+
+@app.route("/api/keyword-suggestions", methods=["GET"])
+def keyword_suggestions():
+    kw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "keyword_suggestions.json")
+    with open(kw_path, encoding="utf-8") as f:
+        return jsonify(json.load(f)), 200
+
+@app.route("/api/keyword-suggestions", methods=["PUT"])
+def update_keyword_suggestions():
+    kw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "keyword_suggestions.json")
+    with open(kw_path, "w", encoding="utf-8") as f:
+        json.dump(request.json, f, ensure_ascii=False, indent=2)
+    return jsonify({"status": "ok"}), 200
+
 # --- LLM内容配置API ---
 @app.route("/api/llm-config", methods=["GET"])
 def get_llm_config():
