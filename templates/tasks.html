@@ -38,7 +38,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .empty{text-align:center;padding:40px;color:#999;font-size:14px}
 .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center}
 .modal-overlay.show{display:flex}
-.modal{background:#fff;border-radius:12px;padding:28px;width:520px;max-width:90vw}
+.modal{background:#fff;border-radius:12px;padding:28px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto}
 .modal h3{font-size:18px;margin-bottom:20px}
 .form-group{margin-bottom:16px}
 .form-group label{display:block;font-size:14px;color:#555;margin-bottom:6px;font-weight:500}
@@ -54,7 +54,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .toast-info{background:#e6f7ff;color:#1890ff;border:1px solid #91d5ff}
 
 .kw-panel{margin-top:8px;max-height:0;overflow:hidden;transition:max-height .3s}
-.kw-panel.open{max-height:500px;overflow-y:auto}
+.kw-panel.open{max-height:220px;overflow-y:auto;border:1px solid #f0f0f0;border-radius:8px;padding:8px;margin-top:6px;background:#fafafa}
 .kw-toggle{font-size:12px;color:#1890ff;cursor:pointer;margin-left:8px}
 .kw-cat{margin-bottom:10px}
 .kw-cat-title{font-size:13px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:6px}
