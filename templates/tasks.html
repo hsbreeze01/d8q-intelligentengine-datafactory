@@ -36,6 +36,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .style-news{background:#e6f7ff;color:#1890ff}.style-deep{background:#f9f0ff;color:#722ed1}.style-invest{background:#fff7e6;color:#fa8c16}
 .freq-tag{background:#f6ffed;color:#52c41a;padding:2px 8px;border-radius:4px;font-size:12px}
 .empty{text-align:center;padding:40px;color:#999;font-size:14px}
+.badge-ok{background:#f6ffed;color:#52c41a;padding:2px 8px;border-radius:4px;font-size:12px}
+.badge-fail{background:#fff2f0;color:#ff4d4f;padding:2px 8px;border-radius:4px;font-size:12px}
+.badge-trigger{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px}
 .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:1000;justify-content:center;align-items:center}
 .modal-overlay.show{display:flex}
 .modal{background:#fff;border-radius:12px;padding:28px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto}
@@ -75,6 +78,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
   <div class="section"><div class="section-header"><h3>📥 采集任务</h3><button class="btn" onclick="openCollectModal()">+ 新建采集任务</button></div><div id="collectTable"><div class="empty">加载中...</div></div></div>
   <div class="section"><div class="section-header"><h3>✍️ 创作任务</h3><button class="btn btn-purple" onclick="openCreationModal()">+ 新建创作任务</button></div><div id="creationTable"><div class="empty">加载中...</div></div></div>
   <div class="section"><div class="section-header"><h3>📤 发布任务</h3><button class="btn btn-orange" onclick="openPublishModal()">+ 新建发布任务</button></div><div id="publishTable"><div class="empty">加载中...</div></div></div>
+  <div class="section"><div class="section-header"><h3>📋 执行记录</h3><button class="btn btn-ghost btn-sm" onclick="loadExecLog()">刷新</button></div><div id="execLogTable"><div class="empty">加载中...</div></div></div>
 </div>
 
 <!-- 采集任务弹窗 -->
@@ -123,6 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <option value="monthly">每月（过去30天资讯）</option>
   </select>
   <div class="hint">修改频率将在下一个任务周期生效。</div></div>
+  <div class="form-group"><label>执行时间</label><input type="time" id="crRunAt" value="08:30"><div class="hint">每日自动创作的触发时间（24小时制）</div></div>
   <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAll()">取消</button><button class="btn btn-purple" onclick="saveCreation()">保存</button></div>
 </div></div>
 
@@ -136,6 +141,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <option value="daily">每日</option><option value="weekly">每周</option><option value="monthly">每月</option>
   </select>
   <div class="hint">修改频率将在下一个任务周期生效。</div></div>
+  <div class="form-group"><label>执行时间</label><input type="time" id="pubRunAt" value="08:50"><div class="hint">每日自动发布的触发时间（24小时制）</div></div>
   <div class="form-group"><label>发布账号</label><input type="text" value="内置账号（未来材料研究所）" disabled><div class="hint">当前使用内置账号</div></div>
   <div class="modal-footer"><button class="btn btn-ghost" onclick="closeAll()">取消</button><button class="btn btn-orange" onclick="savePublish()">保存</button></div>
 </div></div>
@@ -159,13 +165,15 @@ function loadSubjects(id){
 }
 
 // ========== 采集任务 ==========
+function parseCron(expr){var p=(expr||"").split(" ");var h=p.length>=2?p[1]:"?";var m=p.length>=1?p[0]:"?";var freq="每日";if(p.length>=5&&p[4]&&p[4]!=="*")freq="每周";var time=(h.length<2?"0"+h:h)+":"+(m.length<2?"0"+m:m);return{freq:freq,time:time}}
 function loadCollect(){
   api("/api/tasks").then(function(tasks){
     if(!tasks||!tasks.length){document.getElementById("collectTable").innerHTML='<div class="empty">暂无采集任务</div>';return}
-    var h='<table><tr><th>主题</th><th>来源</th><th>调度</th><th>最大数</th><th>状态</th><th>操作</th></tr>';
+    var h='<table><tr><th>主题</th><th>来源</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr>';
     tasks.forEach(function(t){
       var src="";(t.sources||[]).forEach(function(s){src+='<span class="source-tag">'+(SOURCE_NAMES[s]||s)+'</span>'});
-      h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+src+'</td><td>'+esc(t.cron_expr)+'</td><td>'+t.max_results+'</td>';
+      var cp=parseCron(t.cron_expr);
+      h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+src+'</td><td><span class="freq-tag">'+cp.freq+'</span></td><td>'+cp.time+'</td>';
       h+='<td>'+(t.enabled?'<span class="status-on">● 运行中</span>':'<span class="status-off">● 停止</span>')+'</td>';
       h+='<td><div class="actions">';
       h+='<button class="btn btn-sm btn-ghost" onclick="editCollect(\''+esc(t.id)+'\')">编辑</button>';
@@ -214,13 +222,13 @@ function loadCreation(){
   api("/api/content/tasks").then(function(tasks){
     var ct=tasks.filter(function(t){return t.type==="creation"});
     if(!ct.length){document.getElementById("creationTable").innerHTML='<div class="empty">暂无创作任务</div>';return}
-    var h='<table><tr><th>主题</th><th>风格</th><th>频率</th><th>状态</th><th>创建时间</th><th>操作</th></tr>';
+    var h='<table><tr><th>主题</th><th>风格</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr>';
     ct.forEach(function(t){
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td>';
       h+='<td><span class="style-tag '+(STYLE_CLS[t.style]||"")+'">'+(STYLE_NAMES[t.style]||t.style)+'</span></td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
+      h+='<td>'+(t.run_at||'-')+'</td>';
       h+='<td>'+(t.status==="paused"?'<span class="status-off">● 已暂停</span>':'<span class="status-on">● 运行中</span>')+'</td>';
-      h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
       h+='<td><div class="actions">';
       h+='<button class="btn btn-sm '+(t.status==="paused"?'btn-success" onclick="toggleTask(\''+esc(t.id)+'\',\'creation\')">启用':'btn-ghost" onclick="toggleTask(\''+esc(t.id)+'\',\'creation\')">暂停')+'</button>';
       h+='<button class="btn btn-sm btn-ghost" onclick="editCreation(\''+esc(t.id)+'\')">编辑</button>';
@@ -239,9 +247,11 @@ function openCreationModal(task){
     setTimeout(function(){document.getElementById("crSubject").value=task.subject},300);
     document.getElementById("crStyle").value=task.style||"news_brief";
     document.getElementById("crFreq").value=task.freq||"daily";
+    document.getElementById("crRunAt").value=task.run_at||"08:30";
   }else{
     document.getElementById("crStyle").value="news_brief";
     document.getElementById("crFreq").value="daily";
+    document.getElementById("crRunAt").value="08:30";
   }
   document.getElementById("creationModal").classList.add("show")
 }
@@ -252,7 +262,7 @@ function editCreation(id){
 }
 function saveCreation(){
   var s=document.getElementById("crSubject").value;if(!s){toast("请选择主题","error");return}
-  var body={type:"creation",subject:s,style:document.getElementById("crStyle").value,freq:document.getElementById("crFreq").value};
+  var body={type:"creation",subject:s,style:document.getElementById("crStyle").value,freq:document.getElementById("crFreq").value,run_at:document.getElementById("crRunAt").value||"08:30"};
   var editId=document.getElementById("crEditId").value;
   if(editId){
     api("/api/content/tasks/"+editId,{method:"DELETE"}).then(function(){
@@ -271,12 +281,12 @@ function loadPublish(){
   api("/api/content/tasks").then(function(tasks){
     var pt=tasks.filter(function(t){return t.type==="publish"});
     if(!pt.length){document.getElementById("publishTable").innerHTML='<div class="empty">暂无发布任务</div>';return}
-    var h='<table><tr><th>主题</th><th>渠道</th><th>频率</th><th>状态</th><th>创建时间</th><th>操作</th></tr>';
+    var h='<table><tr><th>主题</th><th>渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr>';
     pt.forEach(function(t){
       h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+esc(t.channel||"小红书")+'</td>';
       h+='<td><span class="freq-tag">'+(FREQ_NAMES[t.freq]||t.freq)+'</span></td>';
+      h+='<td>'+(t.run_at||'-')+'</td>';
       h+='<td>'+(t.status==="paused"?'<span class="status-off">● 已暂停</span>':'<span class="status-on">● 运行中</span>')+'</td>';
-      h+='<td>'+esc((t.created_at||"").slice(0,16))+'</td>';
       h+='<td><div class="actions">';
       h+='<button class="btn btn-sm '+(t.status==="paused"?'btn-success" onclick="toggleTask(\''+esc(t.id)+'\',\'publish\')">启用':'btn-ghost" onclick="toggleTask(\''+esc(t.id)+'\',\'publish\')">暂停')+'</button>';
       h+='<button class="btn btn-sm btn-ghost" onclick="editPublish(\''+esc(t.id)+'\')">编辑</button>';
@@ -295,9 +305,11 @@ function openPublishModal(task){
     setTimeout(function(){document.getElementById("pubSubject").value=task.subject},300);
     document.getElementById("pubChannel").value=task.channel||"xiaohongshu";
     document.getElementById("pubFreq").value=task.freq||"daily";
+    document.getElementById("pubRunAt").value=task.run_at||"08:50";
   }else{
     document.getElementById("pubChannel").value="xiaohongshu";
     document.getElementById("pubFreq").value="daily";
+    document.getElementById("pubRunAt").value="08:50";
   }
   document.getElementById("publishModal").classList.add("show")
 }
@@ -308,7 +320,7 @@ function editPublish(id){
 }
 function savePublish(){
   var s=document.getElementById("pubSubject").value;if(!s){toast("请选择主题","error");return}
-  var body={type:"publish",subject:s,channel:document.getElementById("pubChannel").value,freq:document.getElementById("pubFreq").value};
+  var body={type:"publish",subject:s,channel:document.getElementById("pubChannel").value,freq:document.getElementById("pubFreq").value,run_at:document.getElementById("pubRunAt").value||"08:50"};
   var editId=document.getElementById("pubEditId").value;
   if(editId){
     api("/api/content/tasks/"+editId,{method:"DELETE"}).then(function(){
@@ -373,7 +385,23 @@ function pickKw(kw,targetId,isSelect){
   el.focus();
 }
 
-loadCollect();loadCreation();loadPublish()
+
+// ========== 执行记录 ==========
+function loadExecLog(){
+  api("/api/content/exec-log?limit=30").then(function(logs){
+    if(!logs||!logs.length){document.getElementById("execLogTable").innerHTML='<div class="empty">暂无执行记录</div>';return}
+    var h='<table><tr><th>时间</th><th>类型</th><th>主题</th><th>触发</th><th>结果</th><th>摘要</th><th>耗时</th></tr>';
+    logs.forEach(function(l){
+      var tp=l.type==="creation"?"✍️ 创作":"📤 发布";
+      var ok=l.success?'<span class="badge-ok">成功</span>':'<span class="badge-fail">失败</span>';
+      var tr=l.trigger==="scheduler"?'<span class="badge-trigger">定时</span>':'<span class="badge-trigger">手动</span>';
+      h+='<tr><td>'+esc((l.time||"").replace("T"," ").slice(0,19))+'</td><td>'+tp+'</td><td>'+esc(l.subject)+'</td><td>'+tr+'</td><td>'+ok+'</td><td>'+esc((l.result_summary||"").slice(0,40))+'</td><td>'+(l.duration||0)+'s</td></tr>';
+    });
+    document.getElementById("execLogTable").innerHTML=h+'</table>';
+  })
+}
+
+loadCollect();loadCreation();loadPublish();loadExecLog()
 </script>
 </body>
 </html>

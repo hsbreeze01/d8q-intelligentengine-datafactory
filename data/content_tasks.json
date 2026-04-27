@@ -6,7 +6,8 @@
     "freq": "daily",
     "id": "1067d48e",
     "created_at": "2026-04-15T00:02:42.066662",
-    "status": "paused"
+    "status": "active",
+    "run_at": "08:30"
   },
   {
     "type": "publish",
@@ -15,7 +16,8 @@
     "freq": "daily",
     "id": "5d3cba25",
     "created_at": "2026-04-15T00:02:42.127723",
-    "status": "paused"
+    "status": "active",
+    "run_at": "08:50"
   },
   {
     "type": "creation",
@@ -24,7 +26,8 @@
     "freq": "weekly",
     "id": "e90e6f8d",
     "created_at": "2026-04-15T00:10:39.211561",
-    "status": "paused"
+    "status": "paused",
+    "run_at": "08:30"
   },
   {
     "type": "publish",
@@ -33,6 +36,7 @@
     "freq": "weekly",
     "id": "27510762",
     "created_at": "2026-04-15T00:10:39.313195",
-    "status": "paused"
+    "status": "paused",
+    "run_at": "08:50"
   }
 ]

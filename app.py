@@ -298,6 +298,33 @@ def _save_content_tasks(tasks):
     with open(TASK_STORE_PATH, "w", encoding="utf-8") as f:
         json.dump(tasks, f, ensure_ascii=False, indent=2)
 
+EXEC_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "exec_log.json")
+
+def _append_exec_log(task, result, duration, trigger="manual"):
+    import fcntl
+    entry = {
+        "task_id": task.get("id", ""),
+        "type": task.get("type", ""),
+        "subject": task.get("subject", ""),
+        "trigger": trigger,
+        "success": "error" not in result,
+        "result_summary": result.get("error") or result.get("title") or result.get("status") or str(result)[:100],
+        "duration": round(duration, 1),
+        "time": __import__("datetime").datetime.now().isoformat()
+    }
+    try:
+        with open(EXEC_LOG_PATH, "r+", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            logs = __import__("json").load(f)
+            logs.insert(0, entry)
+            logs = logs[:200]  # keep last 200
+            f.seek(0); f.truncate()
+            __import__("json").dump(logs, f, ensure_ascii=False, indent=2)
+    except (FileNotFoundError, __import__("json").JSONDecodeError):
+        with open(EXEC_LOG_PATH, "w", encoding="utf-8") as f:
+            __import__("json").dump([entry], f, ensure_ascii=False, indent=2)
+
+
 
 @app.route("/api/content/tasks", methods=["GET"])
 def list_content_tasks():
@@ -336,6 +363,7 @@ def toggle_content_task(task_id):
 
 @app.route("/api/content/tasks/<task_id>/run", methods=["POST"])
 def run_content_task(task_id):
+    _t0 = __import__("time").time()
     tasks = _load_content_tasks()
     task = next((t for t in tasks if t.get("id") == task_id), None)
     if not task:
@@ -351,6 +379,7 @@ def run_content_task(task_id):
         else:
             from datafactory.content.creator import create_article
             result = create_article(task.get("subject", ""), style=style, freq=task.get("freq", "daily"))
+        _append_exec_log(task, result, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
         return jsonify(result), 200
     elif task_type == "publish":
         # 读取最新文章，调用 infopublisher 服务发布
@@ -376,13 +405,27 @@ def run_content_task(task_id):
                     pub_result, pub_code = _publisher_request("POST", "/api/publish", pub_data)
                     pub_result["file"] = files[-1]
                     pub_result["subject"] = subject
+                    _append_exec_log(task, pub_result, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
                     return jsonify(pub_result), 200
-        return jsonify({"error": "无文章可发布"}), 404
+        _no_art = {"error": "无文章可发布"}
+        _append_exec_log(task, _no_art, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
+        return jsonify(_no_art), 404
 
     return jsonify({"error": "未知任务类型"}), 400
 
 
 
+
+
+@app.route("/api/content/exec-log", methods=["GET"])
+def get_exec_log():
+    try:
+        with open(EXEC_LOG_PATH, encoding="utf-8") as f:
+            logs = json.load(f)
+    except Exception:
+        logs = []
+    limit = int(request.args.get("limit", 50))
+    return jsonify(logs[:limit]), 200
 
 @app.route("/api/keyword-suggestions", methods=["GET"])
 def keyword_suggestions():
