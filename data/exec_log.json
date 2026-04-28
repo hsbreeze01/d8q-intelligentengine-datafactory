@@ -1,0 +1,32 @@
+[
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "💥谷歌员工抗议AI武器化，背后真相令人震",
+    "duration": 4.0,
+    "time": "2026-04-28T08:30:51.238765"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖谷歌员工怒拒AI当杀人武器！",
+    "duration": 3.8,
+    "time": "2026-04-28T08:30:51.070289"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "manual_test",
+    "success": true,
+    "result_summary": "🤫谷歌员工集体反战，AI红线曝光！",
+    "duration": 4.4,
+    "time": "2026-04-28T08:21:50.563448"
+  }
+]

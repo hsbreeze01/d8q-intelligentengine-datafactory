@@ -1,4 +1,5 @@
 """任务调度器 - 根据freq字段和run_at时间定时执行创作和发布任务"""
+import fcntl
 import json
 import logging
 import os
@@ -7,8 +8,14 @@ import time
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+# 确保调度器日志输出到文件
+_fh = logging.FileHandler("/var/log/d8q/scheduler.log")
+_fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+logger.addHandler(_fh)
+logger.setLevel(logging.INFO)
 
 TASKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "content_tasks.json")
+LOCK_PATH = "/tmp/d8q_scheduler.lock"
 
 # 各任务类型的默认执行时间 (HH:MM)
 DEFAULT_RUN_AT = {"creation": "08:30", "publish": "08:50"}
@@ -76,35 +83,46 @@ def _run_task(task):
 
 
 def _tick():
-    """一次调度检查"""
-    now = datetime.now()
-    tasks = _load_tasks()
-    changed = False
+    """一次调度检查（带文件锁防止多worker重复执行）"""
+    lock_fd = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock_fd.close()
+        return  # 另一个worker正在执行，跳过
 
-    # 先执行creation，再执行publish
-    for task_type in ("creation", "publish"):
-        for task in tasks:
-            if task.get("type") != task_type:
-                continue
-            run_h, run_m = _parse_run_at(task)
-            if now.hour != run_h or now.minute < run_m:
-                continue
-            if not _should_run(task):
-                continue
-            logger.info("调度执行: %s %s(%s) run_at=%02d:%02d",
-                        task.get("id"), task_type, task.get("subject"), run_h, run_m)
-            _run_task(task)
-            task["last_run"] = now.strftime("%Y-%m-%d %H:%M:%S")
-            changed = True
+    try:
+        now = datetime.now()
+        tasks = _load_tasks()
+        changed = False
 
-    if changed:
-        _save_tasks(tasks)
+        # 先执行creation，再执行publish
+        for task_type in ("creation", "publish"):
+            for task in tasks:
+                if task.get("type") != task_type:
+                    continue
+                run_h, run_m = _parse_run_at(task)
+                if now.hour != run_h or now.minute < run_m:
+                    continue
+                if not _should_run(task):
+                    continue
+                logger.info("调度执行: %s %s(%s) run_at=%02d:%02d",
+                            task.get("id"), task_type, task.get("subject"), run_h, run_m)
+                _run_task(task)
+                task["last_run"] = now.strftime("%Y-%m-%d %H:%M:%S")
+                changed = True
+
+        if changed:
+            _save_tasks(tasks)
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        lock_fd.close()
 
 
 def start_scheduler():
     """启动后台调度线程"""
     def _loop():
-        logger.info("调度器已启动，执行时间由各任务 run_at 字段控制")
+        logger.info("调度器已启动 (pid=%d)，执行时间由各任务 run_at 字段控制", os.getpid())
         while True:
             try:
                 _tick()
