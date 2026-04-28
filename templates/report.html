@@ -52,6 +52,11 @@ td a:hover{color:#1890ff}
 .export-bar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:16px}
 .progress-text{font-size:13px;color:#1890ff;margin-left:12px}
 @media(max-width:600px){.search-row{flex-direction:column}.batch-area{flex-direction:column}}
+.nav{position:relative}
+.user-info{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-size:13px;color:#888}
+.user-info .role{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px}
+.user-info .logout{color:#ff4d4f;cursor:pointer;border:none;background:none;font-size:13px}
+.user-info .logout:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -250,7 +255,22 @@ function exportPDF(){
       }h+='</table>';
     }
   }
-  h+='</body></html>';
+  h+='<script>
+(function(){
+  fetch("/api/auth/me").then(r=>r.json()).then(d=>{
+    if(d.username){
+      const nav=document.querySelector(".nav");
+      if(nav){
+        const el=document.createElement("div");
+        el.className="user-info";
+        el.innerHTML=`<span class="role">${d.role}</span><span>${d.username}</span><button class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">登出</button>`;
+        nav.appendChild(el);if(d.role==="admin"){var sLink=document.createElement("a");sLink.href="/settings";sLink.textContent="🔧 系统设置";nav.insertBefore(sLink,el);}
+      }
+    }
+  }).catch(()=>{});
+})();
+</script>
+</body></html>';
   w.document.write(h);w.document.close();
   setTimeout(function(){w.print()},500);
 }

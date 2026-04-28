@@ -5,6 +5,16 @@ import urllib.parse
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
 
 app = Flask(__name__)
+
+# --- 认证与权限 ---
+import secrets
+from datetime import timedelta
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
+from auth import auth_bp, check_auth
+app.register_blueprint(auth_bp)
+app.before_request(check_auth)
+
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"

@@ -31,6 +31,11 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .btn-bar{display:flex;justify-content:flex-end;gap:12px;margin-top:8px}
 .toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:999;opacity:0;transition:opacity .3s}
 .toast.show{opacity:1}.toast-ok{background:#52c41a}.toast-err{background:#ff4d4f}
+.nav{position:relative}
+.user-info{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-size:13px;color:#888}
+.user-info .role{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px}
+.user-info .logout{color:#ff4d4f;cursor:pointer;border:none;background:none;font-size:13px}
+.user-info .logout:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -65,6 +70,25 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
   </div>
 
   <div class="btn-bar"><button class="btn" onclick="save()">💾 保存配置</button></div>
+
+  <div class="card" id="userMgmtCard" style="display:none"><h3>👥 用户管理</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="userTable">
+      <thead><tr style="border-bottom:2px solid #f0f0f0;text-align:left">
+        <th style="padding:8px">用户名</th><th style="padding:8px">角色</th><th style="padding:8px">创建时间</th><th style="padding:8px;width:180px">操作</th>
+      </tr></thead>
+      <tbody id="userBody"></tbody>
+    </table>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+      <h4 style="font-size:14px;margin-bottom:12px">➕ 创建新用户</h4>
+      <div class="row">
+        <div class="field"><label>用户名</label><input id="new_user"></div>
+        <div class="field"><label>密码（至少8位）</label><input id="new_pass" type="password"></div>
+        <div class="field"><label>角色</label><select id="new_role"><option value="viewer">viewer - 只读</option><option value="editor">editor - 编辑</option><option value="admin">admin - 管理员</option></select></div>
+      </div>
+      <div class="btn-bar"><button class="btn" onclick="createUser()">创建用户</button></div>
+    </div>
+  </div>
+
 </div>
 <div class="toast" id="toast"></div>
 <script>
@@ -118,6 +142,59 @@ function save(){
 
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 load();
+
+function loadUsers(){
+  fetch("/api/auth/users").then(r=>{if(!r.ok)throw r;return r.json()}).then(users=>{
+    document.getElementById("userMgmtCard").style.display="";
+    var h="";users.forEach(u=>{
+      var row='<tr style="border-bottom:1px solid #f5f5f5">';
+      row+='<td style="padding:8px">'+esc(u.username)+'</td>';
+      row+='<td style="padding:8px"><span class="tag" style="border:none">'+esc(u.role)+'</span></td>';
+      row+='<td style="padding:8px;color:#999;font-size:12px">'+(u.created_at||"").slice(0,16)+'</td>';
+      row+='<td style="padding:8px">';
+      row+='<button style="padding:3px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px" onclick="resetPw(this)" data-u="'+esc(u.username)+'">重置密码</button>';
+      row+='<button style="padding:3px 10px;border:1px solid #ffa39e;border-radius:4px;background:#fff;color:#ff4d4f;cursor:pointer;font-size:12px" onclick="delUser(this)" data-u="'+esc(u.username)+'">删除</button>';
+      row+='</td></tr>';
+      h+=row;
+    });
+    document.getElementById("userBody").innerHTML=h;
+  }).catch(()=>{});
+}
+function createUser(){
+  var u=document.getElementById("new_user").value.trim(),p=document.getElementById("new_pass").value,r=document.getElementById("new_role").value;
+  if(!u||!p){toast("用户名和密码必填",false);return}
+  fetch("/api/auth/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p,role:r})})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok){toast("用户 "+u+" 创建成功",true);document.getElementById("new_user").value="";document.getElementById("new_pass").value="";loadUsers()}else toast(d.error||"创建失败",false)});
+}
+function resetPw(el){
+  var username=el.getAttribute("data-u");
+  var pw=prompt("请输入 "+username+" 的新密码（至少8位）：");
+  if(!pw)return;
+  fetch("/api/auth/users/"+username+"/password",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok)toast(username+" 密码已重置",true);else toast(d.error||"重置失败",false)});
+}
+function delUser(el){
+  var username=el.getAttribute("data-u");
+  if(!confirm("确定删除用户 "+username+" ？"))return;
+  fetch("/api/auth/users/"+username,{method:"DELETE"})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok){toast(username+" 已删除",true);loadUsers()}else toast(d.error||"删除失败",false)});
+}
+loadUsers();
+</script>
+<script>
+(function(){
+  fetch("/api/auth/me").then(r=>r.json()).then(d=>{
+    if(d.username){
+      const nav=document.querySelector(".nav");
+      if(nav){
+        const el=document.createElement("div");
+        el.className="user-info";
+        el.innerHTML=`<span class="role">${d.role}</span><span>${d.username}</span><button class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">登出</button>`;
+        nav.appendChild(el);
+      }
+    }
+  }).catch(()=>{});
+})();
 </script>
 </body>
 </html>
