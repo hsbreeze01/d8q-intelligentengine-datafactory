@@ -608,22 +608,37 @@ def del_watchlist(stock_code):
 # --- 赛道研报聚合 + AI观点汇总 ---
 @app.route("/api/research/track/<int:track_id>", methods=["GET"])
 def research_by_track(track_id):
-    """按赛道聚合研报 + AI观点汇总"""
+    """按赛道聚合研报 + AI观点汇总（带日级缓存）"""
+    from datetime import datetime
+    refresh = request.args.get("refresh") == "1"
+    today = datetime.now().strftime("%Y-%m-%d")
+
     conn = get_db()
     track = conn.execute("SELECT name, keywords FROM tracks WHERE id=?", (track_id,)).fetchone()
-    conn.close()
     if not track:
+        conn.close()
         return jsonify({"error": "赛道不存在"}), 404
 
+    # 检查缓存（同一赛道同一天只调一次LLM）
+    if not refresh:
+        cache = conn.execute(
+            "SELECT data FROM research_cache WHERE track_id=? AND date=?",
+            (track_id, today)).fetchone()
+        if cache:
+            conn.close()
+            result = json.loads(cache["data"])
+            result["cached"] = True
+            return jsonify(result)
+
+    conn.close()
+
     keywords = json.loads(track["keywords"])
-    # 用赛道关键词搜索研报
     all_reports = []
-    for kw in keywords[:3]:  # 取前3个关键词搜索
+    for kw in keywords[:3]:
         data, code = shark_request("GET", "/api/report/search?keyword=" + urllib.parse.quote(kw) + "&limit=10")
         if code == 200 and isinstance(data, dict):
             all_reports.extend(data.get("reports", data.get("results", [])))
 
-    # 去重
     seen = set()
     unique = []
     for r in all_reports:
@@ -632,9 +647,8 @@ def research_by_track(track_id):
             seen.add(title)
             unique.append(r)
 
-    result = {"track": track["name"], "reports": unique[:15], "total": len(unique)}
+    result = {"track": track["name"], "reports": unique[:15], "total": len(unique), "date": today}
 
-    # AI观点汇总（如果有研报）
     if unique:
         from datafactory.content.llm_creator import _llm_call
         titles = "\n".join("- " + r.get("title", "") + " (" + r.get("org", r.get("source", "")) + ")" for r in unique[:10])
@@ -647,6 +661,13 @@ def research_by_track(track_id):
         except Exception:
             result["ai_summary"] = None
 
+    # 写入缓存
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO research_cache (track_id, date, data) VALUES (?,?,?)",
+                (track_id, today, json.dumps(result, ensure_ascii=False)))
+    conn.commit()
+    conn.close()
+    result["cached"] = False
     return jsonify(result)
 
 # 启动调度器（gunicorn preload模式下只启动一次）
