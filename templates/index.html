@@ -306,15 +306,35 @@ toast('已移除');loadWatchlist();
 async function doStock(){
 const code=document.getElementById('stockInput').value.trim();
 if(!code)return;
-document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">分析中...</div></div>';
+document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">⏳ 分析中，请稍候...</div></div>';
 const data=await api('/api/stock/comprehensive',{method:'POST',body:JSON.stringify({stock_code:code})});
-let html='<div class="card"><h3>'+esc(code)+' 分析结果</h3>';
-if(data&&data.analysis){html+='<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">'+esc(typeof data.analysis==='string'?data.analysis:JSON.stringify(data.analysis,null,2))+'</div>'}
-else{html+='<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow:auto">'+esc(JSON.stringify(data,null,2))+'</pre>'}
+if(!data||data.error){document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">分析失败: '+(data?data.error:'网络错误')+'</div></div>';return}
+const name=data.stock_name||data.stock_code||code;
+const score=data.score||0;
+const scoreColor=score>=70?'#52c41a':score>=40?'#faad14':'#ff4d4f';
+const riskColors={低:'#52c41a',中:'#faad14',高:'#ff4d4f'};
+const signalMap={bullish:'看多 📈',bearish:'看空 📉',neutral:'中性 ➡️'};
+const signalColor={bullish:'#52c41a',bearish:'#ff4d4f',neutral:'#999'};
+let html='<div class="card"><h3>'+esc(name)+' ('+esc(data.stock_code||'')+') <span style="font-size:12px;color:#999;font-weight:400">'+esc((data.analyzed_at||'').slice(0,16))+'</span></h3>';
+// 评分+风险+摘要
+html+='<div style="display:flex;gap:24px;align-items:center;margin-bottom:16px"><div style="text-align:center"><div style="font-size:36px;font-weight:700;color:'+scoreColor+'">'+score+'</div><div style="font-size:12px;color:#999">综合评分</div></div>';
+html+='<div style="text-align:center"><div style="font-size:18px;font-weight:600;color:'+(riskColors[data.risk_level]||'#999')+'">'+esc(data.risk_level||'-')+'</div><div style="font-size:12px;color:#999">风险等级</div></div>';
+html+='<div style="flex:1;font-size:14px;line-height:1.8;color:#333;padding:12px;background:#f8f9fa;border-radius:6px;border-left:4px solid '+scoreColor+'">'+esc(data.summary||'')+'</div></div>';
+// 短中长期信号
+const terms=[{key:'short_term',label:'短期'},{key:'mid_term',label:'中期'},{key:'long_term',label:'长期'}];
+html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">';
+terms.forEach(t=>{const d2=data[t.key]||{};const sig=d2.signal||'neutral';
+html+='<div style="border:1px solid #f0f0f0;border-radius:8px;padding:14px"><div style="font-size:13px;color:#666;margin-bottom:6px">'+t.label+' <span style="color:'+(signalColor[sig]||'#999')+';font-weight:600">'+(signalMap[sig]||sig)+'</span></div>';
+html+='<div style="font-size:13px;color:#555;margin-bottom:8px">'+esc(d2.outlook||'')+'</div>';
+if(d2.key_factors&&d2.key_factors.length){html+='<ul style="margin:0;padding-left:16px;font-size:12px;color:#666">';d2.key_factors.forEach(f=>{html+='<li>'+esc(f)+'</li>'});html+='</ul>'}
+html+='</div>'});
 html+='</div>';
-// 关联资讯（通过NER）
-try{const news=await api('/api/news?size=5&keyword='+encodeURIComponent(code));
-if(news&&news.items&&news.items.length){html+='<div class="card"><h3>关联资讯</h3>';news.items.forEach(n=>{html+='<div class="ni"><div class="t">'+esc(n.title)+'</div><div class="m">'+(n.publish_time||'').slice(0,16)+' · '+n.source+'</div></div>'});html+='</div>'}}catch(e){}
+// 风险提示
+if(data.risk_alerts&&data.risk_alerts.length){html+='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:500;color:#ff4d4f;margin-bottom:6px">⚠️ 风险提示</div><ul style="margin:0;padding-left:16px;font-size:13px;color:#666">';data.risk_alerts.forEach(r=>{html+='<li>'+esc(r)+'</li>'});html+='</ul></div>'}
+html+='</div>';
+// 关联资讯
+try{const news=await api('/api/news?size=5&keyword='+encodeURIComponent(data.stock_name||code));
+if(news&&news.items&&news.items.length){html+='<div class="card"><h3>📰 关联资讯</h3>';news.items.forEach(n=>{html+='<div class="ni"><div class="m">'+tagHtml(n.news_type)+'<span style="font-size:12px;color:#999">'+(n.publish_time||'').slice(0,16)+' · '+n.source+'</span></div><div class="t">'+esc(n.title)+'</div>'+(n.ai_summary?'<div class="s" style="font-size:12px;color:#666">💡 '+esc(n.ai_summary)+'</div>':'')+'</div>'});html+='</div>'}}catch(e){}
 document.getElementById('stockResult').innerHTML=html;
 }
 
