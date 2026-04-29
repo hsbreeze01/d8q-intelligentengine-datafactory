@@ -101,8 +101,8 @@ const PAGES=[
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'_div'},
-{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
-{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
+{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor',href:'/tasks'},
+{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin',href:'/settings'},
 ];
 let curPage='dashboard',userRole='viewer';
 
@@ -114,7 +114,7 @@ if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
 return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
 }).join('');
-nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();goPage(a.dataset.p)});
+nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();var p=PAGES.find(x=>x.id===a.dataset.p);if(p&&p.href){location.href=p.href}else{goPage(a.dataset.p)}});
 }
 
 function goPage(id){
