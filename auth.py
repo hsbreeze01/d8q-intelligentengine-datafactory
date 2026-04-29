@@ -133,7 +133,7 @@ def login():
     users = _load_users()
     user = next((u for u in users if u["username"] == username), None)
 
-    if not user or not _check_pw(password, user["password_hash"]):
+    if not user or not _check_pw(password, user["password_hash"]) or user.get("frozen"):
         _record_fail(ip)
         return jsonify({"error": "用户名或密码错误"}), 401
 
@@ -164,7 +164,7 @@ def me():
 def list_users():
     users = _load_users()
     return jsonify([{"username": u["username"], "role": u["role"],
-                     "created_at": u.get("created_at", "")} for u in users])
+                     "created_at": u.get("created_at", ""), "frozen": u.get("frozen", False)} for u in users])
 
 
 @auth_bp.route("/api/auth/users", methods=["POST"])
@@ -218,4 +218,17 @@ def change_password(username):
             u["password_hash"] = _hash_pw(password)
             _save_users(users)
             return jsonify({"ok": True})
+    return jsonify({"error": "用户不存在"}), 404
+
+
+@auth_bp.route("/api/auth/users/<username>/freeze", methods=["POST"])
+def freeze_user(username):
+    if username == session.get("username"):
+        return jsonify({"error": "不能冻结自己"}), 400
+    users = _load_users()
+    for u in users:
+        if u["username"] == username:
+            u["frozen"] = not u.get("frozen", False)
+            _save_users(users)
+            return jsonify({"ok": True, "frozen": u["frozen"]})
     return jsonify({"error": "用户不存在"}), 404

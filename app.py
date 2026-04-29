@@ -236,6 +236,39 @@ def shark_request(method, path, data=None):
         return {"error": str(e)}, 502
 
 
+# 股票名称/代码互转缓存
+_stock_cache = {}
+
+def resolve_stock(input_str):
+    """将股票名称或代码统一解析为 (code, name)，使用东方财富搜索"""
+    input_str = input_str.strip()
+    if not input_str:
+        return input_str, input_str
+    if input_str in _stock_cache:
+        return _stock_cache[input_str]
+    # 纯6位数字直接视为代码
+    if input_str.isdigit() and len(input_str) == 6:
+        _stock_cache[input_str] = (input_str, input_str)
+        return input_str, input_str
+    # 用东方财富 suggest 接口解析名称→代码
+    try:
+        url = "https://searchapi.eastmoney.com/api/suggest/get?input=" + urllib.parse.quote(input_str) + "&type=14&count=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        items = data.get("QuotationCodeTable", {}).get("Data", [])
+        if items:
+            code = items[0].get("Code", input_str)
+            name = items[0].get("Name", input_str)
+            result = (code, name)
+            _stock_cache[input_str] = result
+            return result
+    except Exception:
+        pass
+    _stock_cache[input_str] = (input_str, input_str)
+    return input_str, input_str
+
+
 # --- Stock Analysis API (proxy to StockShark) ---
 @app.route("/api/stock/comprehensive", methods=["POST"])
 def stock_comprehensive():
@@ -248,7 +281,8 @@ def stock_announcements():
     sc = request.args.get("stock_code", "")
     days = request.args.get("days", "30")
     ai = request.args.get("ai_summary", "false").lower() == "true"
-    data, status = shark_request("GET", "/api/announcement/stock/" + sc + "?days=" + days)
+    code, name = resolve_stock(sc)
+    data, status = shark_request("GET", "/api/announcement/stock/" + code + "?days=" + days)
     if status == 200 and ai and data.get("announcements"):
         from datafactory.content.llm_creator import _llm_call
         titles = [a["title"] for a in data["announcements"][:10]]
@@ -269,7 +303,8 @@ def stock_reports():
 @app.route("/api/stock/quote", methods=["GET"])
 def stock_quote():
     symbol = request.args.get("symbol", "")
-    data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + symbol)
+    code, _ = resolve_stock(symbol)
+    data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + code)
     return jsonify(data), status
 
 
@@ -283,10 +318,14 @@ def report_stock_query():
     days = body.get("days", 7)
 
     def _query_one(kw):
-        data, code = shark_request("GET", "/api/report/stock/" + kw + "?days=" + str(days) + "&stock_name=" + kw)
-        if code == 200:
-            return data
-        return {"stock_code": kw, "stock_name": kw, "reports": [], "announcements": [], "error": str(data)}
+        # 研报用 search 接口（按关键词精确匹配）
+        rpt_data, rpt_code = shark_request("GET", "/api/report/search?keyword=" + kw + "&limit=20")
+        reports = rpt_data.get("reports", []) if rpt_code == 200 else []
+        # 公告用 announcement 接口（需要股票代码）
+        code, name = resolve_stock(kw)
+        ann_data, ann_code = shark_request("GET", "/api/announcement/stock/" + code + "?days=" + str(days))
+        anns = ann_data.get("announcements", []) if ann_code == 200 else []
+        return {"stock_code": code, "stock_name": name, "reports": reports, "announcements": anns}
 
     results = [None] * min(len(keywords), 20)
     with ThreadPoolExecutor(max_workers=5) as pool:
