@@ -569,6 +569,18 @@ def update_push_config():
     conn.close()
     return jsonify({"ok": True})
 
+
+# --- 服务状态 API (admin only, 读取健康检查结果) ---
+@app.route("/api/service-status")
+def service_status():
+    status_file = "/var/log/d8q/service_status.json"
+    try:
+        with open(status_file, encoding="utf-8") as f:
+            return json.loads(f.read()), 200
+    except Exception:
+        return {"error": "状态文件不存在"}, 404
+
+
 # 启动调度器（gunicorn preload模式下只启动一次）
 from scheduler import start_scheduler
 start_scheduler()

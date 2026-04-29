@@ -167,6 +167,8 @@ el.innerHTML=`
 <tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(11,16)}</td><td>${l.type||''}</td><td>${l.subject||''}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger||''}</span></td></tr>`).join('')}</tbody></table></div>`;
 // 渲染图表
 loadDashChart(heatData);
+// 服务状态卡片 (admin only)
+if(userRole==='admin'){loadServiceStatus();}
 }
 
 async function loadDashChart(latestHeat){
@@ -406,6 +408,20 @@ const users=await api('/api/auth/users');
 document.getElementById('userMgmt').innerHTML=`<table class="et"><thead><tr><th>用户名</th><th>角色</th><th>操作</th></tr></thead>
 <tbody>${(users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td><span class="badge badge-info">${u.role}</span></td><td><button class="btn-ghost" style="padding:3px 8px;font-size:12px" onclick="if(confirm('重置密码？')){api('/api/auth/users/${u.username}/password',{method:'PUT',body:JSON.stringify({password:prompt('新密码(≥8位):')})}).then(()=>toast('已重置'))}">重置密码</button></td></tr>`).join('')}</tbody></table>`;
 }
+
+// === 服务状态 (admin) ===
+async function loadServiceStatus(){
+try{const d=await api('/api/service-status');if(!d.services)return;
+const el=document.getElementById('contentArea');
+const svcs=d.services;
+const html=Object.entries(svcs).map(([name,s])=>{
+const ok=s.status==='ok'||s.status==='active';
+return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:13px">${name}${s.port?' <span style=color:#999;font-size:11px>:'+s.port+'</span>':''}</span><span class="badge ${ok?'badge-ok':'badge-err'}">${ok?'● 正常':'● 异常'}</span></div>`;
+}).join('');
+const card=document.createElement('div');card.className='card';card.style.marginTop='16px';
+card.innerHTML=`<h3>🖥️ 服务状态 <span style="font-size:11px;color:#999;font-weight:400">更新于 ${d.timestamp||''}</span></h3>${html}`;
+el.appendChild(card);
+}catch(e){}}
 
 // === 初始化 ===
 async function init(){
