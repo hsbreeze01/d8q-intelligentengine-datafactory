@@ -536,6 +536,39 @@ def settings_page():
         return f.read()
 
 
+
+
+# --- 推送配置 API ---
+@app.route("/api/push/config", methods=["GET"])
+def get_push_config():
+    from flask import session
+    username = session.get("username", "")
+    conn = get_db()
+    row = conn.execute("SELECT * FROM push_configs WHERE user_id=?", (username,)).fetchone()
+    conn.close()
+    if row:
+        return jsonify(dict(row))
+    return jsonify({"user_id": username, "email": "", "enabled_types": "[]",
+                    "daily_time": "08:00", "weekly_day": "friday", "alert_threshold": 30})
+
+
+@app.route("/api/push/config", methods=["PUT"])
+def update_push_config():
+    from flask import session
+    username = session.get("username", "")
+    body = request.json or {}
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO push_configs "
+        "(user_id, email, enabled_types, daily_time, weekly_day, alert_threshold, webhook_url) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (username, body.get("email", ""), json.dumps(body.get("enabled_types", [])),
+         body.get("daily_time", "08:00"), body.get("weekly_day", "friday"),
+         body.get("alert_threshold", 30), body.get("webhook_url", "")))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
 # 启动调度器（gunicorn preload模式下只启动一次）
 from scheduler import start_scheduler
 start_scheduler()
