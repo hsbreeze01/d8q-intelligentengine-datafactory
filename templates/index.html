@@ -278,33 +278,99 @@ const blob=new Blob([content],{type:'text/markdown'});
 const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='weekly_report.md';a.click();
 }
 
-// === 个股（保留原有） ===
+// === 个股（自选股+分析+关联资讯） ===
 function loadStock(el){
-el.innerHTML=`<div class="card"><h3>个股分析</h3>
-<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入股票代码或名称" id="stockInput"><button class="btn" onclick="doStock()">分析</button></div>
-<div id="stockResult"><div class="empty">输入股票代码开始分析</div></div></div>`;
+el.innerHTML=`
+<div class="card"><h3>搜索分析</h3>
+<div style="display:flex;gap:12px"><input class="search" style="flex:1;width:auto" placeholder="输入股票代码或名称，如 002594、北特科技" id="stockInput" onkeydown="if(event.key==='Enter')doStock()"><button class="btn" onclick="doStock()">分析</button><button class="btn-ghost" style="padding:8px 16px" onclick="addToWatchlist()">+ 加入自选</button></div></div>
+<div class="card"><h3>我的自选 <a class="more" onclick="loadStock(document.getElementById('contentArea'))">刷新</a></h3><div id="watchlistArea">加载中...</div></div>
+<div id="stockResult"></div>`;
+loadWatchlist();
+}
+async function loadWatchlist(){
+const data=await api('/api/watchlist');
+const el=document.getElementById('watchlistArea');
+if(!data||!data.length){el.innerHTML='<div class="empty">暂无自选股，搜索后点击"+ 加入自选"添加</div>';return}
+el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">'+data.map(s=>`<div style="padding:12px;border:1px solid #f0f0f0;border-radius:6px;cursor:pointer;position:relative" onclick="document.getElementById('stockInput').value='${s.stock_code}';doStock()"><div style="font-size:14px;font-weight:500">${esc(s.stock_name||s.stock_code)}</div><div style="font-size:12px;color:#999">${s.stock_code}</div><span style="position:absolute;top:4px;right:8px;color:#ff4d4f;cursor:pointer;font-size:14px" onclick="event.stopPropagation();delWatchlist('${s.stock_code}')">×</span></div>`).join('')+'</div>';
+}
+async function addToWatchlist(){
+const code=document.getElementById('stockInput').value.trim();
+if(!code){toast('请先输入股票代码',true);return}
+await api('/api/watchlist',{method:'POST',body:JSON.stringify({stock_code:code,stock_name:code})});
+toast('已加入自选');loadWatchlist();
+}
+async function delWatchlist(code){
+await api('/api/watchlist/'+code,{method:'DELETE'});
+toast('已移除');loadWatchlist();
 }
 async function doStock(){
 const code=document.getElementById('stockInput').value.trim();
 if(!code)return;
-document.getElementById('stockResult').innerHTML='<div class="empty">分析中...</div>';
+document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">分析中...</div></div>';
 const data=await api('/api/stock/comprehensive',{method:'POST',body:JSON.stringify({stock_code:code})});
-document.getElementById('stockResult').innerHTML='<pre style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+esc(JSON.stringify(data,null,2))+'</pre>';
+let html='<div class="card"><h3>'+esc(code)+' 分析结果</h3>';
+if(data&&data.analysis){html+='<div style="font-size:14px;line-height:1.8;white-space:pre-wrap">'+esc(typeof data.analysis==='string'?data.analysis:JSON.stringify(data.analysis,null,2))+'</div>'}
+else{html+='<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow:auto">'+esc(JSON.stringify(data,null,2))+'</pre>'}
+html+='</div>';
+// 关联资讯（通过NER）
+try{const news=await api('/api/news?size=5&keyword='+encodeURIComponent(code));
+if(news&&news.items&&news.items.length){html+='<div class="card"><h3>关联资讯</h3>';news.items.forEach(n=>{html+='<div class="ni"><div class="t">'+esc(n.title)+'</div><div class="m">'+(n.publish_time||'').slice(0,16)+' · '+n.source+'</div></div>'});html+='</div>'}}catch(e){}
+document.getElementById('stockResult').innerHTML=html;
 }
 
-// === 研报（保留原有） ===
+// === 研报（赛道聚合+搜索+完整展示+导出） ===
 function loadReport(el){
-el.innerHTML=`<div class="card"><h3>研报搜索</h3>
-<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入关键词搜索研报" id="reportInput"><button class="btn" onclick="doReport()">搜索</button></div>
+el.innerHTML=`
+<div class="card"><h3>赛道研报 <a class="more" id="trackRefresh" style="display:none" onclick="loadTrackReport(1)">刷新观点</a></h3>
+<div class="filters" id="trackFilter"></div>
+<div id="trackReportArea"><div class="empty">选择赛道查看研报聚合</div></div></div>
+<div class="card"><h3>研报搜索</h3>
+<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入股票名称或关键词搜索研报" id="reportInput" onkeydown="if(event.key==='Enter')doReport()"><button class="btn" onclick="doReport()">搜索</button></div>
 <div id="reportResult"><div class="empty">输入关键词开始搜索</div></div></div>`;
+loadTrackFilters();
+}
+async function loadTrackFilters(){
+const tracks=await api('/api/proxy/tracks');
+document.getElementById('trackFilter').innerHTML=(tracks||[]).map(t=>`<span class="fb" onclick="loadTrackReport(${t.id})">${t.name}</span>`).join('');
+}
+async function loadTrackReport(trackId,refresh){
+const area=document.getElementById('trackReportArea');
+area.innerHTML='<div class="empty">加载中...</div>';
+document.getElementById('trackRefresh').style.display='inline';
+document.getElementById('trackRefresh').onclick=()=>loadTrackReport(trackId,true);
+const data=await api('/api/research/track/'+trackId+(refresh?'?refresh=1':''));
+if(!data||data.error){area.innerHTML='<div class="empty">'+(data.error||'加载失败')+'</div>';return}
+let html='';
+if(data.ai_summary){html+='<div style="background:#f8f9fa;border-radius:6px;padding:14px;margin-bottom:16px;border-left:4px solid #1890ff"><div style="font-size:12px;color:#999;margin-bottom:6px">🤖 AI观点汇总'+(data.cached?' <span style="color:#52c41a">(缓存)</span>':'')+'</div><div style="font-size:13px;line-height:1.8;color:#555">'+esc(data.ai_summary)+'</div></div>'}
+if(data.reports&&data.reports.length){
+html+='<table class="et"><thead><tr><th>研报名称</th><th style="max-width:200px">摘要</th><th>机构</th><th>日期</th><th>操作</th></tr></thead><tbody>';
+data.reports.forEach(r=>{html+='<tr><td>'+esc(r.title)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.summary||'')+'">'+esc(r.summary||'-')+'</td><td>'+esc(r.org||r.source||'-')+'</td><td>'+esc(r.date||'-')+'</td><td>'+(r.detail_url?'<a href="'+esc(r.detail_url)+'" target="_blank" style="color:#1890ff;font-size:12px">查看</a>':'-')+'</td></tr>'});
+html+='</tbody></table>'}
+else{html+='<div class="empty">暂无研报数据</div>'}
+area.innerHTML=html;
 }
 async function doReport(){
 const kw=document.getElementById('reportInput').value.trim();
 if(!kw)return;
 document.getElementById('reportResult').innerHTML='<div class="empty">搜索中...</div>';
-const data=await api('/api/stock/reports?keyword='+encodeURIComponent(kw));
-const items=data.reports||data.results||[];
-document.getElementById('reportResult').innerHTML=items.length?`<table class="et"><thead><tr><th>标题</th><th>机构</th><th>日期</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.org||r.source||'')}</td><td>${r.date||''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">未找到相关研报</div>';
+const data=await api('/api/report/stock',{method:'POST',body:JSON.stringify({keywords:[kw],days:30})});
+const results=data.results||[];
+let html='';
+results.forEach(r=>{
+if(!r)return;
+const name=r.stock_name||r.stock_code||kw;
+const reports=r.reports||[];
+const anns=r.announcements||[];
+html+='<div style="margin-bottom:16px"><h4 style="font-size:14px;margin-bottom:8px">'+esc(name)+' <span style="font-size:12px;color:#999">研报 '+reports.length+'篇 | 公告 '+anns.length+'条</span></h4>';
+if(reports.length){html+='<table class="et"><thead><tr><th>研报名称</th><th style="max-width:180px">摘要</th><th>机构</th><th>日期</th><th>链接</th></tr></thead><tbody>';
+reports.forEach(rpt=>{html+='<tr><td>'+esc(rpt.title)+'</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(rpt.summary||'')+'">'+esc(rpt.summary||'-')+'</td><td>'+esc(rpt.org||'-')+'</td><td>'+esc(rpt.date||'-')+'</td><td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#1890ff;font-size:12px">查看</a>':'-')+'</td></tr>'});
+html+='</tbody></table>'}
+if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:12px">📋 公告 ('+anns.length+'条)</summary><table class="et"><thead><tr><th>公告标题</th><th>日期</th></tr></thead><tbody>';
+anns.forEach(a=>{html+='<tr><td>'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank">'+esc(a.title)+'</a>':esc(a.title))+'</td><td>'+esc(a.date||'-')+'</td></tr>'});
+html+='</tbody></table></details>'}
+if(!reports.length&&!anns.length)html+='<div class="empty">暂无数据</div>';
+html+='</div>'});
+document.getElementById('reportResult').innerHTML=html||'<div class="empty">未找到相关研报</div>';
 }
 
 // === 任务管理（完整CRUD） ===
