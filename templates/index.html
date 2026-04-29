@@ -398,6 +398,7 @@ el.innerHTML=`<div class="card"><h3>LLM 配置</h3>
 <div style="text-align:right"><button class="btn" onclick="saveSettings()">保存配置</button></div></div>
 <div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div>`;
 loadUserMgmt();
+loadServiceStatus();
 }
 async function saveSettings(){
 await api('/api/llm-config',{method:'PUT',body:JSON.stringify({llm:{model:document.getElementById('sModel').value,temperature:parseFloat(document.getElementById('sTemp').value),max_tokens:parseInt(document.getElementById('sTokens').value),base_url:document.getElementById('sUrl').value}})});
