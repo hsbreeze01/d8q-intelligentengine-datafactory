@@ -104,7 +104,7 @@ const PAGES=[
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
 ];
-let curPage='dashboard',userRole='viewer';
+let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
 
 function initNav(){
 const nav=document.getElementById('nav');

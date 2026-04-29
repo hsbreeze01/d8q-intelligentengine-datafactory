@@ -47,6 +47,10 @@ def agent_request(method, path, data=None):
 @app.route("/track")
 @app.route("/feed")
 @app.route("/weekly")
+@app.route("/tasks")
+@app.route("/stock")
+@app.route("/report")
+@app.route("/settings")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()
@@ -108,12 +112,6 @@ def weekly_generate():
         return jsonify({"content": content, "track": track_name, "news_count": len(news)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-@app.route("/tasks")
-def tasks_page():
-    with open(os.path.join(TMPL_DIR, "tasks.html"), encoding="utf-8") as f:
-        return f.read()
 
 
 # --- News API ---
@@ -230,12 +228,6 @@ def shark_request(method, path, data=None):
         return {"error": str(e)}, 502
 
 
-@app.route("/stock")
-def stock_page():
-    with open(os.path.join(TMPL_DIR, "stock.html"), encoding="utf-8") as f:
-        return f.read()
-
-
 # --- Stock Analysis API (proxy to StockShark) ---
 @app.route("/api/stock/comprehensive", methods=["POST"])
 def stock_comprehensive():
@@ -264,12 +256,6 @@ def stock_quote():
     data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + symbol)
     return jsonify(data), status
 
-
-
-@app.route("/report")
-def report_page():
-    with open(os.path.join(TMPL_DIR, "report.html"), encoding="utf-8") as f:
-        return f.read()
 
 
 @app.route("/api/report/stock", methods=["POST"])
@@ -529,12 +515,6 @@ def update_llm_config():
             cfg[k] = v
     save_config(cfg)
     return jsonify({"status": "ok"}), 200
-
-@app.route("/settings")
-def settings_page():
-    with open(os.path.join(TMPL_DIR, "settings.html"), encoding="utf-8") as f:
-        return f.read()
-
 
 
 
