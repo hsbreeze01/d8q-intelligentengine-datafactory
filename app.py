@@ -561,6 +561,94 @@ def service_status():
         return {"error": "状态文件不存在"}, 404
 
 
+
+
+# --- 自选股 API ---
+@app.route("/api/watchlist", methods=["GET"])
+def get_watchlist():
+    from flask import session
+    username = session.get("username", "")
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM user_watchlist WHERE user_id=?", (username,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/watchlist", methods=["POST"])
+def add_watchlist():
+    from flask import session
+    username = session.get("username", "")
+    body = request.json or {}
+    code = body.get("stock_code", "").strip()
+    name = body.get("stock_name", "").strip()
+    if not code:
+        return jsonify({"error": "stock_code必填"}), 400
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO user_watchlist (user_id, stock_code, stock_name) VALUES (?,?,?)",
+                    (username, code, name))
+        conn.commit()
+    except Exception:
+        pass
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/watchlist/<stock_code>", methods=["DELETE"])
+def del_watchlist(stock_code):
+    from flask import session
+    username = session.get("username", "")
+    conn = get_db()
+    conn.execute("DELETE FROM user_watchlist WHERE user_id=? AND stock_code=?", (username, stock_code))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# --- 赛道研报聚合 + AI观点汇总 ---
+@app.route("/api/research/track/<int:track_id>", methods=["GET"])
+def research_by_track(track_id):
+    """按赛道聚合研报 + AI观点汇总"""
+    conn = get_db()
+    track = conn.execute("SELECT name, keywords FROM tracks WHERE id=?", (track_id,)).fetchone()
+    conn.close()
+    if not track:
+        return jsonify({"error": "赛道不存在"}), 404
+
+    keywords = json.loads(track["keywords"])
+    # 用赛道关键词搜索研报
+    all_reports = []
+    for kw in keywords[:3]:  # 取前3个关键词搜索
+        data, code = shark_request("GET", "/api/report/search?keyword=" + urllib.parse.quote(kw) + "&limit=10")
+        if code == 200 and isinstance(data, dict):
+            all_reports.extend(data.get("reports", data.get("results", [])))
+
+    # 去重
+    seen = set()
+    unique = []
+    for r in all_reports:
+        title = r.get("title", "")
+        if title not in seen:
+            seen.add(title)
+            unique.append(r)
+
+    result = {"track": track["name"], "reports": unique[:15], "total": len(unique)}
+
+    # AI观点汇总（如果有研报）
+    if unique:
+        from datafactory.content.llm_creator import _llm_call
+        titles = "\n".join("- " + r.get("title", "") + " (" + r.get("org", r.get("source", "")) + ")" for r in unique[:10])
+        try:
+            summary = _llm_call(
+                f"以下是关于「{track['name']}」赛道的最新研报列表，请用3-5句话总结机构的整体观点倾向（看多/看空/共识），不要逐条列举：\n{titles}",
+                system="你是专业的投资分析师，擅长提炼研报观点。"
+            )
+            result["ai_summary"] = summary
+        except Exception:
+            result["ai_summary"] = None
+
+    return jsonify(result)
+
 # 启动调度器（gunicorn preload模式下只启动一次）
 from scheduler import start_scheduler
 start_scheduler()
