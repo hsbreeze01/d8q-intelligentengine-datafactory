@@ -101,8 +101,8 @@ const PAGES=[
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'_div'},
-{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor',href:'/tasks'},
-{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin',href:'/settings'},
+{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
+{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
 ];
 let curPage='dashboard',userRole='viewer';
 
@@ -114,7 +114,7 @@ if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
 return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
 }).join('');
-nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();var p=PAGES.find(x=>x.id===a.dataset.p);if(p&&p.href){location.href=p.href}else{goPage(a.dataset.p)}});
+nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();goPage(a.dataset.p)});
 }
 
 function goPage(id){
@@ -305,17 +305,78 @@ const items=data.reports||data.results||[];
 document.getElementById('reportResult').innerHTML=items.length?`<table class="et"><thead><tr><th>标题</th><th>机构</th><th>日期</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.org||r.source||'')}</td><td>${r.date||''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">未找到相关研报</div>';
 }
 
-// === 任务（保留原有，简化展示） ===
+// === 任务管理（完整CRUD） ===
 async function loadTasks(el){
 const[tasks,ctasks,logs]=await Promise.all([api('/api/tasks'),api('/api/content/tasks'),api('/api/content/exec-log?limit=20')]);
 el.innerHTML=`
-<div class="card"><h3>采集任务</h3><table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th></tr></thead>
-<tbody>${(tasks||[]).map(t=>`<tr><td>${esc(t.subject)}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td></tr>`).join('')}</tbody></table></div>
-<div class="card"><h3>创作/发布任务</h3><table class="et"><thead><tr><th>类型</th><th>主题</th><th>频率</th><th>执行时间</th><th>状态</th></tr></thead>
-<tbody>${(ctasks||[]).map(t=>`<tr><td>${t.type}</td><td>${t.subject}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='active'?'badge-ok':'badge-info'}">${t.status}</span></td></tr>`).join('')}</tbody></table></div>
-<div class="card"><h3>执行记录</h3><table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>耗时</th><th>触发</th></tr></thead>
-<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(11,16)}</td><td>${l.type}</td><td>${l.subject}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger}</span></td></tr>`).join('')}</tbody></table></div>`;
+<div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
+<table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
+<tbody>${(tasks||[]).map(t=>`<tr><td><b>${esc(t.subject)}</b></td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
+<td><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+
+<div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
+<table class="et"><thead><tr><th>类型</th><th>主题</th><th>风格/渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr></thead>
+<tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='active'?'badge-ok':'badge-err'}">${t.status}</span></td>
+<td><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+
+<div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="loadTasks(document.getElementById('contentArea'))">刷新</button></h3>
+<table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>结果</th><th>耗时</th><th>触发</th></tr></thead>
+<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(5,16)}</td><td>${l.type}</td><td>${l.subject}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(l.result_summary||'')}</td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger}</span></td></tr>`).join('')}</tbody></table></div>
+
+<div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>`;
 }
+
+// 采集任务操作
+function showCollectForm(){
+document.getElementById('taskModal').style.display='flex';
+document.getElementById('taskModal').innerHTML=`<div class="card" style="width:450px;max-width:90vw">
+<h3>新建采集任务</h3>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">采集主题 *</label><input class="search" style="width:100%;margin-top:4px" id="mSubject" placeholder="如：人工智能、具身智能"></div>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">数据来源</label><div style="margin-top:4px"><label><input type="checkbox" value="cailianshe" checked> 财联社</label> <label><input type="checkbox" value="nbd" checked> 每经</label> <label><input type="checkbox" value="36kr" checked> 36氪</label></div></div>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">调度频率</label><select class="search" style="width:100%;margin-top:4px" id="mCron"><option value="0 */2 * * *">每2小时</option><option value="0 */4 * * *">每4小时</option><option value="0 8,12,18 * * *">每天3次</option><option value="0 9 * * *">每天1次</option></select></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="saveCollect()">保存</button></div></div>`;
+}
+
+async function saveCollect(){
+var subject=document.getElementById('mSubject').value.trim();
+if(!subject){toast('主题必填',true);return}
+var sources=[];document.querySelectorAll('#taskModal input[type=checkbox]:checked').forEach(c=>sources.push(c.value));
+var cron=document.getElementById('mCron').value;
+await api('/api/tasks',{method:'POST',body:JSON.stringify({subject,sources,cron_expr:cron,max_results:20})});
+toast('采集任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
+}
+
+async function runCollect(id){toast('执行中...');var r=await api('/api/tasks/'+id+'/run',{method:'POST'});toast('采集完成: '+(r.total_count||0)+'条');loadTasks(document.getElementById('contentArea'))}
+async function delCollect(id){if(!confirm('确定删除？'))return;await api('/api/tasks/'+id,{method:'DELETE'});toast('已删除');loadTasks(document.getElementById('contentArea'))}
+
+// 创作/发布任务操作
+function showContentForm(type){
+var isPublish=type==='publish';
+document.getElementById('taskModal').style.display='flex';
+document.getElementById('taskModal').innerHTML=`<div class="card" style="width:450px;max-width:90vw">
+<h3>新建${isPublish?'发布':'创作'}任务</h3>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">主题 *</label><input class="search" style="width:100%;margin-top:4px" id="mCSubject" placeholder="如：人工智能"></div>
+${isPublish?'<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">发布渠道</label><select class="search" style="width:100%;margin-top:4px" id="mChannel"><option value="xiaohongshu">小红书</option></select></div>'
+:'<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">文章风格</label><select class="search" style="width:100%;margin-top:4px" id="mStyle"><option value="news_brief">资讯速递</option><option value="research_report">研究报告</option></select></div>'}
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">频率</label><select class="search" style="width:100%;margin-top:4px" id="mFreq"><option value="daily">每日</option><option value="weekly">每周</option></select></div>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">执行时间</label><input type="time" class="search" style="width:100%;margin-top:4px" id="mRunAt" value="${isPublish?'08:50':'08:30'}"></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="saveContent('${type}')">保存</button></div></div>`;
+}
+
+async function saveContent(type){
+var subject=document.getElementById('mCSubject').value.trim();
+if(!subject){toast('主题必填',true);return}
+var body={type,subject,freq:document.getElementById('mFreq').value,run_at:document.getElementById('mRunAt').value};
+if(type==='creation')body.style=document.getElementById('mStyle').value;
+else body.channel=document.getElementById('mChannel').value;
+await api('/api/content/tasks',{method:'POST',body:JSON.stringify(body)});
+toast('任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
+}
+
+async function runContent(id){toast('执行中，请稍候...');var r=await api('/api/content/tasks/'+id+'/run',{method:'POST'});toast(r.title||r.status||r.error||'完成');loadTasks(document.getElementById('contentArea'))}
+async function toggleContent(id){await api('/api/content/tasks/'+id+'/toggle',{method:'POST'});toast('状态已切换');loadTasks(document.getElementById('contentArea'))}
+async function delContent(id){if(!confirm('确定删除？'))return;await api('/api/content/tasks/'+id,{method:'DELETE'});toast('已删除');loadTasks(document.getElementById('contentArea'))}
+function closeModal(){document.getElementById('taskModal').style.display='none'}
 
 // === 设置（保留原有） ===
 async function loadSettings(el){
