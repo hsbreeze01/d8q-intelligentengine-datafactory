@@ -133,6 +133,8 @@ def news():
     subject = request.args.get("subject", "")
     source = request.args.get("source", "")
     date = request.args.get("date", "")
+    keyword = request.args.get("keyword", "")
+    news_type = request.args.get("news_type", "")
     where, params = [], []
     if subject:
         where.append("subject=?"); params.append(subject)
@@ -140,6 +142,10 @@ def news():
         where.append("source=?"); params.append(source)
     if date:
         where.append("DATE(publish_time)=?"); params.append(date)
+    if keyword:
+        where.append("(title LIKE ? OR entities LIKE ?)"); params.extend(['%'+keyword+'%', '%'+keyword+'%'])
+    if news_type:
+        where.append("news_type=?"); params.append(news_type)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     conn = get_db()
     try:
