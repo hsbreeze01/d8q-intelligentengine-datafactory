@@ -44,9 +44,70 @@ def agent_request(method, path, data=None):
 
 
 @app.route("/")
+@app.route("/track")
+@app.route("/feed")
+@app.route("/weekly")
 def index():
-    with open(os.path.join(TMPL_DIR, "news.html"), encoding="utf-8") as f:
+    with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()
+
+
+@app.route("/api/proxy/tracks", methods=["GET"])
+@app.route("/api/proxy/tracks/heat", methods=["GET"])
+@app.route("/api/proxy/tracks/heat/latest", methods=["GET"])
+@app.route("/api/proxy/tracks/<int:track_id>/news", methods=["GET"])
+def proxy_tracks(**kwargs):
+    """Proxy track API to Agent"""
+    path = request.path.replace("/api/proxy/", "/api/")
+    qs = request.query_string.decode()
+    url = AGENT_API + path + ("?" + qs if qs else "")
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            import json as _json
+            return _json.loads(resp.read()), resp.status
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
+@app.route("/api/weekly/generate", methods=["POST"])
+def weekly_generate():
+    """Generate weekly report via LLM"""
+    from datafactory.content.llm_creator import _llm_call, _fetch_news
+    body = request.json or {}
+    track_id = body.get("track_id", 1)
+    days = body.get("days", 7)
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    track = conn.execute("SELECT name FROM tracks WHERE id=?", (track_id,)).fetchone()
+    if not track:
+        conn.close()
+        return jsonify({"error": "赛道不存在"}), 404
+    track_name = track["name"]
+    conn.close()
+    news = _fetch_news(track_name, days)
+    if not news:
+        return jsonify({"error": "无资讯数据"}), 404
+    news_text = "\n".join("- [" + n["title"] + "] (" + n.get("source","") + ", " + (n.get("publish_time",""))[:10] + ")" for n in news[:20])
+    prompt = f"""你是专业的投资分析师。根据以下资讯，生成一份结构化的行业周报。
+
+赛道：{track_name}
+时间范围：近{days}天
+资讯列表：
+{news_text}
+
+要求：
+1. 分为：本周概览、重要事件、政策动态、融资并购、机构观点、下周关注
+2. 每个章节用 ## 标题
+3. 要点用 • 列表
+4. 总字数 800-1200 字
+5. 语气专业客观"""
+    try:
+        content = _llm_call(prompt, system="你是资深行业分析师。")
+        return jsonify({"content": content, "track": track_name, "news_count": len(news)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/tasks")

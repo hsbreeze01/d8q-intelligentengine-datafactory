@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q 智能资讯平台</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333;display:flex;height:100vh;overflow:hidden}
+.sidebar{width:200px;background:#001529;color:rgba(255,255,255,.65);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar .logo{padding:16px 20px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar .logo span{font-size:11px;opacity:.5;font-weight:400;margin-left:4px}
+.sidebar nav{flex:1;padding:8px 0}
+.sidebar nav a{display:flex;align-items:center;gap:10px;padding:12px 20px;color:rgba(255,255,255,.65);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:all .15s}
+.sidebar nav a:hover{color:#fff;background:rgba(255,255,255,.05)}
+.sidebar nav a.active{color:#fff;background:rgba(24,144,255,.15);border-left-color:#1890ff}
+.sidebar .divider{height:1px;background:rgba(255,255,255,.08);margin:8px 16px}
+.sidebar .user-box{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);font-size:12px}
+.sidebar .user-box .name{color:#fff;font-size:13px;font-weight:500}
+.sidebar .user-box .role{color:rgba(255,255,255,.45);margin-top:2px}
+.sidebar .user-box .logout{color:#ff6b6b;cursor:pointer;margin-top:4px;font-size:11px}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:48px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0}
+.topbar .title{font-size:16px;font-weight:600}
+.topbar .search{padding:6px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;width:220px;outline:none}
+.topbar .search:focus{border-color:#1890ff}
+.content{flex:1;overflow-y:auto;padding:24px}
+.page{display:none}.page.active{display:block}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.mc{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.mc .label{font-size:13px;color:#999;margin-bottom:8px}
+.mc .value{font-size:28px;font-weight:700;color:#1890ff}
+.mc .sub{font-size:12px;margin-top:4px}.mc .sub.up{color:#52c41a}.mc .sub.warn{color:#faad14}
+.card{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
+.card h3{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.card h3 .more{font-size:12px;color:#1890ff;font-weight:400;cursor:pointer;text-decoration:none}
+.grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+.ni{padding:12px 0;border-bottom:1px solid #f5f5f5}.ni:last-child{border-bottom:none}
+.ni .t{font-size:14px;font-weight:500;margin-bottom:4px}
+.ni .m{font-size:12px;color:#999}
+.ni .s{font-size:13px;color:#666;margin-top:4px;line-height:1.6}
+.ni .acts{margin-top:6px;display:flex;gap:12px}.ni .acts a{font-size:12px;color:#1890ff;cursor:pointer;text-decoration:none}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;margin-right:4px}
+.tag-policy{background:#fff7e6;color:#fa8c16}.tag-tech{background:#e6f7ff;color:#1890ff}
+.tag-funding{background:#f6ffed;color:#52c41a}.tag-market{background:#f9f0ff;color:#722ed1}.tag-report{background:#f0f0f0;color:#666}
+.et{width:100%;border-collapse:collapse;font-size:13px}
+.et th{text-align:left;padding:10px 12px;background:#fafafa;color:#666;font-weight:500;border-bottom:1px solid #f0f0f0}
+.et td{padding:10px 12px;border-bottom:1px solid #f5f5f5}
+.badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.badge-ok{background:#f6ffed;color:#52c41a}.badge-info{background:#e6f7ff;color:#1890ff}.badge-err{background:#fff2f0;color:#ff4d4f}
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.fb{padding:6px 14px;border:1px solid #d9d9d9;border-radius:16px;font-size:12px;cursor:pointer;background:#fff;transition:all .15s}
+.fb:hover{border-color:#1890ff;color:#1890ff}.fb.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.tc{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .2s;border-left:4px solid #1890ff}
+.tc:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.tc .n{font-size:16px;font-weight:600;margin-bottom:12px}
+.tc .sc{font-size:24px;font-weight:700;color:#1890ff}
+.tc .ch{font-size:13px;margin-left:8px}.tc .ch.up{color:#52c41a}.tc .ch.dn{color:#ff4d4f}
+.tc .st{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px;font-size:12px;color:#666}
+.tc .st b{color:#333;font-weight:500;float:right}
+.btn{padding:10px 20px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+.btn:hover{background:#40a9ff}.btn-ghost{background:transparent;color:#1890ff;border:1px solid #1890ff}.btn-ghost:hover{background:#e6f7ff}
+.btn-lg{padding:12px 32px;font-size:15px}
+.tpl-opts{display:flex;gap:12px;margin-bottom:16px}
+.tpl-opt{padding:10px 20px;border:2px solid #e8e8e8;border-radius:8px;cursor:pointer;font-size:13px}
+.tpl-opt.active{border-color:#1890ff;background:#e6f7ff;color:#1890ff}
+.rcfg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.rcfg .f label{display:block;font-size:12px;color:#666;margin-bottom:4px}
+.rcfg .f select{width:100%;padding:8px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;outline:none}
+.edt-bar{display:flex;gap:4px;padding:8px 12px;background:#fafafa;border:1px solid #e8e8e8;border-radius:6px 6px 0 0}
+.edt-bar button{padding:4px 8px;border:none;background:none;cursor:pointer;border-radius:4px;font-size:13px}
+.edt-bar button:hover{background:#e8e8e8}
+.edt-body{border:1px solid #e8e8e8;border-top:none;border-radius:0 0 6px 6px;padding:20px;min-height:300px;font-size:14px;line-height:1.8;outline:none}
+.empty{text-align:center;padding:40px;color:#999;font-size:14px}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:6px;font-size:14px;z-index:9999;opacity:0;transition:opacity .3s;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
+.toast.show{opacity:1}.toast.err{background:#fff2f0;color:#ff4d4f;border-color:#ffccc7}
+@media(max-width:768px){.sidebar{width:56px}.sidebar .logo span,.sidebar nav a span,.sidebar .user-box{display:none}.sidebar nav a{justify-content:center;padding:12px}}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<div class="logo">🏭 D8Q<span>Pro</span></div>
+<nav id="nav"></nav>
+<div class="user-box"><div class="name" id="uName">-</div><div class="role" id="uRole">-</div><div class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">退出登录</div></div>
+</div>
+<div class="main">
+<div class="topbar"><div class="title" id="pageTitle">概览</div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
+<div class="content" id="contentArea"></div>
+</div>
+<div class="toast" id="toast"></div>
+</body>
+</html>
+<script>
+// === 导航与路由 ===
+const PAGES=[
+{id:'dashboard',icon:'📊',label:'概览',title:'概览'},
+{id:'track',icon:'🔥',label:'赛道',title:'赛道热度'},
+{id:'feed',icon:'📰',label:'资讯',title:'资讯'},
+{id:'weekly',icon:'📝',label:'周报',title:'周报工作台'},
+{id:'stock',icon:'📈',label:'个股',title:'个股分析'},
+{id:'report',icon:'📑',label:'研报',title:'研报分析'},
+{id:'_div'},
+{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
+{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
+];
+let curPage='dashboard',userRole='viewer';
+
+function initNav(){
+const nav=document.getElementById('nav');
+nav.innerHTML=PAGES.map(p=>{
+if(p.id==='_div')return'<div class="divider"></div>';
+if(p.role==='admin'&&userRole!=='admin')return'';
+if(p.role==='editor'&&userRole==='viewer')return'';
+return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
+}).join('');
+nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();goPage(a.dataset.p)});
+}
+
+function goPage(id){
+curPage=id;
+document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.p===id));
+const p=PAGES.find(x=>x.id===id);
+document.getElementById('pageTitle').textContent=p?p.title:id;
+loadPage(id);
+}
+
+function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2500)}
+function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',market:'市场',report:'研报'};return`<span class="tag tag-${type||'tech'}">${m[type]||type||''}</span>`}
+
+// === 页面加载 ===
+function loadPage(id){
+const area=document.getElementById('contentArea');
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings};
+if(loaders[id])loaders[id](area);
+else area.innerHTML='<div class="empty">页面开发中...</div>';
+}
+
+// === Dashboard ===
+async function loadDashboard(el){
+const[heat,news,logs]=await Promise.all([
+api('/api/proxy/tracks/heat/latest'),
+api('/api/news?size=5'),
+api('/api/content/exec-log?limit=5')
+]);
+const heatData=heat||[];
+const newsItems=news.items||[];
+const totalNews=news.total||0;
+const trackCount=heatData.length;
+const alerts=heatData.filter(h=>h.change&&h.change>15).length;
+
+el.innerHTML=`
+<div class="metrics">
+<div class="mc"><div class="label">今日资讯</div><div class="value">${totalNews}</div><div class="sub up">数据库总量</div></div>
+<div class="mc"><div class="label">关注赛道</div><div class="value">${trackCount}</div><div class="sub">活跃追踪中</div></div>
+<div class="mc"><div class="label">热度异动</div><div class="value">${alerts}</div><div class="sub warn">${alerts?'有赛道热度突增':'暂无异动'}</div></div>
+<div class="mc"><div class="label">最近执行</div><div class="value">${(logs||[]).length}</div><div class="sub">条记录</div></div>
+</div>
+<div class="grid-2">
+<div class="card"><h3>赛道热度趋势 (7日) <a class="more" onclick="goPage('track')">查看全部 →</a></h3><div id="dashChart" style="height:220px"></div></div>
+<div class="card"><h3>今日要闻 <a class="more" onclick="goPage('feed')">更多 →</a></h3>${newsItems.slice(0,5).map(n=>`<div class="ni"><div class="t">${esc(n.title)}</div><div class="m">${(n.publish_time||'').slice(5,16)} · ${n.source}</div></div>`).join('')}</div>
+</div>
+<div class="card"><h3>最近执行记录</h3>
+<table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>耗时</th><th>触发</th></tr></thead>
+<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(11,16)}</td><td>${l.type||''}</td><td>${l.subject||''}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger||''}</span></td></tr>`).join('')}</tbody></table></div>`;
+// 渲染图表
+loadDashChart(heatData);
+}
+
+async function loadDashChart(latestHeat){
+const data=await api('/api/proxy/tracks/heat?days=7');
+if(!data||!data.length)return;
+const tracks={};
+data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,dates:[],scores:[]};tracks[d.name].dates.push(d.date.slice(5));tracks[d.name].scores.push(d.score)});
+const series=Object.entries(tracks).map(([name,v])=>({name,type:'line',smooth:true,data:v.scores,itemStyle:{color:v.color},lineStyle:{color:v.color}}));
+const dates=Object.values(tracks)[0]?.dates||[];
+const chart=echarts.init(document.getElementById('dashChart'));
+chart.setOption({tooltip:{trigger:'axis'},legend:{top:0,right:0,textStyle:{fontSize:11}},grid:{top:30,bottom:20,left:40,right:20},xAxis:{type:'category',data:dates},yAxis:{type:'value',max:100},series});
+}
+
+// === 赛道页 ===
+async function loadTrack(el){
+const[tracks,latest]=await Promise.all([api('/api/proxy/tracks'),api('/api/proxy/tracks/heat/latest')]);
+el.innerHTML=`
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+<div class="filters"><span class="fb active" onclick="loadTrackChart(7)">7天</span><span class="fb" onclick="loadTrackChart(30)">30天</span><span class="fb" onclick="loadTrackChart(90)">90天</span></div>
+</div>
+<div class="card"><h3>热度趋势对比</h3><div id="trackChart" style="height:250px"></div></div>
+<div class="tg">${(latest||[]).map(t=>`
+<div class="tc" style="border-left-color:${t.color||'#1890ff'}" onclick="goPage('feed')">
+<div class="n">${esc(t.name)}</div>
+<span class="sc">${t.score!=null?t.score:'-'}</span>
+<span class="ch ${(t.change||0)>=0?'up':'dn'}">${t.change!=null?(t.change>=0?'↑':'↓')+Math.abs(t.change).toFixed(1):''}</span>
+<div class="st"><span>资讯 <b>${t.news_count||0}条</b></span><span>政策 <b>${t.policy_count||0}条</b></span><span>研报 <b>${t.report_count||0}次</b></span><span>融资 <b>${t.funding_count||0}笔</b></span></div>
+</div>`).join('')}</div>`;
+loadTrackChart(7);
+}
+
+async function loadTrackChart(days){
+document.querySelectorAll('.filters .fb').forEach((b,i)=>b.classList.toggle('active',[7,30,90][i]===days));
+const data=await api('/api/proxy/tracks/heat?days='+days);
+if(!data||!data.length)return;
+const tracks={};
+data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,dates:[],scores:[]};tracks[d.name].dates.push(d.date.slice(5));tracks[d.name].scores.push(d.score)});
+const series=Object.entries(tracks).map(([name,v])=>({name,type:'line',smooth:true,data:v.scores,itemStyle:{color:v.color},lineStyle:{color:v.color},areaStyle:{color:v.color,opacity:0.05}}));
+const dates=Object.values(tracks)[0]?.dates||[];
+const chart=echarts.init(document.getElementById('trackChart'));
+chart.setOption({tooltip:{trigger:'axis'},legend:{top:0,right:0},grid:{top:30,bottom:20,left:40,right:20},xAxis:{type:'category',data:dates},yAxis:{type:'value',max:100},series});
+}
+
+// === 资讯页 ===
+let feedPage=1,feedSubject='',feedType='';
+async function loadFeed(el){
+const meta=await api('/api/meta');
+el.innerHTML=`
+<div class="filters" id="fSubjects"><span class="fb active" data-v="">全部赛道</span>${(meta.subjects||[]).map(s=>`<span class="fb" data-v="${s}">${s}</span>`).join('')}</div>
+<div class="filters" id="fTypes"><span class="fb active" data-v="">全部分类</span><span class="fb" data-v="policy">政策</span><span class="fb" data-v="funding">融资</span><span class="fb" data-v="tech">技术</span><span class="fb" data-v="market">市场</span><span class="fb" data-v="report">研报</span></div>
+<div class="card" id="feedList"><div class="empty">加载中...</div></div>
+<div id="feedPager" style="text-align:center;margin-top:12px"></div>`;
+document.querySelectorAll('#fSubjects .fb').forEach(b=>b.onclick=()=>{document.querySelectorAll('#fSubjects .fb').forEach(x=>x.classList.remove('active'));b.classList.add('active');feedSubject=b.dataset.v;feedPage=1;renderFeed()});
+document.querySelectorAll('#fTypes .fb').forEach(b=>b.onclick=()=>{document.querySelectorAll('#fTypes .fb').forEach(x=>x.classList.remove('active'));b.classList.add('active');feedType=b.dataset.v;feedPage=1;renderFeed()});
+feedPage=1;renderFeed();
+}
+
+async function renderFeed(){
+let url=`/api/news?page=${feedPage}&size=10`;
+if(feedSubject)url+=`&subject=${feedSubject}`;
+const data=await api(url);
+const items=(data.items||[]).filter(n=>!feedType||n.news_type===feedType);
+document.getElementById('feedList').innerHTML=items.length?items.map(n=>`
+<div class="ni">
+<div class="m">${tagHtml(n.news_type)}<span style="font-size:12px;color:#999">${(n.publish_time||'').slice(0,16)} · ${n.source} · ${n.subject}</span></div>
+<div class="t">${esc(n.title)}</div>
+${n.ai_summary?`<div class="s">💡 ${esc(n.ai_summary)}</div>`:''}
+<div class="acts"><a onclick="toast('已加入周报素材')">📝 加入周报</a><a onclick="toast('已标记')">⭐ 标记</a></div>
+</div>`).join(''):'<div class="empty">暂无数据</div>';
+const pages=Math.ceil((data.total||0)/10);
+document.getElementById('feedPager').innerHTML=pages>1?Array.from({length:Math.min(pages,10)},(_,i)=>`<span class="fb${feedPage===i+1?' active':''}" onclick="feedPage=${i+1};renderFeed()" style="display:inline-block;margin:2px">${i+1}</span>`).join(''):'';
+}
+</script>
+<script>
+// === 周报工作台 ===
+async function loadWeekly(el){
+const tracks=await api('/api/proxy/tracks');
+el.innerHTML=`
+<div class="card"><h3>生成配置</h3>
+<div class="rcfg"><div class="f"><label>赛道</label><select id="wTrack">${(tracks||[]).map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
+<div class="f"><label>时间范围</label><select id="wRange"><option value="7">本周</option><option value="14">近两周</option><option value="30">近30天</option></select></div>
+<div class="f"><label>语言</label><select><option>中文</option><option>English</option></select></div></div>
+<div style="margin-bottom:12px;font-size:13px;color:#666">选择模板：</div>
+<div class="tpl-opts"><div class="tpl-opt active" data-t="standard">📋 标准周报</div><div class="tpl-opt" data-t="committee">📊 投委会汇报</div><div class="tpl-opt" data-t="lp">📄 LP简报</div></div>
+<div style="text-align:center"><button class="btn btn-lg" onclick="genWeekly()">🚀 一键生成周报</button></div></div>
+<div class="card"><h3>编辑区 <a class="more" onclick="exportWeekly()">导出 Markdown</a></h3>
+<div class="edt-bar"><button><b>B</b></button><button><i>I</i></button><button>H1</button><button>H2</button><button>•</button><button>表格</button></div>
+<div class="edt-body" contenteditable="true" id="weeklyEditor"><p style="color:#999">点击"一键生成"开始...</p></div></div>`;
+document.querySelectorAll('.tpl-opts .tpl-opt').forEach(o=>o.onclick=()=>{document.querySelectorAll('.tpl-opt').forEach(x=>x.classList.remove('active'));o.classList.add('active')});
+}
+
+async function genWeekly(){
+const trackId=document.getElementById('wTrack').value;
+const days=document.getElementById('wRange').value;
+const editor=document.getElementById('weeklyEditor');
+editor.innerHTML='<p style="color:#999">⏳ 正在生成周报，请稍候...</p>';
+try{
+const data=await api('/api/weekly/generate',{method:'POST',body:JSON.stringify({track_id:parseInt(trackId),days:parseInt(days)})});
+if(data.content){editor.innerText=data.content;toast('周报生成成功')}
+else{editor.innerHTML='<p style="color:#ff4d4f">生成失败: '+(data.error||'未知错误')+'</p>';toast(data.error||'生成失败',true)}
+}catch(e){editor.innerHTML='<p style="color:#ff4d4f">请求失败</p>';toast('网络错误',true)}
+}
+
+function exportWeekly(){
+const content=document.getElementById('weeklyEditor').innerText;
+const blob=new Blob([content],{type:'text/markdown'});
+const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='weekly_report.md';a.click();
+}
+
+// === 个股（保留原有） ===
+function loadStock(el){
+el.innerHTML=`<div class="card"><h3>个股分析</h3>
+<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入股票代码或名称" id="stockInput"><button class="btn" onclick="doStock()">分析</button></div>
+<div id="stockResult"><div class="empty">输入股票代码开始分析</div></div></div>`;
+}
+async function doStock(){
+const code=document.getElementById('stockInput').value.trim();
+if(!code)return;
+document.getElementById('stockResult').innerHTML='<div class="empty">分析中...</div>';
+const data=await api('/api/stock/comprehensive',{method:'POST',body:JSON.stringify({stock_code:code})});
+document.getElementById('stockResult').innerHTML='<pre style="font-size:13px;line-height:1.6;white-space:pre-wrap">'+esc(JSON.stringify(data,null,2))+'</pre>';
+}
+
+// === 研报（保留原有） ===
+function loadReport(el){
+el.innerHTML=`<div class="card"><h3>研报搜索</h3>
+<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入关键词搜索研报" id="reportInput"><button class="btn" onclick="doReport()">搜索</button></div>
+<div id="reportResult"><div class="empty">输入关键词开始搜索</div></div></div>`;
+}
+async function doReport(){
+const kw=document.getElementById('reportInput').value.trim();
+if(!kw)return;
+document.getElementById('reportResult').innerHTML='<div class="empty">搜索中...</div>';
+const data=await api('/api/stock/reports?keyword='+encodeURIComponent(kw));
+const items=data.reports||data.results||[];
+document.getElementById('reportResult').innerHTML=items.length?`<table class="et"><thead><tr><th>标题</th><th>机构</th><th>日期</th></tr></thead><tbody>${items.map(r=>`<tr><td>${esc(r.title)}</td><td>${esc(r.org||r.source||'')}</td><td>${r.date||''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">未找到相关研报</div>';
+}
+
+// === 任务（保留原有，简化展示） ===
+async function loadTasks(el){
+const[tasks,ctasks,logs]=await Promise.all([api('/api/tasks'),api('/api/content/tasks'),api('/api/content/exec-log?limit=20')]);
+el.innerHTML=`
+<div class="card"><h3>采集任务</h3><table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th></tr></thead>
+<tbody>${(tasks||[]).map(t=>`<tr><td>${esc(t.subject)}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td></tr>`).join('')}</tbody></table></div>
+<div class="card"><h3>创作/发布任务</h3><table class="et"><thead><tr><th>类型</th><th>主题</th><th>频率</th><th>执行时间</th><th>状态</th></tr></thead>
+<tbody>${(ctasks||[]).map(t=>`<tr><td>${t.type}</td><td>${t.subject}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='active'?'badge-ok':'badge-info'}">${t.status}</span></td></tr>`).join('')}</tbody></table></div>
+<div class="card"><h3>执行记录</h3><table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>耗时</th><th>触发</th></tr></thead>
+<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(11,16)}</td><td>${l.type}</td><td>${l.subject}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger}</span></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// === 设置（保留原有） ===
+async function loadSettings(el){
+const cfg=await api('/api/llm-config');
+el.innerHTML=`<div class="card"><h3>LLM 配置</h3>
+<div class="rcfg"><div class="f"><label>模型</label><input id="sModel" value="${cfg.llm?.model||''}"></div>
+<div class="f"><label>Temperature</label><input id="sTemp" type="number" step="0.1" value="${cfg.llm?.temperature||0.7}"></div>
+<div class="f"><label>Max Tokens</label><input id="sTokens" type="number" value="${cfg.llm?.max_tokens||2000}"></div></div>
+<div style="margin-bottom:12px"><label style="font-size:12px;color:#666">API Base URL</label><input class="search" style="width:100%;margin-top:4px" id="sUrl" value="${cfg.llm?.base_url||''}"></div>
+<div style="text-align:right"><button class="btn" onclick="saveSettings()">保存配置</button></div></div>
+<div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div>`;
+loadUserMgmt();
+}
+async function saveSettings(){
+await api('/api/llm-config',{method:'PUT',body:JSON.stringify({llm:{model:document.getElementById('sModel').value,temperature:parseFloat(document.getElementById('sTemp').value),max_tokens:parseInt(document.getElementById('sTokens').value),base_url:document.getElementById('sUrl').value}})});
+toast('配置已保存');
+}
+async function loadUserMgmt(){
+const users=await api('/api/auth/users');
+document.getElementById('userMgmt').innerHTML=`<table class="et"><thead><tr><th>用户名</th><th>角色</th><th>操作</th></tr></thead>
+<tbody>${(users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td><span class="badge badge-info">${u.role}</span></td><td><button class="btn-ghost" style="padding:3px 8px;font-size:12px" onclick="if(confirm('重置密码？')){api('/api/auth/users/${u.username}/password',{method:'PUT',body:JSON.stringify({password:prompt('新密码(≥8位):')})}).then(()=>toast('已重置'))}">重置密码</button></td></tr>`).join('')}</tbody></table>`;
+}
+
+// === 初始化 ===
+async function init(){
+try{const me=await api('/api/auth/me');
+document.getElementById('uName').textContent=me.username||'-';
+document.getElementById('uRole').textContent=({admin:'管理员',editor:'编辑',viewer:'只读'}[me.role])||me.role;
+userRole=me.role||'viewer';
+}catch(e){}
+initNav();
+loadPage(curPage);
+}
+init();
+</script>
