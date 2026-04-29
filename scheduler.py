@@ -82,6 +82,33 @@ def _run_task(task):
         return {"error": str(e)}
 
 
+# --- 每日附加任务的执行状态 ---
+_daily_extras_last_run = ""
+
+
+def _run_daily_extras():
+    """每日 07:00 执行：热度异动检测 + 政策分析"""
+    global _daily_extras_last_run
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _daily_extras_last_run == today:
+        return
+    now = datetime.now()
+    if now.hour != 7 or now.minute > 5:
+        return
+    _daily_extras_last_run = today
+    try:
+        from heat_anomaly import detect_heat_anomaly, run_policy_analysis, run_investment_collection
+        logger.info("执行每日附加任务: 热度异动检测 + 政策分析")
+        r1 = detect_heat_anomaly()
+        logger.info("热度异动检测结果: %s", r1)
+        r2 = run_policy_analysis()
+        r3 = run_investment_collection()
+        logger.info("投融资采集结果: %s", r3)
+        logger.info("政策分析结果: %s", r2)
+    except Exception as e:
+        logger.error("每日附加任务失败: %s", e)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -89,12 +116,15 @@ def _tick():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         lock_fd.close()
-        return  # 另一个worker正在执行，跳过
+        return
 
     try:
         now = datetime.now()
         tasks = _load_tasks()
         changed = False
+
+        # 每日附加任务
+        _run_daily_extras()
 
         # 先执行creation，再执行publish
         for task_type in ("creation", "publish"):

@@ -1,0 +1,9 @@
+{
+  "llm": {
+    "api_key": "sk-858d16b6349a4ad98026a0a1da811a8f",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  }
+}

@@ -15,6 +15,8 @@ from auth import auth_bp, check_auth
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
+from export_weekly import export_bp
+app.register_blueprint(export_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
@@ -245,9 +247,17 @@ def stock_comprehensive():
 def stock_announcements():
     sc = request.args.get("stock_code", "")
     days = request.args.get("days", "30")
+    ai = request.args.get("ai_summary", "false").lower() == "true"
     data, status = shark_request("GET", "/api/announcement/stock/" + sc + "?days=" + days)
+    if status == 200 and ai and data.get("announcements"):
+        from datafactory.content.llm_creator import _llm_call
+        titles = [a["title"] for a in data["announcements"][:10]]
+        prompt = "以下是上市公司近期公告标题列表，请用1-2句话概括核心要点和对投资者的影响：\n" + "\n".join(f"- {t}" for t in titles)
+        try:
+            data["ai_summary"] = _llm_call(prompt, system="你是证券分析师，简洁专业地解读公告。")
+        except Exception:
+            data["ai_summary"] = None
     return jsonify(data), status
-
 
 @app.route("/api/stock/reports", methods=["GET"])
 def stock_reports():

@@ -160,7 +160,7 @@ el.innerHTML=`
 </div>
 <div class="grid-2">
 <div class="card"><h3>赛道热度趋势 (7日) <a class="more" onclick="goPage('track')">查看全部 →</a></h3><div id="dashChart" style="height:220px"></div></div>
-<div class="card"><h3>今日要闻 <a class="more" onclick="goPage('feed')">更多 →</a></h3>${newsItems.slice(0,5).map(n=>`<div class="ni"><div class="t">${esc(n.title)}</div><div class="m">${(n.publish_time||'').slice(5,16)} · ${n.source}</div></div>`).join('')}</div>
+<div class="card"><h3>今日要闻 <a class="more" onclick="goPage('feed')">更多 →</a></h3>${newsItems.slice(0,5).map(n=>`<div class="ni"><div class="t">${n.url?`<a href="${n.url}" target="_blank" style="color:#333;text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div><div class="m">${(n.publish_time||'').slice(5,16)} · ${n.source}</div></div>`).join('')}</div>
 </div>
 <div class="card"><h3>最近执行记录</h3>
 <table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>耗时</th><th>触发</th></tr></thead>
@@ -234,8 +234,8 @@ const items=(data.items||[]).filter(n=>!feedType||n.news_type===feedType);
 document.getElementById('feedList').innerHTML=items.length?items.map(n=>`
 <div class="ni">
 <div class="m">${tagHtml(n.news_type)}<span style="font-size:12px;color:#999">${(n.publish_time||'').slice(0,16)} · ${n.source} · ${n.subject}</span></div>
-<div class="t">${esc(n.title)}</div>
-${n.ai_summary?`<div class="s">💡 ${esc(n.ai_summary)}</div>`:''}
+<div class="t">${n.url?`<a href="${n.url}" target="_blank" style="color:#333;text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div>
+${n.ai_summary?`<div class="s" style="font-size:13px;color:#52c41a;margin:4px 0">💡 ${esc(n.ai_summary)}</div>`:(n.content?`<div class="s" style="font-size:13px;color:#666;margin:4px 0">${esc(n.content.slice(0,100))}${n.content.length>100?"...":""}</div>`:"")}${n.url?`<div style="margin-top:4px"><a href="${n.url}" target="_blank" style="font-size:12px;color:#1890ff;text-decoration:none">查看原文 →</a></div>`:""}
 <div class="acts"><a onclick="toast('已加入周报素材')">📝 加入周报</a><a onclick="toast('已标记')">⭐ 标记</a></div>
 </div>`).join(''):'<div class="empty">暂无数据</div>';
 const pages=Math.ceil((data.total||0)/10);
