@@ -278,7 +278,7 @@ function saveCreation(){
   }
 }
 function runCreation(id){toast("生成中...","info");api("/api/content/tasks/"+id+"/run",{method:"POST"}).then(function(r){
-  if(r.error)toast(r.error,"error");else toast("已生成: "+r.title+" ("+r.news_count+"条资讯)","success")
+  if(r.error)toast(r.error,"error");else toast("已生成: "+r.title+" ("+(r.news_count||r.data_count||0)+"条资讯)","success")
 })}
 
 // ========== 发布任务 ==========

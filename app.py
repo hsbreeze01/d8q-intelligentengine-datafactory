@@ -419,7 +419,7 @@ def _append_exec_log(task, result, duration, trigger="manual"):
         "type": task.get("type", ""),
         "subject": task.get("subject", ""),
         "trigger": trigger,
-        "success": "error" not in result,
+        "success": "error" not in result and result.get("status") != "error",
         "result_summary": result.get("error") or result.get("title") or result.get("status") or str(result)[:100],
         "duration": round(duration, 1),
         "time": __import__("datetime").datetime.now().isoformat()
