@@ -140,10 +140,9 @@ else area.innerHTML='<div class="empty">页面开发中...</div>';
 
 // === Dashboard ===
 async function loadDashboard(el){
-const[heat,news,logs]=await Promise.all([
+const[heat,news]=await Promise.all([
 api('/api/proxy/tracks/heat/latest'),
-api('/api/news?size=5'),
-api('/api/content/exec-log?limit=5')
+api('/api/news?size=5')
 ]);
 const heatData=heat||[];
 const newsItems=news.items||[];
@@ -156,15 +155,13 @@ el.innerHTML=`
 <div class="mc"><div class="label">今日资讯</div><div class="value">${totalNews}</div><div class="sub up">数据库总量</div></div>
 <div class="mc"><div class="label">关注赛道</div><div class="value">${trackCount}</div><div class="sub">活跃追踪中</div></div>
 <div class="mc"><div class="label">热度异动</div><div class="value">${alerts}</div><div class="sub warn">${alerts?'有赛道热度突增':'暂无异动'}</div></div>
-<div class="mc"><div class="label">最近执行</div><div class="value">${(logs||[]).length}</div><div class="sub">条记录</div></div>
+
 </div>
 <div class="grid-2">
 <div class="card"><h3>赛道热度趋势 (7日) <a class="more" onclick="goPage('track')">查看全部 →</a></h3><div id="dashChart" style="height:220px"></div></div>
 <div class="card"><h3>今日要闻 <a class="more" onclick="goPage('feed')">更多 →</a></h3>${newsItems.slice(0,5).map(n=>`<div class="ni"><div class="t">${n.url?`<a href="${n.url}" target="_blank" style="color:#333;text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div><div class="m">${(n.publish_time||'').slice(5,16)} · ${n.source}</div></div>`).join('')}</div>
 </div>
-<div class="card"><h3>最近执行记录</h3>
-<table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>耗时</th><th>触发</th></tr></thead>
-<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(11,16)}</td><td>${l.type||''}</td><td>${l.subject||''}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger||''}</span></td></tr>`).join('')}</tbody></table></div>`;
+`;
 // 渲染图表
 loadDashChart(heatData);
 // 服务状态卡片 (admin only)
@@ -404,7 +401,7 @@ el.innerHTML=`
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
 <table class="et"><thead><tr><th>类型</th><th>主题</th><th>风格/渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='active'?'badge-ok':'badge-err'}">${t.status}</span></td>
+<tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='paused'?'badge-err':'badge-ok'}">${t.status==='paused'?'已暂停':'运行中'}</span></td>
 <td><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
 
 <div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="loadTasks(document.getElementById('contentArea'))">刷新</button></h3>
