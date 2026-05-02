@@ -2,7 +2,7 @@
 import sqlite3, json, os
 import urllib.request
 import urllib.parse
-from flask import Flask, request, jsonify, render_template_string, send_from_directory
+from flask import Flask, request, jsonify, render_template_string, send_from_directory, session
 
 app = Flask(__name__)
 
@@ -70,6 +70,17 @@ def proxy_tracks(**kwargs):
     path = request.path.replace("/api/proxy/", "/api/")
     qs = request.query_string.decode()
     url = AGENT_API + path + ("?" + qs if qs else "")
+    # Inject user_id for personalization (unless admin requests view=all, or user has no subscriptions)
+    _username = session.get("username", "")
+    _role = session.get("role", "viewer")
+    if _username and not (_role == "admin" and request.args.get("view") == "all"):
+        # Check if user has any subscriptions
+        _conn = get_db()
+        _has_subs = _conn.execute("SELECT 1 FROM user_subscriptions WHERE user_id=? LIMIT 1", (_username,)).fetchone()
+        _conn.close()
+        if _has_subs:
+            sep = "&" if "?" in url else "?"
+            url = url + sep + "user_id=" + urllib.parse.quote(_username)
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -159,6 +170,25 @@ def news():
         where.append("(title LIKE ? OR entities LIKE ?)"); params.extend(['%'+keyword+'%', '%'+keyword+'%'])
     if news_type:
         where.append("news_type=?"); params.append(news_type)
+    # User subscription filtering
+    _news_username = session.get("username", "")
+    _news_role = session.get("role", "viewer")
+    _news_view = request.args.get("view", "")
+    if _news_username and not (_news_role == "admin" and _news_view == "all"):
+        conn_u = get_db()
+        try:
+            _sub_rows = conn_u.execute(
+                "SELECT t.name FROM user_subscriptions us JOIN tracks t ON us.track_id = t.id WHERE us.user_id = ?",
+                (_news_username,)
+            ).fetchall()
+        finally:
+            conn_u.close()
+        if _sub_rows:
+            _track_names = [r[0] for r in _sub_rows]
+            _placeholders = ",".join(["?"] * len(_track_names))
+            where.append(f"subject IN ({_placeholders})")
+            params.extend(_track_names)
+        # If no subscriptions, return full data (new user guidance)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     conn = get_db()
     try:
@@ -215,6 +245,12 @@ def run_task(task_id):
     data, code = agent_request("POST", "/api/tasks/" + task_id + "/run")
     return jsonify(data), code
 
+
+
+@app.route("/api/tasks/<task_id>/toggle", methods=["PUT"])
+def toggle_task(task_id):
+    data, code = agent_request("PUT", "/api/tasks/" + task_id + "/toggle")
+    return jsonify(data), code
 
 
 def _publisher_request(method, path, data=None):
@@ -547,8 +583,10 @@ def get_exec_log():
             logs = json.load(f)
     except Exception:
         logs = []
-    limit = int(request.args.get("limit", 50))
-    return jsonify(logs[:limit]), 200
+    page = int(request.args.get("page", 1))
+    size = int(request.args.get("size", 10))
+    total = len(logs)
+    return jsonify({"total": total, "items": logs[(page-1)*size:page*size], "page": page, "size": size}), 200
 
 @app.route("/api/keyword-suggestions", methods=["GET"])
 def keyword_suggestions():
@@ -587,7 +625,6 @@ def update_llm_config():
 # --- 推送配置 API ---
 @app.route("/api/push/config", methods=["GET"])
 def get_push_config():
-    from flask import session
     username = session.get("username", "")
     conn = get_db()
     row = conn.execute("SELECT * FROM push_configs WHERE user_id=?", (username,)).fetchone()
@@ -600,7 +637,6 @@ def get_push_config():
 
 @app.route("/api/push/config", methods=["PUT"])
 def update_push_config():
-    from flask import session
     username = session.get("username", "")
     body = request.json or {}
     conn = get_db()
@@ -629,46 +665,83 @@ def service_status():
 
 
 
-# --- 自选股 API ---
+# --- 用户订阅 API ---
+@app.route("/api/user/subscriptions", methods=["GET"])
+def get_user_subscriptions():
+    """获取当前用户订阅的赛道"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    data, code = agent_request("GET", f"/api/user/{username}/subscriptions")
+    return jsonify(data), code
+
+@app.route("/api/user/subscribe", methods=["POST"])
+def subscribe_track():
+    """订阅赛道"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    body = request.json or {}
+    body["user_id"] = username
+    data, code = agent_request("POST", "/api/user/subscribe", body)
+    return jsonify(data), code
+
+@app.route("/api/user/subscribe/<int:track_id>", methods=["DELETE"])
+def unsubscribe_track(track_id):
+    """取消订阅赛道"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    data, code = agent_request("DELETE", f"/api/user/subscribe/{username}/{track_id}")
+    return jsonify(data), code
+
+@app.route("/api/user/preferences", methods=["GET"])
+def get_user_preferences():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    data, code = agent_request("GET", f"/api/user/{username}/preferences")
+    return jsonify(data), code
+
+@app.route("/api/user/preferences", methods=["PUT"])
+def set_user_preference():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    body = request.json or {}
+    body["user_id"] = username
+    data, code = agent_request("PUT", "/api/user/preferences", body)
+    return jsonify(data), code
+
+
+# --- 自选股 API (proxy to Agent) ---
 @app.route("/api/watchlist", methods=["GET"])
 def get_watchlist():
-    from flask import session
     username = session.get("username", "")
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM user_watchlist WHERE user_id=?", (username,)).fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    data, code = agent_request("GET", f"/api/user/{username}/watchlist")
+    return jsonify(data), code
 
 
 @app.route("/api/watchlist", methods=["POST"])
 def add_watchlist():
-    from flask import session
     username = session.get("username", "")
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
     body = request.json or {}
-    code = body.get("stock_code", "").strip()
-    name = body.get("stock_name", "").strip()
-    if not code:
-        return jsonify({"error": "stock_code必填"}), 400
-    conn = get_db()
-    try:
-        conn.execute("INSERT INTO user_watchlist (user_id, stock_code, stock_name) VALUES (?,?,?)",
-                    (username, code, name))
-        conn.commit()
-    except Exception:
-        pass
-    conn.close()
-    return jsonify({"ok": True})
+    body["user_id"] = username
+    data, code = agent_request("POST", "/api/user/watchlist", body)
+    return jsonify(data), code
 
 
 @app.route("/api/watchlist/<stock_code>", methods=["DELETE"])
 def del_watchlist(stock_code):
-    from flask import session
     username = session.get("username", "")
-    conn = get_db()
-    conn.execute("DELETE FROM user_watchlist WHERE user_id=? AND stock_code=?", (username, stock_code))
-    conn.commit()
-    conn.close()
-    return jsonify({"ok": True})
+    if not username:
+        return jsonify({"success": False, "error": "未登录"}), 401
+    data, code = agent_request("DELETE", f"/api/user/{username}/watchlist/{stock_code}")
+    return jsonify(data), code
 
 
 # --- 赛道研报聚合 + AI观点汇总 ---
