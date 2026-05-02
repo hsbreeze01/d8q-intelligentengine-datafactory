@@ -76,6 +76,55 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:6px;font-size:14px;z-index:9999;opacity:0;transition:opacity .3s;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
 .toast.show{opacity:1}.toast.err{background:#fff2f0;color:#ff4d4f;border-color:#ffccc7}
 @media(max-width:768px){.sidebar{width:56px}.sidebar .logo span,.sidebar nav a span,.sidebar .user-box{display:none}.sidebar nav a{justify-content:center;padding:12px}}
+
+/* === 资讯 Feed 样式 === */
+.feed-item{background:#fff;border-radius:10px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:all .2s;border-left:4px solid #d9d9d9}
+.feed-item:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-1px)}
+.feed-item.policy{border-left-color:#fa8c16}.feed-item.tech{border-left-color:#1890ff}
+.feed-item.funding{border-left-color:#52c41a}.feed-item.market{border-left-color:#722ed1}.feed-item.report{border-left-color:#666}
+.feed-title{font-size:15px;font-weight:500;margin-bottom:8px;line-height:1.5}
+.feed-title a{color:#333;text-decoration:none}.feed-title a:hover{color:#1890ff}
+.feed-meta{font-size:12px;color:#999;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.feed-summary{font-size:13px;color:#666;line-height:1.7;margin-top:6px;padding:8px 12px;background:#f8f9fa;border-radius:6px}
+.feed-actions{margin-top:8px;display:flex;gap:12px}
+.feed-actions a{font-size:12px;color:#1890ff;cursor:pointer;text-decoration:none}
+.feed-actions a:hover{text-decoration:underline}
+.feed-pager{display:flex;justify-content:center;gap:6px;margin-top:16px}
+.feed-pager .fp{min-width:32px;height:32px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;cursor:pointer;background:#fff;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.feed-pager .fp:hover{border-color:#1890ff;color:#1890ff}.feed-pager .fp.active{background:#1890ff;color:#fff;border-color:#1890ff}
+
+/* === 个股页样式 === */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.stock-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;transition:all .2s;position:relative;border:1px solid #f0f0f0}
+.stock-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-2px);border-color:#1890ff}
+.stock-card .sc-name{font-size:15px;font-weight:600;margin-bottom:4px}
+.stock-card .sc-code{font-size:12px;color:#999}
+.stock-card .sc-del{position:absolute;top:8px;right:10px;color:#ccc;cursor:pointer;font-size:16px;transition:color .15s}
+.stock-card .sc-del:hover{color:#ff4d4f}
+.score-ring{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:50%;font-size:24px;font-weight:700;margin-right:20px}
+.risk-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:16px;font-size:13px;font-weight:500}
+.risk-badge.low{background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
+.risk-badge.mid{background:#fffbe6;color:#faad14;border:1px solid #ffe58f}
+.risk-badge.high{background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7}
+.term-card{border:1px solid #f0f0f0;border-radius:10px;padding:16px;transition:all .2s}
+.term-card:hover{border-color:#1890ff}
+.term-card .term-label{font-size:13px;color:#999;margin-bottom:4px}
+.term-card .term-signal{font-size:16px;font-weight:600;margin-bottom:8px}
+.term-card .term-outlook{font-size:13px;color:#555;line-height:1.6;margin-bottom:8px}
+.term-card ul{margin:0;padding-left:16px;font-size:12px;color:#666}
+.alert-box{background:#fff2f0;border:1px solid #ffccc7;border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.alert-box .alert-title{font-size:13px;font-weight:500;color:#ff4d4f;margin-bottom:6px}
+
+/* === 研报页样式 === */
+.rpt-item{background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:all .2s}
+.rpt-item:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.rpt-title{font-size:14px;font-weight:500;margin-bottom:6px;line-height:1.5}
+.rpt-meta{font-size:12px;color:#999;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rpt-meta .org-tag{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:10px;font-size:11px}
+.ai-box{background:linear-gradient(135deg,#e6f7ff,#f0f5ff);border:1px solid #91d5ff;border-radius:10px;padding:16px;margin-bottom:16px}
+.ai-box .ai-label{font-size:12px;color:#1890ff;font-weight:500;margin-bottom:8px}
+.ai-box .ai-text{font-size:14px;line-height:1.8;color:#333}
+
 </style>
 </head>
 <body>
@@ -229,15 +278,16 @@ let url=`/api/news?page=${feedPage}&size=10`;
 if(feedSubject)url+=`&subject=${feedSubject}`;
 const data=await api(url);
 const items=(data.items||[]).filter(n=>!feedType||n.news_type===feedType);
-document.getElementById('feedList').innerHTML=items.length?items.map(n=>`
-<div class="ni">
-<div class="m">${tagHtml(n.news_type)}<span style="font-size:12px;color:#999">${(n.publish_time||'').slice(0,16)} · ${n.source} · ${n.subject}</span></div>
-<div class="t">${n.url?`<a href="${n.url}" target="_blank" style="color:#333;text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div>
-${n.ai_summary?`<div class="s" style="font-size:13px;color:#52c41a;margin:4px 0">💡 ${esc(n.ai_summary)}</div>`:(n.content?`<div class="s" style="font-size:13px;color:#666;margin:4px 0">${esc(n.content.slice(0,100))}${n.content.length>100?"...":""}</div>`:"")}${n.url?`<div style="margin-top:4px"><a href="${n.url}" target="_blank" style="font-size:12px;color:#1890ff;text-decoration:none">查看原文 →</a></div>`:""}
-<div class="acts"><a onclick="toast('已加入周报素材')">📝 加入周报</a><a onclick="toast('已标记')">⭐ 标记</a></div>
-</div>`).join(''):'<div class="empty">暂无数据</div>';
+document.getElementById('feedList').innerHTML=items.length?items.map(n=>{
+const cls=n.news_type||'';
+return `<div class="feed-item ${cls}">
+<div class="feed-title">${n.url?`<a href="${n.url}" target="_blank">${esc(n.title)}</a>`:esc(n.title)}</div>
+<div class="feed-meta">${tagHtml(n.news_type)}<span>📅 ${(n.publish_time||'').slice(0,16)}</span><span>📰 ${esc(n.source||'')}</span><span>🔥 ${esc(n.subject||'')}</span></div>
+${n.ai_summary?`<div class="feed-summary">💡 ${esc(n.ai_summary)}</div>`:(n.content?`<div class="feed-summary">${esc(n.content.slice(0,150))}${n.content.length>150?'...':''}</div>`:'')}
+<div class="feed-actions">${n.url?`<a href="${n.url}" target="_blank">查看原文 →</a>`:''}<a onclick="toast('已加入周报素材')">📝 加入周报</a></div>
+</div>`;}).join(''):'<div class="empty">暂无数据</div>';
 const pages=Math.ceil((data.total||0)/10);
-document.getElementById('feedPager').innerHTML=pages>1?Array.from({length:Math.min(pages,10)},(_,i)=>`<span class="fb${feedPage===i+1?' active':''}" onclick="feedPage=${i+1};renderFeed()" style="display:inline-block;margin:2px">${i+1}</span>`).join(''):'';
+document.getElementById('feedPager').innerHTML=pages>1?'<div class="feed-pager">'+Array.from({length:Math.min(pages,10)},(_,i)=>`<div class="fp${feedPage===i+1?' active':''}" onclick="feedPage=${i+1};renderFeed()">${i+1}</div>`).join('')+'</div>':'';
 }
 </script>
 <script>
@@ -279,17 +329,28 @@ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=
 // === 个股（自选股+分析+关联资讯） ===
 function loadStock(el){
 el.innerHTML=`
-<div class="card"><h3>搜索分析</h3>
-<div style="display:flex;gap:12px"><input class="search" style="flex:1;width:auto" placeholder="输入股票代码或名称，如 002594、北特科技" id="stockInput" onkeydown="if(event.key==='Enter')doStock()"><button class="btn" onclick="doStock()">分析</button><button class="btn-ghost" style="padding:8px 16px" onclick="addToWatchlist()">+ 加入自选</button></div></div>
-<div class="card"><h3>我的自选 <a class="more" onclick="loadStock(document.getElementById('contentArea'))">刷新</a></h3><div id="watchlistArea">加载中...</div></div>
+<div class="card" style="padding:20px 24px">
+<div style="display:flex;gap:12px;align-items:center">
+<div style="flex:1;position:relative">
+<input class="search" style="width:100%;padding:12px 16px;font-size:14px" placeholder="🔍 输入股票代码或名称，如 002594、北特科技" id="stockInput" onkeydown="if(event.key==='Enter')doStock()">
+</div>
+<button class="btn" style="padding:10px 24px" onclick="doStock()">📈 分析</button>
+<button class="btn-ghost" style="padding:10px 16px" onclick="addToWatchlist()">+ 自选</button>
+</div>
+</div>
+<div class="card" style="padding:20px 24px"><h3>我的自选 <a class="more" onclick="loadStock(document.getElementById('contentArea'))">🔄 刷新</a></h3><div id="watchlistArea" class="stock-grid">加载中...</div></div>
 <div id="stockResult"></div>`;
 loadWatchlist();
 }
 async function loadWatchlist(){
 const data=await api('/api/watchlist');
 const el=document.getElementById('watchlistArea');
-if(!data||!data.length){el.innerHTML='<div class="empty">暂无自选股，搜索后点击"+ 加入自选"添加</div>';return}
-el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">'+data.map(s=>`<div style="padding:12px;border:1px solid #f0f0f0;border-radius:6px;cursor:pointer;position:relative" onclick="document.getElementById('stockInput').value='${s.stock_code}';doStock()"><div style="font-size:14px;font-weight:500">${esc(s.stock_name||s.stock_code)}</div><div style="font-size:12px;color:#999">${s.stock_code}</div><span style="position:absolute;top:4px;right:8px;color:#ff4d4f;cursor:pointer;font-size:14px" onclick="event.stopPropagation();delWatchlist('${s.stock_code}')">×</span></div>`).join('')+'</div>';
+if(!data||!data.length){el.innerHTML='<div class="empty" style="grid-column:1/-1;padding:40px">暂无自选股，搜索后点击「+ 自选」添加</div>';return}
+el.innerHTML=data.map(s=>`<div class="stock-card" onclick="document.getElementById('stockInput').value='${s.stock_code}';doStock()">
+<div class="sc-name">${esc(s.stock_name||s.stock_code)}</div>
+<div class="sc-code">${s.stock_code}</div>
+<span class="sc-del" onclick="event.stopPropagation();delWatchlist('${s.stock_code}')">×</span>
+</div>`).join('');
 }
 async function addToWatchlist(){
 const code=document.getElementById('stockInput').value.trim();
@@ -304,31 +365,46 @@ toast('已移除');loadWatchlist();
 async function doStock(){
 const code=document.getElementById('stockInput').value.trim();
 if(!code)return;
-document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">⏳ 分析中，请稍候...</div></div>';
+document.getElementById('stockResult').innerHTML='<div class="card" style="padding:20px 24px"><div class="empty">⏳ 正在深度分析，请稍候...</div></div>';
 const data=await api('/api/stock/comprehensive',{method:'POST',body:JSON.stringify({stock_code:code})});
-if(!data||data.error){document.getElementById('stockResult').innerHTML='<div class="card"><div class="empty">分析失败: '+(data?data.error:'网络错误')+'</div></div>';return}
+if(!data||data.error){document.getElementById('stockResult').innerHTML='<div class="card" style="padding:20px 24px"><div class="empty">❌ '+(data?data.error:'网络错误')+'</div></div>';return}
 const name=data.stock_name||data.stock_code||code;
 const score=data.score||0;
 const scoreColor=score>=70?'#52c41a':score>=40?'#faad14':'#ff4d4f';
-const riskColors={低:'#52c41a',中:'#faad14',高:'#ff4d4f'};
+const riskLv=data.risk_level||'中';
+const riskCls=riskLv==='低'?'low':riskLv==='高'?'high':'mid';
 const signalMap={bullish:'看多 📈',bearish:'看空 📉',neutral:'中性 ➡️'};
 const signalColor={bullish:'#52c41a',bearish:'#ff4d4f',neutral:'#999'};
-let html='<div class="card"><h3>'+esc(name)+' ('+esc(data.stock_code||'')+') <span style="font-size:12px;color:#999;font-weight:400">'+esc((data.analyzed_at||'').slice(0,16))+'</span></h3>';
-// 评分+风险+摘要
-html+='<div style="display:flex;gap:24px;align-items:center;margin-bottom:16px"><div style="text-align:center"><div style="font-size:36px;font-weight:700;color:'+scoreColor+'">'+score+'</div><div style="font-size:12px;color:#999">综合评分</div></div>';
-html+='<div style="text-align:center"><div style="font-size:18px;font-weight:600;color:'+(riskColors[data.risk_level]||'#999')+'">'+esc(data.risk_level||'-')+'</div><div style="font-size:12px;color:#999">风险等级</div></div>';
-html+='<div style="flex:1;font-size:14px;line-height:1.8;color:#333;padding:12px;background:#f8f9fa;border-radius:6px;border-left:4px solid '+scoreColor+'">'+esc(data.summary||'')+'</div></div>';
-// 短中长期信号
-const terms=[{key:'short_term',label:'短期'},{key:'mid_term',label:'中期'},{key:'long_term',label:'长期'}];
-html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">';
+const terms=[{key:'short_term',label:'短期(1-4周)'},{key:'mid_term',label:'中期(1-6月)'},{key:'long_term',label:'长期(1-3年)'}];
+let html=`<div class="card" style="padding:20px 24px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+<h3 style="margin:0">${esc(name)} <span style="font-size:14px;color:#999;font-weight:400">(${esc(data.stock_code||'')})</span></h3>
+<span style="font-size:12px;color:#999">${data.cached?'📦 缓存':'🆕 实时'} · ${esc((data.analyzed_at||'').slice(0,16))}</span>
+</div>
+<div style="display:flex;gap:24px;align-items:center;margin-bottom:20px">
+<div class="score-ring" style="background:${scoreColor}15;color:${scoreColor};border:3px solid ${scoreColor}">${score}</div>
+<div style="flex:1">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+<span class="risk-badge ${riskCls}">⚡ 风险: ${esc(riskLv)}</span>
+<span style="font-size:12px;color:#999">综合评分</span>
+</div>
+<div style="font-size:14px;line-height:1.8;color:#333;padding:14px;background:#f8f9fa;border-radius:8px;border-left:4px solid ${scoreColor}">${esc(data.summary||'暂无摘要')}</div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">`;
 terms.forEach(t=>{const d2=data[t.key]||{};const sig=d2.signal||'neutral';
-html+='<div style="border:1px solid #f0f0f0;border-radius:8px;padding:14px"><div style="font-size:13px;color:#666;margin-bottom:6px">'+t.label+' <span style="color:'+(signalColor[sig]||'#999')+';font-weight:600">'+(signalMap[sig]||sig)+'</span></div>';
-html+='<div style="font-size:13px;color:#555;margin-bottom:8px">'+esc(d2.outlook||'')+'</div>';
-if(d2.key_factors&&d2.key_factors.length){html+='<ul style="margin:0;padding-left:16px;font-size:12px;color:#666">';d2.key_factors.forEach(f=>{html+='<li>'+esc(f)+'</li>'});html+='</ul>'}
-html+='</div>'});
+html+=`<div class="term-card">
+<div class="term-label">${t.label}</div>
+<div class="term-signal" style="color:${signalColor[sig]||'#999'}">${signalMap[sig]||sig}</div>
+<div class="term-outlook">${esc(d2.outlook||'')}</div>`;
+if(d2.key_factors&&d2.key_factors.length){html+='<ul>';d2.key_factors.forEach(f=>{html+='<li>'+esc(f)+'</li>'});html+='</ul>'}
+html+='</div>';});
 html+='</div>';
-// 风险提示
-if(data.risk_alerts&&data.risk_alerts.length){html+='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:500;color:#ff4d4f;margin-bottom:6px">⚠️ 风险提示</div><ul style="margin:0;padding-left:16px;font-size:13px;color:#666">';data.risk_alerts.forEach(r=>{html+='<li>'+esc(r)+'</li>'});html+='</ul></div>'}
+if(data.risk_alerts&&data.risk_alerts.length){
+html+=`<div class="alert-box"><div class="alert-title">⚠️ 风险提示</div><ul style="margin:0;padding-left:16px;font-size:13px;color:#666;line-height:1.8">`;
+data.risk_alerts.forEach(r=>{html+='<li>'+esc(r)+'</li>'});
+html+='</ul></div>';
+}
 html+='</div>';
 // 关联资讯
 try{const news=await api('/api/news?size=5&keyword='+encodeURIComponent(data.stock_name||code));
@@ -359,36 +435,55 @@ document.getElementById('trackRefresh').onclick=()=>loadTrackReport(trackId,true
 const data=await api('/api/research/track/'+trackId+(refresh?'?refresh=1':''));
 if(!data||data.error){area.innerHTML='<div class="empty">'+(data.error||'加载失败')+'</div>';return}
 let html='';
-if(data.ai_summary){html+='<div style="background:#f8f9fa;border-radius:6px;padding:14px;margin-bottom:16px;border-left:4px solid #1890ff"><div style="font-size:12px;color:#999;margin-bottom:6px">🤖 AI观点汇总'+(data.cached?' <span style="color:#52c41a">(缓存)</span>':'')+'</div><div style="font-size:13px;line-height:1.8;color:#555">'+esc(data.ai_summary)+'</div></div>'}
+if(data.ai_summary){html+=`<div class="ai-box"><div class="ai-label">🤖 AI 观点汇总${data.cached?' <span style="color:#52c41a">(缓存)</span>':''}</div><div class="ai-text">${esc(data.ai_summary)}</div></div>`}
 if(data.reports&&data.reports.length){
-html+='<table class="et"><thead><tr><th>研报名称</th><th style="max-width:200px">摘要</th><th>机构</th><th>日期</th><th>操作</th></tr></thead><tbody>';
-data.reports.forEach(r=>{html+='<tr><td>'+esc(r.title)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.summary||'')+'">'+esc(r.summary||'-')+'</td><td>'+esc(r.org||r.source||'-')+'</td><td>'+esc(r.date||'-')+'</td><td>'+(r.detail_url?'<a href="'+esc(r.detail_url)+'" target="_blank" style="color:#1890ff;font-size:12px">查看</a>':'-')+'</td></tr>'});
-html+='</tbody></table>'}
-else{html+='<div class="empty">暂无研报数据</div>'}
+data.reports.forEach(r=>{
+html+=`<div class="rpt-item">
+<div class="rpt-title">${r.detail_url?`<a href="${esc(r.detail_url)}" target="_blank" style="color:#333;text-decoration:none">${esc(r.title)}</a>`:esc(r.title)}</div>
+<div class="rpt-meta">
+<span class="org-tag">${esc(r.org||r.source||'未知机构')}</span>
+<span>📅 ${esc(r.date||'-')}</span>
+</div>
+${r.summary?`<div style="font-size:12px;color:#666;margin-top:6px;line-height:1.5">${esc(r.summary).slice(0,200)}${r.summary.length>200?'...':''}</div>`:''}
+</div>`;
+});
+}else{html+='<div class="empty">暂无研报数据</div>'}
 area.innerHTML=html;
 }
 async function doReport(){
 const kw=document.getElementById('reportInput').value.trim();
 if(!kw)return;
-document.getElementById('reportResult').innerHTML='<div class="empty">搜索中...</div>';
+document.getElementById('reportResult').innerHTML='<div class="empty">🔍 搜索中...</div>';
 const data=await api('/api/report/stock',{method:'POST',body:JSON.stringify({keywords:[kw],days:30})});
 const results=data.results||[];
+if(!results.length){document.getElementById('reportResult').innerHTML='<div class="empty">未找到相关研报</div>';return}
 let html='';
 results.forEach(r=>{
 if(!r)return;
 const name=r.stock_name||r.stock_code||kw;
 const reports=r.reports||[];
 const anns=r.announcements||[];
-html+='<div style="margin-bottom:16px"><h4 style="font-size:14px;margin-bottom:8px">'+esc(name)+' <span style="font-size:12px;color:#999">研报 '+reports.length+'篇 | 公告 '+anns.length+'条</span></h4>';
-if(reports.length){html+='<table class="et"><thead><tr><th>研报名称</th><th style="max-width:180px">摘要</th><th>机构</th><th>日期</th><th>链接</th></tr></thead><tbody>';
-reports.forEach(rpt=>{html+='<tr><td>'+esc(rpt.title)+'</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(rpt.summary||'')+'">'+esc(rpt.summary||'-')+'</td><td>'+esc(rpt.org||'-')+'</td><td>'+esc(rpt.date||'-')+'</td><td>'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#1890ff;font-size:12px">查看</a>':'-')+'</td></tr>'});
-html+='</tbody></table>'}
-if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:12px">📋 公告 ('+anns.length+'条)</summary><table class="et"><thead><tr><th>公告标题</th><th>日期</th></tr></thead><tbody>';
-anns.forEach(a=>{html+='<tr><td>'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank">'+esc(a.title)+'</a>':esc(a.title))+'</td><td>'+esc(a.date||'-')+'</td></tr>'});
-html+='</tbody></table></details>'}
-if(!reports.length&&!anns.length)html+='<div class="empty">暂无数据</div>';
-html+='</div>'});
-document.getElementById('reportResult').innerHTML=html||'<div class="empty">未找到相关研报</div>';
+html+=`<div class="card" style="padding:16px 20px;margin-bottom:12px">
+<h4 style="font-size:15px;margin-bottom:12px">${esc(name)} <span style="font-size:12px;color:#999;font-weight:400">研报 ${reports.length}篇 · 公告 ${anns.length}条</span></h4>`;
+if(reports.length){
+reports.forEach(rpt=>{
+html+=`<div class="rpt-item" style="margin-bottom:8px">
+<div class="rpt-title">${rpt.detail_url?`<a href="${esc(rpt.detail_url)}" target="_blank" style="color:#333;text-decoration:none">${esc(rpt.title)}</a>`:esc(rpt.title)}</div>
+<div class="rpt-meta"><span class="org-tag">${esc(rpt.org||'未知')}</span><span>📅 ${esc(rpt.date||'-')}</span></div>
+${rpt.summary?`<div style="font-size:12px;color:#666;margin-top:4px;line-height:1.5">${esc(rpt.summary).slice(0,150)}...</div>`:''}
+</div>`;
+});
+}
+if(anns.length){
+html+=`<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:13px;padding:6px 0">📋 公告 (${anns.length}条)</summary>`;
+anns.forEach(a=>{
+html+=`<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">${a.detail_url?`<a href="${esc(a.detail_url)}" target="_blank" style="color:#333;text-decoration:none">${esc(a.title)}</a>`:esc(a.title)}</div><div class="rpt-meta"><span>📅 ${esc(a.date||'-')}</span></div></div>`;
+});
+html+='</details>';
+}
+html+='</div>';
+});
+document.getElementById('reportResult').innerHTML=html;
 }
 
 // === 任务管理（完整CRUD） ===
