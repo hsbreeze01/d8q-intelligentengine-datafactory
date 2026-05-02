@@ -125,6 +125,13 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .ai-box .ai-label{font-size:12px;color:#1890ff;font-weight:500;margin-bottom:8px}
 .ai-box .ai-text{font-size:14px;line-height:1.8;color:#333}
 
+.view-toggle{display:inline-flex;border:1px solid #d9d9d9;border-radius:6px;overflow:hidden;margin-right:16px;font-size:12px}
+.view-toggle span{padding:4px 12px;cursor:pointer;background:#fff;color:#666;transition:all .15s}
+.view-toggle span.active{background:#1890ff;color:#fff}
+.view-toggle span:hover:not(.active){background:#f5f5f5}
+.guide-banner{background:linear-gradient(135deg,#e6f7ff 0%,#bae7ff 100%);border:1px solid #91d5ff;border-radius:8px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:#1890ff;animation:slideDown .3s ease}
+.guide-banner a{color:#0050b3;font-weight:600;text-decoration:underline;cursor:pointer}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -134,7 +141,7 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 <div class="user-box"><div class="name" id="uName">-</div><div class="role" id="uRole">-</div><div class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">退出登录</div></div>
 </div>
 <div class="main">
-<div class="topbar"><div class="title" id="pageTitle">概览</div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
+<div class="topbar"><div class="title" id="pageTitle">概览</div><div id="viewToggle" style="display:none" class="view-toggle"><span class="active" data-v="mine" onclick="switchView('mine')">我的视图</span><span data-v="all" onclick="switchView('all')">全局视图</span></div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
 <div class="content" id="contentArea"></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -150,6 +157,7 @@ const PAGES=[
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'policy',icon:'📜',label:'政策',title:'政策分析'},
+{id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
@@ -180,22 +188,24 @@ window.addEventListener('popstate',e=>{if(e.state&&e.state.page)goPage(e.state.p
 
 function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2500)}
 function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
+function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',market:'市场',report:'研报'};return`<span class="tag tag-${type||'tech'}">${m[type]||type||''}</span>`}
 
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,policy:loadPolicy};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
 
 // === Dashboard ===
 async function loadDashboard(el){
+if(window._showGuide){const gb=document.createElement('div');gb.className='guide-banner';gb.innerHTML='👋 欢迎使用 D8Q！请先选择您关注的赛道，我们将为您个性化推荐内容。<a onclick="goPage(\'follows\')">去关注 →</a>';el.parentElement.insertBefore(gb,el);}
 const[heat,news]=await Promise.all([
-api('/api/proxy/tracks/heat/latest'),
-api('/api/news?size=5')
+apiV('/api/proxy/tracks/heat/latest'),
+apiV('/api/news?size=5')
 ]);
 const heatData=heat||[];
 const newsItems=news.items||[];
@@ -222,7 +232,7 @@ if(userRole==='admin'){loadServiceStatus();}
 }
 
 async function loadDashChart(latestHeat){
-const data=await api('/api/proxy/tracks/heat?days=7');
+const data=await apiV('/api/proxy/tracks/heat?days=7');
 if(!data||!data.length)return;
 const tracks={};
 data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,dates:[],scores:[]};tracks[d.name].dates.push(d.date.slice(5));tracks[d.name].scores.push(d.score)});
@@ -234,7 +244,7 @@ chart.setOption({tooltip:{trigger:'axis'},legend:{top:0,right:0,textStyle:{fontS
 
 // === 赛道页 ===
 async function loadTrack(el){
-const[tracks,latest]=await Promise.all([api('/api/proxy/tracks'),api('/api/proxy/tracks/heat/latest')]);
+const[tracks,latest]=await Promise.all([apiV('/api/proxy/tracks'),apiV('/api/proxy/tracks/heat/latest')]);
 el.innerHTML=`
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
 <div class="filters"><span class="fb active" onclick="loadTrackChart(7)">7天</span><span class="fb" onclick="loadTrackChart(30)">30天</span><span class="fb" onclick="loadTrackChart(90)">90天</span></div>
@@ -252,7 +262,7 @@ loadTrackChart(7);
 
 async function loadTrackChart(days){
 document.querySelectorAll('.filters .fb').forEach((b,i)=>b.classList.toggle('active',[7,30,90][i]===days));
-const data=await api('/api/proxy/tracks/heat?days='+days);
+const data=await apiV('/api/proxy/tracks/heat?days='+days);
 if(!data||!data.length)return;
 const tracks={};
 data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,dates:[],scores:[]};tracks[d.name].dates.push(d.date.slice(5));tracks[d.name].scores.push(d.score)});
@@ -279,7 +289,7 @@ feedPage=1;renderFeed();
 async function renderFeed(){
 let url=`/api/news?page=${feedPage}&size=10`;
 if(feedSubject)url+=`&subject=${feedSubject}`;
-const data=await api(url);
+const data=await apiV(url);
 const items=(data.items||[]).filter(n=>!feedType||n.news_type===feedType);
 document.getElementById('feedList').innerHTML=items.length?items.map(n=>{
 const cls=n.news_type||'';
@@ -296,7 +306,7 @@ document.getElementById('feedPager').innerHTML=pages>1?'<div class="feed-pager">
 <script>
 // === 周报工作台 ===
 async function loadWeekly(el){
-const tracks=await api('/api/proxy/tracks');
+const tracks=await apiV('/api/proxy/tracks');
 el.innerHTML=`
 <div class="card"><h3>生成配置</h3>
 <div class="rcfg"><div class="f"><label>赛道</label><select id="wTrack">${(tracks||[]).map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
@@ -410,7 +420,7 @@ html+='</ul></div>';
 }
 html+='</div>';
 // 关联资讯
-try{const news=await api('/api/news?size=5&keyword='+encodeURIComponent(data.stock_name||code));
+try{const news=await apiV('/api/news?size=5&keyword='+encodeURIComponent(data.stock_name||code));
 if(news&&news.items&&news.items.length){html+='<div class="card"><h3>📰 关联资讯</h3>';news.items.forEach(n=>{html+='<div class="ni"><div class="m">'+tagHtml(n.news_type)+'<span style="font-size:12px;color:#999">'+(n.publish_time||'').slice(0,16)+' · '+n.source+'</span></div><div class="t">'+esc(n.title)+'</div>'+(n.ai_summary?'<div class="s" style="font-size:12px;color:#666">💡 '+esc(n.ai_summary)+'</div>':'')+'</div>'});html+='</div>'}}catch(e){}
 document.getElementById('stockResult').innerHTML=html;
 }
@@ -427,7 +437,7 @@ el.innerHTML=`
 loadTrackFilters();
 }
 async function loadTrackFilters(){
-const tracks=await api('/api/proxy/tracks');
+const tracks=await apiV('/api/proxy/tracks');
 document.getElementById('trackFilter').innerHTML=(tracks||[]).map(t=>`<span class="fb" onclick="loadTrackReport(${t.id})">${t.name}</span>`).join('');
 }
 async function loadTrackReport(trackId,refresh){
@@ -491,26 +501,39 @@ document.getElementById('reportResult').innerHTML=html;
 
 // === 任务管理（完整CRUD） ===
 async function loadTasks(el){
-const[tasks,ctasks,logs]=await Promise.all([api('/api/tasks'),api('/api/content/tasks'),api('/api/content/exec-log?limit=20')]);
+const[tasks,ctasks]=await Promise.all([api('/api/tasks'),api('/api/content/tasks')]);
 el.innerHTML=`
 <div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
 <table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
 <tbody>${(tasks||[]).map(t=>`<tr><td><b>${esc(t.subject)}</b></td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
-<td><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
 <table class="et"><thead><tr><th>类型</th><th>主题</th><th>风格/渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr></thead>
 <tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='paused'?'badge-err':'badge-ok'}">${t.status==='paused'?'已暂停':'运行中'}</span></td>
-<td><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
 
-<div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="loadTasks(document.getElementById('contentArea'))">刷新</button></h3>
-<table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>结果</th><th>耗时</th><th>触发</th></tr></thead>
-<tbody>${(logs||[]).map(l=>`<tr><td>${(l.time||'').slice(5,16)}</td><td>${l.type}</td><td>${l.subject}</td><td><span class="badge ${l.success?'badge-ok':'badge-err'}">${l.success?'成功':'失败'}</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(l.result_summary||'')}</td><td>${l.duration||'-'}s</td><td><span class="badge badge-info">${l.trigger}</span></td></tr>`).join('')}</tbody></table></div>
+<div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="renderExecLog(1)">刷新</button></h3><div id="execLogBody">加载中...</div><div id="execLogPager" style="text-align:center;margin-top:12px"></div></div>
 
 <div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>`;
+renderExecLog(1);
 }
 
 // 采集任务操作
+let execLogPage=1;
+async function renderExecLog(page){
+execLogPage=page;
+const data=await api('/api/content/exec-log?page='+page+'&size=10');
+const logs=data.items||[];
+const total=data.total||0;
+const pages=Math.ceil(total/10);
+const body=document.getElementById('execLogBody');
+if(!logs.length){body.innerHTML='<div class="empty">暂无执行记录</div>';document.getElementById('execLogPager').innerHTML='';return}
+body.innerHTML='<table class="et"><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th><th>结果</th><th>耗时</th><th>触发</th></tr></thead><tbody>'+logs.map(l=>'<tr><td>'+(l.time||'').slice(5,16)+'</td><td>'+l.type+'</td><td>'+esc(l.subject)+'</td><td><span class="badge '+(l.success?'badge-ok':'badge-err')+'">'+(l.success?'成功':'失败')+'</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+esc(l.result_summary||'')+'</td><td>'+(l.duration||'-')+'s</td><td><span class="badge badge-info">'+l.trigger+'</span></td></tr>').join('')+'</tbody></table>';
+const pager=document.getElementById('execLogPager');
+if(pages>1){pager.innerHTML='<div class="feed-pager">'+Array.from({length:Math.min(pages,10)},(_,i)=>'<div class="fp'+(page===i+1?' active':'')+'" onclick="renderExecLog('+(i+1)+')">'+(i+1)+'</div>').join('')+'</div>'}else{pager.innerHTML=''}
+}
+
 function showCollectForm(){
 document.getElementById('taskModal').style.display='flex';
 document.getElementById('taskModal').innerHTML=`<div class="card" style="width:520px;max-width:90vw;max-height:85vh;overflow-y:auto">
@@ -539,6 +562,8 @@ toast('采集任务已创建');closeModal();loadTasks(document.getElementById('c
 
 async function runCollect(id){toast('执行中...');var r=await api('/api/tasks/'+id+'/run',{method:'POST'});toast('采集完成: '+(r.total_count||0)+'条');loadTasks(document.getElementById('contentArea'))}
 async function delCollect(id){if(!confirm('确定删除？'))return;await api('/api/tasks/'+id,{method:'DELETE'});toast('已删除');loadTasks(document.getElementById('contentArea'))}
+async function toggleCollect(id){var r=await api('/api/tasks/'+id+'/toggle',{method:'PUT'});toast(r.enabled?'已恢复运行':'已暂停');loadTasks(document.getElementById('contentArea'))}
+
 
 // 创作/发布任务操作
 function showContentForm(type){
@@ -698,14 +723,40 @@ await api('/api/auth/users/'+name+'/freeze',{method:'POST'});
 toast(frozen?'已解冻':'已冻结');loadUserMgmt();
 }
 async function delUser(name){
-if(!confirm('确认删除用户 '+name+' ？此操作不可恢复'))return;
+const modal=document.getElementById('taskModal');
+modal.style.display='flex';
+modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+<h3 style="margin-bottom:20px;color:#ff4d4f">⚠️ 删除用户</h3>
+<div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#fff2f0;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div></div>
+<div style="background:#fff2f0;border:1px solid #ffccc7;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#ff4d4f;line-height:1.6">此操作将永久删除该用户及其所有个人数据（订阅、自选股、偏好设置等），且<strong>不可恢复</strong>。</div>
+<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">请输入用户名 <b>${esc(name)}</b> 以确认</label><input id="del_confirm" class="search" style="width:100%;margin-top:6px;padding:10px 12px" placeholder="输入用户名确认删除" onkeydown="if(event.key==='Enter')submitDelUser('${name}')"></div>
+<div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" style="background:#ff4d4f" onclick="submitDelUser('${name}')">确认删除</button></div></div>`;
+setTimeout(()=>document.getElementById('del_confirm')?.focus(),100);
+}
+async function submitDelUser(name){
+const v=document.getElementById('del_confirm').value.trim();
+if(v!==name){toast('输入的用户名不匹配',true);return}
 const r=await api('/api/auth/users/'+name,{method:'DELETE'});
-if(r.error){toast(r.error)}else{toast('已删除');loadUserMgmt()}
+if(r.error){toast(r.error,true)}else{toast('用户 '+name+' 已删除');closeModal();loadUserMgmt()}
 }
 async function resetPw(name){
-const pw=prompt('新密码(≥8位):');if(!pw)return;
+const modal=document.getElementById('taskModal');
+modal.style.display='flex';
+modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+<h3 style="margin-bottom:20px">🔑 重置密码</h3>
+<div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#e6f7ff;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div><div style="font-size:12px;color:#999">设置新密码</div></div>
+<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新密码</label><input id="rp_pass" type="password" class="search" style="width:100%;margin-top:6px;padding:10px 12px" placeholder="至少 8 位字符" onkeydown="if(event.key==='Enter')submitResetPw('${name}')"></div>
+<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">确认密码</label><input id="rp_pass2" type="password" class="search" style="width:100%;margin-top:6px;padding:10px 12px" placeholder="再次输入新密码" onkeydown="if(event.key==='Enter')submitResetPw('${name}')"></div>
+<div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="submitResetPw('${name}')">确认重置</button></div></div>`;
+setTimeout(()=>document.getElementById('rp_pass')?.focus(),100);
+}
+async function submitResetPw(name){
+const pw=document.getElementById('rp_pass').value;
+const pw2=document.getElementById('rp_pass2').value;
+if(pw.length<8){toast('密码至少 8 位',true);return}
+if(pw!==pw2){toast('两次输入的密码不一致',true);return}
 const r=await api('/api/auth/users/'+name+'/password',{method:'PUT',body:JSON.stringify({password:pw})});
-if(r&&r.error){toast(r.error)}else{toast('已重置')}
+if(r&&r.error){toast(r.error,true)}else{toast('密码重置成功');closeModal()}
 }
 
 // === 服务状态 (admin) ===
@@ -722,12 +773,95 @@ card.innerHTML=`<h3>🖥️ 服务状态 <span style="font-size:11px;color:#999;
 el.appendChild(card);
 }catch(e){}}
 
+// === 我的关注 ===
+async function loadFollows(el){
+const [tracks, subs] = await Promise.all([
+apiV('/api/proxy/tracks'),
+api('/api/user/subscriptions')
+]);
+const subIds = new Set((subs.subscriptions||[]).map(s => s.track_id));
+el.innerHTML = `
+<div class="card"><h3>关注的赛道</h3>
+<p style="font-size:13px;color:#999;margin-bottom:16px">选择您关注的赛道，平台将为您推荐相关内容</p>
+<div class="tg">
+${(tracks||[]).map(t => `
+<div class="tc" style="border-left-color:${t.color||'#1890ff'};cursor:default">
+<div class="n">${esc(t.name)}</div>
+${subIds.has(t.id)
+? '<div style="margin-top:12px"><span class="badge badge-ok">已关注 ✓</span> <a style="font-size:12px;color:#ff4d4f;cursor:pointer;margin-left:8px" onclick="toggleSub('+t.id+',false)">取消</a></div>'
+: '<button class="btn" style="margin-top:12px;padding:6px 16px;font-size:12px" onclick="toggleSub('+t.id+',true)">+ 关注</button>'}
+</div>
+`).join('')}
+</div></div>
+<div class="card" style="margin-top:16px"><h3>自选股 <a class="more" onclick="loadFollows(document.getElementById('contentArea'))">&#x1F504;</a></h3>
+<div style="display:flex;gap:8px;margin-bottom:16px">
+<input class="search" style="flex:1" placeholder="输入股票代码或名称" id="followStockInput" onkeydown="if(event.key==='Enter')addFollowStock()">
+<button class="btn" style="padding:6px 16px;font-size:12px" onclick="addFollowStock()">+ 添加</button>
+</div>
+<div id="followWatchlist" class="stock-grid">加载中...</div>
+</div>`;
+const wl = await api('/api/watchlist');
+const wlEl = document.getElementById('followWatchlist');
+if (wl.watchlist && wl.watchlist.length) {
+wlEl.innerHTML = wl.watchlist.map(s => '<div class="stock-card"><div class="sc-name">'+esc(s.stock_name||s.stock_code)+'</div><div style="font-size:12px;color:#999">'+esc(s.stock_code)+'</div><div style="margin-top:8px"><a style="font-size:12px;color:#ff4d4f;cursor:pointer" onclick="removeFollowStock(\''+esc(s.stock_code)+'\')">删除</a></div></div>').join('');
+} else {
+wlEl.innerHTML = '<div class="empty">暂无自选股</div>';
+}
+}
+
+async function toggleSub(trackId, subscribe) {
+if (subscribe) {
+await api('/api/user/subscribe', {method:'POST', body:JSON.stringify({track_id:trackId})});
+toast('关注成功');
+} else {
+await api('/api/user/subscribe/' + trackId, {method:'DELETE'});
+toast('已取消关注');
+}
+loadFollows(document.getElementById('contentArea'));
+}
+
+async function addFollowStock() {
+const input = document.getElementById('followStockInput');
+const val = input.value.trim();
+if (!val) return;
+const code = val.match(/^\d{6}$/) ? val : val;
+const name = val.match(/^\d{6}$/) ? '' : val;
+await api('/api/watchlist', {method:'POST', body:JSON.stringify({stock_code:code, stock_name:name})});
+input.value = '';
+toast('已添加');
+loadFollows(document.getElementById('contentArea'));
+}
+
+async function removeFollowStock(code) {
+await api('/api/watchlist/' + code, {method:'DELETE'});
+toast('已删除');
+loadFollows(document.getElementById('contentArea'));
+}
+
+function switchView(mode) {
+localStorage.setItem('d8q_view_mode', mode);
+window.viewAll = (mode === 'all');
+document.querySelectorAll('#viewToggle span').forEach(s => s.classList.toggle('active', s.dataset.v === mode));
+loadPage(curPage);
+}
+
+
 // === 初始化 ===
 async function init(){
+window.viewAll = (localStorage.getItem('d8q_view_mode') || 'mine') === 'all';
 try{const me=await api('/api/auth/me');
 document.getElementById('uName').textContent=me.username||'-';
 document.getElementById('uRole').textContent=({admin:'管理员',editor:'编辑',viewer:'只读'}[me.role])||me.role;
 userRole=me.role||'viewer';
+if(userRole==='admin'){
+const vt=document.getElementById('viewToggle');
+vt.style.display='';
+const activeMode=window.viewAll?'all':'mine';
+vt.querySelectorAll('span').forEach(s=>s.classList.toggle('active',s.dataset.v===activeMode));
+}
+try{const subs=await api('/api/user/subscriptions');
+if(!subs.subscriptions||!subs.subscriptions.length){window._showGuide=true;}
+}catch(eg){}
 }catch(e){}
 initNav();
 loadPage(curPage);
