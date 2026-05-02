@@ -601,6 +601,7 @@ el.innerHTML=`<div class="filters" style="margin-bottom:20px">
 <span class="fb active" onclick="settingsTab(this,'cfg')">🎨 内容配置</span>
 <span class="fb" onclick="settingsTab(this,'prompts')">💬 Prompt 管理</span>
 <span class="fb" onclick="settingsTab(this,'users')">👥 用户管理</span>
+${userRole==='admin'?'<span class="fb" onclick="settingsTab(this,\'analytics\')">📊 运营分析</span>':''}
 </div>
 <div id="st-cfg"><div class="card"><h3>LLM 配置</h3>
 <div class="rcfg"><div class="f"><label>模型</label><input id="sModel" value="${cfg.llm?.model||''}"></div>
@@ -609,7 +610,8 @@ el.innerHTML=`<div class="filters" style="margin-bottom:20px">
 <div style="margin-bottom:12px"><label style="font-size:12px;color:#666">API Base URL</label><input class="search" style="width:100%;margin-top:4px" id="sUrl" value="${cfg.llm?.base_url||''}"></div>
 <div style="text-align:right"><button class="btn" onclick="saveSettings()">保存配置</button></div></div></div>
 <div id="st-prompts" style="display:none"><div id="promptsPanel">加载中...</div></div>
-<div id="st-users" style="display:none"><div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div></div>`;
+<div id="st-users" style="display:none"><div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div></div>
+<div id="st-analytics" style="display:none"><div id="analyticsPanel">加载中...</div></div>`;
 loadUserMgmt();
 loadServiceStatus();
 }
@@ -621,6 +623,8 @@ document.getElementById('st-prompts').style.display=tab==='prompts'?'':'none';
 document.getElementById('st-users').style.display=tab==='users'?'':'none';
 if(tab==='prompts'&&!window._pLoaded){loadPromptsPanel();window._pLoaded=true;}
 if(tab==='users')loadUserMgmt();
+document.getElementById('st-analytics').style.display=tab==='analytics'?'':'none';
+if(tab==='analytics'&&userRole==='admin'&&!window._aLoaded){loadAnalyticsPanel();window._aLoaded=true;}
 }
 var _pAll={},_pSvc='all';
 const _pNames={agent:'Agent 数据智能',shark:'Shark 股票数据',compass:'Compass 金融分析',factory:'Factory 资讯工厂'};
@@ -776,7 +780,7 @@ el.appendChild(card);
 // === 我的关注 ===
 async function loadFollows(el){
 const [tracks, subs] = await Promise.all([
-apiV('/api/proxy/tracks'),
+api('/api/proxy/tracks?view=all'),
 api('/api/user/subscriptions')
 ]);
 const subIds = new Set((subs.subscriptions||[]).map(s => s.track_id));
@@ -1053,6 +1057,105 @@ renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '')
 toast(`✅ 分析完成：🟢利好${利好} ⚪中性${中性} 🔴利空${利空}`);
 }
 
+
+// === 运营分析 ===
+let analyticsDays = 30;
+async function loadAnalyticsPanel() {
+    const panel = document.getElementById('analyticsPanel');
+    const overview = await api('/api/analytics/overview');
+    panel.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn-ghost" style="padding:6px 14px;font-size:12px;${analyticsDays===7?'background:#1890ff;color:#fff;border-color:#1890ff':''}" onclick="analyticsDays=7;loadAnalyticsPanel()">近 7 天</button>
+        <button class="btn-ghost" style="padding:6px 14px;font-size:12px;${analyticsDays===30?'background:#1890ff;color:#fff;border-color:#1890ff':''}" onclick="analyticsDays=30;loadAnalyticsPanel()">近 30 天</button>
+        <button class="btn-ghost" style="padding:6px 14px;font-size:12px;${analyticsDays===9999?'background:#1890ff;color:#fff;border-color:#1890ff':''}" onclick="analyticsDays=9999;loadAnalyticsPanel()">全部</button>
+    </div>
+    <div class="metrics">
+        <div class="mc"><div class="label">今日活跃用户</div><div class="value">${overview.dau||0}</div><div class="sub">DAU</div></div>
+        <div class="mc"><div class="label">月活用户</div><div class="value">${overview.mau||0}</div><div class="sub">MAU</div></div>
+        <div class="mc"><div class="label">今日事件数</div><div class="value">${overview.today_events||0}</div><div class="sub">API调用</div></div>
+        <div class="mc"><div class="label">最热门功能</div><div class="value" style="font-size:20px">${(overview.top_function||{}).name||'-'}</div><div class="sub">${(overview.top_function||{}).count||0} 次</div></div>
+    </div>
+    <div class="grid-2" style="margin-top:20px">
+        <div class="card"><h3>功能使用排行</h3><div id="funcChart" style="height:300px"></div></div>
+        <div class="card"><h3>活跃度趋势</h3><div id="trendChart" style="height:300px"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>用户活跃度</h3><div id="userTable"></div></div>
+    <div class="card" style="margin-top:16px"><h3>功能冷热图</h3><div id="coldHotChart" style="min-height:200px"></div></div>`;
+    loadFuncChart();
+    loadTrendChart();
+    loadUserTable();
+    loadColdHotChart();
+}
+
+async function loadFuncChart() {
+    const data = await api('/api/analytics/functions?days=' + analyticsDays);
+    const funcs = data.functions || [];
+    if (!funcs.length) return;
+    const chart = echarts.init(document.getElementById('funcChart'));
+    chart.setOption({
+        tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
+        grid: {top: 10, bottom: 30, left: 80, right: 30},
+        xAxis: {type: 'value'},
+        yAxis: {type: 'category', data: funcs.map(f => f.name).reverse(), axisLabel: {fontSize: 12}},
+        series: [{type: 'bar', data: funcs.map(f => f.count).reverse(), itemStyle: {color: '#1890ff', borderRadius: [0, 4, 4, 0]}}],
+        tooltip: {formatter: function(p) {return p.name + ': ' + p.value + ' 次 (' + (funcs.find(f=>f.name===p.name)||{}).percentage + '%)'}}
+    });
+}
+
+async function loadTrendChart() {
+    const data = await api('/api/analytics/trends?days=' + analyticsDays);
+    const trends = data.trends || [];
+    if (!trends.length) return;
+    const chart = echarts.init(document.getElementById('trendChart'));
+    chart.setOption({
+        tooltip: {trigger: 'axis'},
+        legend: {top: 0, right: 0, textStyle: {fontSize: 11}},
+        grid: {top: 30, bottom: 30, left: 40, right: 40},
+        xAxis: {type: 'category', data: trends.map(t => t.date.slice(5))},
+        yAxis: [{type: 'value', name: 'DAU', position: 'left'}, {type: 'value', name: '调用量', position: 'right'}],
+        series: [
+            {name: 'DAU', type: 'line', smooth: true, data: trends.map(t => t.dau), itemStyle: {color: '#1890ff'}},
+            {name: '调用量', type: 'line', smooth: true, yAxisIndex: 1, data: trends.map(t => t.total_calls), itemStyle: {color: '#faad14'}}
+        ]
+    });
+}
+
+async function loadUserTable() {
+    const data = await api('/api/analytics/users?days=' + analyticsDays);
+    const users = data.users || [];
+    const el = document.getElementById('userTable');
+    if (!users.length) {el.innerHTML = '<div class="empty">暂无数据</div>'; return;}
+    el.innerHTML = '<table class="et"><thead><tr><th>用户</th><th>最近活跃</th><th>使用功能数</th><th>总调用</th><th>日均</th></tr></thead><tbody>' +
+        users.map(u => {
+            const inactive = u.last_active && new Date(u.last_active) < new Date(Date.now() - 7*86400000);
+            return '<tr' + (inactive ? ' style="background:#fff2f0"' : '') + '><td>' + esc(u.user_id) + (inactive ? ' <span style="color:#ff4d4f;font-size:11px">不活跃</span>' : '') + '</td><td>' + (u.last_active || '-').slice(0, 16) + '</td><td>' + u.function_count + '</td><td>' + u.total_calls + '</td><td>' + u.daily_avg + '</td></tr>';
+        }).join('') + '</tbody></table>';
+}
+
+async function loadColdHotChart() {
+    const data = await api('/api/analytics/cold-hot?days=' + analyticsDays);
+    const users = data.users || [];
+    const functions = data.functions || [];
+    const matrix = data.matrix || [];
+    if (!users.length || !functions.length) {document.getElementById('coldHotChart').innerHTML = '<div class="empty">暂无数据</div>'; return;}
+    const maxVal = Math.max(1, ...matrix.flat());
+    const el = document.getElementById('coldHotChart');
+    let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px"><thead><tr><th style="padding:6px 10px;background:#fafafa;border:1px solid #f0f0f0"></th>';
+    functions.forEach(f => {html += '<th style="padding:6px 10px;background:#fafafa;border:1px solid #f0f0f0;font-weight:500">' + f + '</th>';});
+    html += '</tr></thead><tbody>';
+    users.forEach((u, ui) => {
+        html += '<tr><td style="padding:6px 10px;background:#fafafa;border:1px solid #f0f0f0;font-weight:500">' + esc(u) + '</td>';
+        functions.forEach((f, fi) => {
+            const val = (matrix[ui] || [])[fi] || 0;
+            const intensity = Math.round((val / maxVal) * 100);
+            const bg = val === 0 ? '#fff5f5' : 'rgba(24,144,255,' + (intensity / 100 * 0.6 + 0.1).toFixed(2) + ')';
+            html += '<td style="padding:6px 10px;border:1px solid #f0f0f0;text-align:center;background:' + bg + ';color:' + (val === 0 ? '#ff4d4f' : '#333') + '">' + (val || '-') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+}
 
 
 init();
