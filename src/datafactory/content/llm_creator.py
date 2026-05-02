@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import time
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -16,8 +17,8 @@ SHARK_API = "http://localhost:5000"
 FREQ_DAYS = {"daily": 1, "weekly": 7, "monthly": 30}
 
 
-def _llm_call(prompt, system="你是专业的内容创作助手。", cfg=None):
-    """调用LLM"""
+def _llm_call(prompt, system="你是专业的内容创作助手。", cfg=None, max_retries=2):
+    """调用LLM（含重试）"""
     if cfg is None:
         cfg = load_config()["llm"]
     body = json.dumps({
@@ -26,14 +27,24 @@ def _llm_call(prompt, system="你是专业的内容创作助手。", cfg=None):
         "temperature": cfg.get("temperature", 0.7),
         "max_tokens": cfg.get("max_tokens", 2000),
     }).encode()
-    req = urllib.request.Request(
-        cfg["base_url"].rstrip("/") + "/chat/completions",
-        data=body, method="POST",
-        headers={"Authorization": "Bearer " + cfg["api_key"], "Content-Type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
-    return data["choices"][0]["message"]["content"].strip()
+    last_err = None
+    for attempt in range(max_retries + 1):
+        try:
+            req = urllib.request.Request(
+                cfg["base_url"].rstrip("/") + "/chat/completions",
+                data=body, method="POST",
+                headers={"Authorization": "Bearer " + cfg["api_key"], "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read())
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            last_err = e
+            if attempt < max_retries:
+                wait = 2 ** attempt
+                logger.warning("LLM call failed (%s), retry in %ds (attempt %d/%d)...", e, wait, attempt + 1, max_retries)
+                time.sleep(wait)
+    raise last_err
 
 
 def _fetch_news(subject, days=1):
