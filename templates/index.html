@@ -100,9 +100,9 @@ const PAGES=[
 {id:'weekly',icon:'📝',label:'周报',title:'周报工作台'},
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
+{id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
-{id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
 ];
 let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
@@ -641,27 +641,77 @@ const tracks = await api("/api/proxy/tracks");
 var options = '<option value="">全部赛道</option>';
 (tracks||[]).forEach(function(t){options += '<option value="'+t.id+'">'+t.name+'</option>';});
 el.innerHTML = `
-<div class="card"><h3>📜 政策分析 <span style="font-size:12px;color:#999;font-weight:400">自动识别政策类资讯并分析影响</span></h3>
-  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
-    <select id="pol_track" class="search" style="width:200px">${options}</select>
-    <select id="pol_days" class="search" style="width:120px">
-      <option value="7">近7天</option>
-      <option value="30" selected>近30天</option>
-      <option value="90">近90天</option>
+<style>
+.pol-hero{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.pol-stat{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.05);text-align:center;transition:transform .2s}
+.pol-stat:hover{transform:translateY(-2px)}
+.pol-stat .num{font-size:32px;font-weight:700;margin-bottom:4px}
+.pol-stat .lbl{font-size:12px;color:#999}
+.pol-stat.positive .num{color:#52c41a}.pol-stat.negative .num{color:#ff4d4f}.pol-stat.neutral .num{color:#1890ff}.pol-stat.total .num{color:#333}
+.pol-bar{display:flex;gap:0;height:6px;border-radius:3px;overflow:hidden;margin-bottom:20px;background:#f0f0f0}
+.pol-bar .seg{transition:width .4s}
+.pol-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.pol-toolbar select{padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;outline:none;min-width:140px}
+.pol-toolbar select:focus{border-color:#1890ff}
+.pol-item{background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);border-left:4px solid #d9d9d9;transition:all .2s;cursor:default}
+.pol-item:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-1px)}
+.pol-item.positive{border-left-color:#52c41a}.pol-item.negative{border-left-color:#ff4d4f}.pol-item.neutral{border-left-color:#1890ff}
+.pol-item .pol-title{font-size:14px;font-weight:500;margin-bottom:6px;line-height:1.5}
+.pol-item .pol-title a{color:#333;text-decoration:none}.pol-item .pol-title a:hover{color:#1890ff}
+.pol-item .pol-meta{font-size:12px;color:#999;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pol-item .pol-summary{font-size:13px;color:#666;line-height:1.6;background:#fafafa;padding:8px 12px;border-radius:6px;margin-top:8px}
+.pol-item .pol-actions{display:flex;align-items:center;gap:8px;margin-top:8px}
+.pol-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:500}
+.pol-tag.positive{background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
+.pol-tag.negative{background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7}
+.pol-tag.neutral{background:#e6f7ff;color:#1890ff;border:1px solid #91d5ff}
+.pol-tag.category{background:#f9f0ff;color:#722ed1;border:1px solid #d3adf7}
+.pol-empty{text-align:center;padding:60px 20px;color:#ccc}
+.pol-empty .icon{font-size:48px;margin-bottom:12px}
+.pol-empty .text{font-size:14px}
+.pol-progress{background:#e6f7ff;border:1px solid #91d5ff;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1890ff;display:none}
+.pol-progress.show{display:flex;align-items:center;gap:8px}
+@keyframes polSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.pol-spin{display:inline-block;animation:polSpin 1s linear infinite}
+</style>
+<div class="card" style="padding:20px 24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <h3 style="margin:0">📜 政策分析 <span style="font-size:12px;color:#999;font-weight:400;margin-left:4px">AI 自动识别政策资讯，分析行业影响</span></h3>
+  </div>
+  <div class="pol-toolbar">
+    <select id="pol_track">${options}</select>
+    <select id="pol_days">
+      <option value="7">近 7 天</option>
+      <option value="30" selected>近 30 天</option>
+      <option value="90">近 90 天</option>
     </select>
     <button class="btn" onclick="analyzePolicies()">🔍 分析政策</button>
-    <button class="btn btn-ghost" onclick="batchClassify()">🤖 批量AI识别</button>
+    <button class="btn btn-ghost" onclick="batchClassify()">🤖 批量 AI 识别</button>
   </div>
-  <div id="polStats" style="display:flex;gap:16px;margin-bottom:16px"></div>
+  <div id="polStats" class="pol-hero" style="display:none">
+    <div class="pol-stat total"><div class="num" id="ps_total">0</div><div class="lbl">资讯总数</div></div>
+    <div class="pol-stat neutral"><div class="num" id="ps_neutral">0</div><div class="lbl">⚪ 中性政策</div></div>
+    <div class="pol-stat positive"><div class="num" id="ps_positive">0</div><div class="lbl">🟢 利好政策</div></div>
+    <div class="pol-stat negative"><div class="num" id="ps_negative">0</div><div class="lbl">🔴 利空政策</div></div>
+  </div>
+  <div id="polBar" class="pol-bar" style="display:none">
+    <div class="seg" id="pb_pos" style="background:#52c41a;width:0"></div>
+    <div class="seg" id="pb_neu" style="background:#1890ff;width:0"></div>
+    <div class="seg" id="pb_neg" style="background:#ff4d4f;width:0"></div>
+  </div>
+  <div id="polProgress" class="pol-progress"><span class="pol-spin">⏳</span> <span id="polProgressText">正在分析...</span></div>
 </div>
-<div class="card"><h3>政策列表 <span id="polCount" style="font-size:12px;color:#999;font-weight:400"></span></h3>
-  <div class="filters" id="polFilters">
-    <span class="fb active" data-v="" onclick="filterPol('')">全部</span>
-    <span class="fb" data-v="利好" onclick="filterPol('利好')">🟢 利好</span>
-    <span class="fb" data-v="中性" onclick="filterPol('中性')">⚪ 中性</span>
-    <span class="fb" data-v="利空" onclick="filterPol('利空')">🔴 利空</span>
+<div class="card" style="padding:20px 24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h3 style="margin:0">政策列表 <span id="polCount" style="font-size:12px;color:#999;font-weight:400;margin-left:4px"></span></h3>
+    <div class="filters" id="polFilters" style="margin:0">
+      <span class="fb active" data-v="" onclick="filterPol('')">全部</span>
+      <span class="fb" data-v="利好" onclick="filterPol('利好')">🟢 利好</span>
+      <span class="fb" data-v="中性" onclick="filterPol('中性')">⚪ 中性</span>
+      <span class="fb" data-v="利空" onclick="filterPol('利空')">🔴 利空</span>
+    </div>
   </div>
-  <div id="polList"><div class="empty">选择赛道并点击「分析政策」开始</div></div>
+  <div id="polList"><div class="pol-empty"><div class="icon">📜</div><div class="text">选择赛道并点击「分析政策」开始</div></div></div>
 </div>`;
 }
 
@@ -673,77 +723,102 @@ renderPolList(impact);
 function renderPolList(filterImpact){
 const list = filterImpact ? _polData.filter(p => p.impact === filterImpact) : _polData;
 const container = document.getElementById('polList');
-if(!list.length){container.innerHTML = '<div class="empty">暂无符合条件的政策</div>';return}
-container.innerHTML = list.map(p => `
-<div class="ni" style="border-left:3px solid ${p.impact==='利好'?'#52c41a':p.impact==='利空'?'#ff4d4f':'#999'};padding-left:12px">
-  <div class="t">${p.url?`<a href="${esc(p.url)}" target="_blank" style="color:#333;text-decoration:none">${esc(p.title)}</a>`:esc(p.title)}</div>
-  <div class="m">${(p.publish_time||'').slice(0,16)} · ${p.source} · ${p.category||'未分类'}</div>
-  ${p.summary?`<div class="s" style="font-size:12px;color:#666;margin-top:4px">${esc(p.summary)}</div>`:''}
-  <div style="margin-top:6px"><span class="badge ${p.impact==='利好'?'badge-ok':p.impact==='利空'?'badge-err':'badge-info'}">${p.impact||'未分析'}</span>
-  ${p.track_name?`<span style="font-size:11px;color:#999;margin-left:8px">${esc(p.track_name)}</span>`:''}
-  <span style="font-size:11px;color:#1890ff;cursor:pointer;margin-left:8px" onclick="classifyOne(${p.id},this)">🤖 AI分析</span>
+const total = _polData.length;
+const pos = _polData.filter(p=>p.impact==='利好').length;
+const neu = _polData.filter(p=>p.impact==='中性').length;
+const neg = _polData.filter(p=>p.impact==='利空').length;
+// 更新统计
+if(total>0){
+  document.getElementById('polStats').style.display='';
+  document.getElementById('ps_total').textContent=total;
+  document.getElementById('ps_positive').textContent=pos;
+  document.getElementById('ps_neutral').textContent=neu;
+  document.getElementById('ps_negative').textContent=neg;
+  const classified=pos+neu+neg;
+  if(classified>0){
+    document.getElementById('polBar').style.display='';
+    document.getElementById('pb_pos').style.width=(pos/classified*100)+'%';
+    document.getElementById('pb_neu').style.width=(neu/classified*100)+'%';
+    document.getElementById('pb_neg').style.width=(neg/classified*100)+'%';
+  }
+}
+if(!list.length){container.innerHTML='<div class="pol-empty"><div class="icon">🔍</div><div class="text">暂无符合条件的政策</div></div>';return}
+container.innerHTML = list.map(p => {
+  const cls = p.impact==='利好'?'positive':p.impact==='利空'?'negative':p.impact?'neutral':'';
+  return `<div class="pol-item ${cls}">
+  <div class="pol-title">${p.url?`<a href="${esc(p.url)}" target="_blank">${esc(p.title)}</a>`:esc(p.title)}</div>
+  <div class="pol-meta">
+    <span>📅 ${(p.publish_time||'').slice(0,10)}</span>
+    <span>📰 ${esc(p.source||'')}</span>
+    ${p.track_name?`<span>🔥 ${esc(p.track_name)}</span>`:''}
   </div>
-</div>`).join('');
+  <div class="pol-actions">
+    ${p.impact?`<span class="pol-tag ${cls}">${p.impact}</span>`:''}
+    ${p.category?`<span class="pol-tag category">${esc(p.category)}</span>`:''}
+    ${!p.impact?`<span style="font-size:12px;color:#1890ff;cursor:pointer" onclick="classifyOne(${p.id},this)">🤖 AI 分析</span>`:''}
+  </div>
+  ${p.summary?`<div class="pol-summary">${esc(p.summary)}</div>`:''}
+</div>`;}).join('');
 }
 
 async function analyzePolicies(){
 const trackId = document.getElementById('pol_track').value;
 const days = document.getElementById('pol_days').value;
 const url = trackId ? "/api/proxy/tracks/"+trackId+"/news?days="+days : "/api/proxy/tracks/1/news?days="+days;
-document.getElementById('polList').innerHTML = '<div class="empty">加载中...</div>';
+document.getElementById('polList').innerHTML = '<div class="pol-empty"><div class="icon"><span class="pol-spin">⏳</span></div><div class="text">正在加载资讯...</div></div>';
 const news = await api(url);
 const newsItems = news && news.items ? news.items : (Array.isArray(news) ? news : []);
-if(!newsItems.length){document.getElementById('polList').innerHTML = '<div class="empty">暂无资讯数据</div>';return}
-// 显示全部资讯，由AI识别哪些是政策类
+if(!newsItems.length){document.getElementById('polList').innerHTML = '<div class="pol-empty"><div class="icon">📭</div><div class="text">暂无资讯数据</div></div>';return}
 _polData = newsItems.map(n => ({...n, impact: '', category: '', summary: '', track_name: ''}));
-document.getElementById('polCount').textContent = '共 ' + newsItems.length + ' 条资讯，点击「批量AI识别」筛选政策类';
-const statsEl = document.getElementById('polStats');
-statsEl.innerHTML = '<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">📰 共 '+newsItems.length+' 条资讯</div>';
+document.getElementById('polCount').textContent = '共 ' + newsItems.length + ' 条资讯';
+document.getElementById('polStats').style.display='';
+document.getElementById('ps_total').textContent = newsItems.length;
+document.getElementById('ps_positive').textContent = 0;
+document.getElementById('ps_neutral').textContent = 0;
+document.getElementById('ps_negative').textContent = 0;
+document.getElementById('polBar').style.display='none';
 renderPolList('');
 }
 
 async function classifyOne(newsId, el){
-el.textContent = '分析中...';
+el.innerHTML = '<span class="pol-spin">⏳</span> 分析中...';
+el.style.pointerEvents='none';
 const newsItem = _polData.find(n => n.id === newsId);
 if(!newsItem) return;
-const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: newsItem.title + ' ' + (newsItem.content||'')})});
-if(result && result.policy && result.policy.is_policy){
-const p = result.policy;
-newsItem.impact = p.impact || '中性';
-newsItem.category = p.category || '';
-newsItem.summary = p.summary || '';
-el.textContent = '✅ 已分析';
+try{
+  const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: newsItem.title + ' ' + (newsItem.content||'')})});
+  if(result && result.policy && result.policy.is_policy){
+    const p = result.policy;
+    newsItem.impact = p.impact || '中性';
+    newsItem.category = p.category || '';
+    newsItem.summary = p.summary || '';
+  }
+}catch(e){}
 renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '');
-} else {
-el.textContent = '非政策';
-}
 }
 
 async function batchClassify(){
-if(!_polData.length){toast('请先分析政策', true);return}
-let done = 0,利好=0,利空=0,中性=0;
-document.querySelectorAll('#polList .ni').forEach(ni => {
-const btn = ni.querySelector('span[onclick^="classifyOne"]');
-if(btn) btn.textContent = '⏳';
-});
+if(!_polData.length){toast('请先加载资讯数据');return}
+let done=0,total=_polData.filter(i=>!i.impact).length,利好=0,利空=0,中性=0;
+const progEl=document.getElementById('polProgress');
+const progText=document.getElementById('polProgressText');
+progEl.classList.add('show');
 for(const item of _polData){
-if(item.impact) continue;
-const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: item.title + ' ' + (item.content||'')})});
-if(result && result.policy && result.policy.is_policy){
-item.impact = result.policy.impact || '中性';
-item.category = result.policy.category || '';
-item.summary = result.policy.summary || '';
-if(item.impact==='利好')利好++; else if(item.impact==='利空')利空++; else 中性++;
+  if(item.impact) continue;
+  done++;
+  progText.textContent=`正在分析 ${done}/${total}... ${item.title.slice(0,20)}`;
+  const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: item.title + ' ' + (item.content||'')})});
+  if(result && result.policy && result.policy.is_policy){
+    item.impact = result.policy.impact || '中性';
+    item.category = result.policy.category || '';
+    item.summary = result.policy.summary || '';
+    if(item.impact==='利好')利好++; else if(item.impact==='利空')利空++; else 中性++;
+  }
+  if(done%5===0||done===total) renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '');
 }
-done++;
-}
-document.getElementById('polStats').innerHTML = `
-<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">✅ 批量分析完成</div>
-<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">🟢 利好: ${利好}</div>
-<div style="padding:8px 16px;background:#f0f5ff;border-radius:6px;font-size:13px">⚪ 中性: ${中性}</div>
-<div style="padding:8px 16px;background:#fff2f0;border-radius:6px;font-size:13px">🔴 利空: ${利空}</div>`;
+progEl.classList.remove('show');
 renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '');
-toast('批量分析完成: 利好'+利好+' 利空'+利空+' 中性'+中性);
+toast(`✅ 分析完成：🟢利好${利好} ⚪中性${中性} 🔴利空${利空}`);
 }
 
 
