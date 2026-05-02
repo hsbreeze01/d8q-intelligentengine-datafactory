@@ -731,3 +731,90 @@ start_scheduler()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8088)
+
+
+# --- 邮件推送 API ---
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+SMTP_CFG = {
+    "server": os.getenv("SMTP_SERVER", "smtp.qq.com"),
+    "port": int(os.getenv("SMTP_PORT", "465")),
+    "user": os.getenv("SMTP_USER", ""),
+    "password": os.getenv("SMTP_PASSWORD", "")
+}
+
+@app.route("/api/notify/email", methods=["POST"])
+def send_email():
+    """发送邮件"""
+    data = request.json or {}
+    subject = data.get("subject", "D8Q 通知")
+    content = data.get("content", "")
+    receiver = data.get("receiver", "")
+    
+    if not SMTP_CFG["user"] or not SMTP_CFG["password"]:
+        return jsonify({"success": False, "error": "SMTP未配置"}), 400
+    if not content:
+        return jsonify({"success": False, "error": "内容为空"}), 400
+    if not receiver:
+        return jsonify({"success": False, "error": "收件人为空"}), 400
+    
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = SMTP_CFG["user"]
+        msg["To"] = receiver
+        msg["Subject"] = subject
+        msg.attach(MIMEText(content, "html", "utf-8"))
+        
+        with smtplib.SMTP_SSL(SMTP_CFG["server"], SMTP_CFG["port"]) as server:
+            server.login(SMTP_CFG["user"], SMTP_CFG["password"])
+            server.sendmail(SMTP_CFG["user"], receiver, msg.as_string())
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/notify/test", methods=["GET"])
+def test_email_config():
+    """测试邮件配置"""
+    if not SMTP_CFG["user"] or not SMTP_CFG["password"]:
+        return jsonify({"configured": False, "error": "SMTP未配置"})
+    return jsonify({"configured": True, "smtp": SMTP_CFG["server"], "user": SMTP_CFG["user"][:3] + "***"})
+
+
+# --- 政策分析 API ---
+@app.route("/api/policy/classify", methods=["POST"])
+def classify_policy():
+    """使用 LLM 识别政策类资讯"""
+    from datafactory.content.llm_creator import _llm_call
+    data = request.json or {}
+    content = data.get("content", "")
+    
+    if not content:
+        return jsonify({"success": False, "error": "内容为空"}), 400
+    
+    prompt = f"""请分析以下新闻内容，判断是否为政策/监管类资讯。
+
+新闻内容：
+{content[:1000]}
+
+请按以下 JSON 格式返回（注意是标准JSON，布尔值用小写true/false）：
+{{
+    "is_policy": true/false,
+    "category": "政策类型（国内政策/海外政策/行业监管/财政政策等）",
+    "summary": "政策要点摘要（50字以内）",
+    "impact": "利好/利空/中性"
+}}
+"""
+    try:
+        result = _llm_call(prompt, system="你是专业政策分析师，严格按照JSON格式返回结果。")
+        if result:
+            import re
+            match = re.search(r'\{[\s\S]*\}', result)
+            if match:
+                pol = json.loads(match.group())
+                return jsonify({"success": True, "policy": pol})
+        return jsonify({"success": False, "raw": result}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

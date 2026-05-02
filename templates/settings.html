@@ -56,6 +56,19 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
     <div class="field"><label>API Key</label><input id="llm_key" type="password"><div class="hint">修改后保存生效，留空保持不变</div></div>
   </div>
 
+
+  <div class="card"><h3>📧 邮件推送设置</h3>
+    <div class="row">
+      <div class="field"><label>SMTP 服务器</label><input id="smtp_server" placeholder="smtp.qq.com"></div>
+      <div class="field"><label>SMTP 端口</label><input id="smtp_port" type="number" placeholder="465"></div>
+    </div>
+    <div class="field"><label>发送邮箱</label><input id="smtp_user" placeholder="your_email@qq.com"></div>
+    <div class="field"><label>授权码/密码</label><input id="smtp_password" type="password"><div class="hint">需要使用 SMTP 授权码，不是登录密码</div></div>
+    <div class="field"><label>接收邮箱</label><input id="smtp_receiver" placeholder="target@email.com"></div>
+    <div style="margin-top:12px"><button class="btn" onclick="testEmail()">🧪 测试邮件发送</button> <span id="email_test_result" style="margin-left:12px;color:#666"></span></div>
+  </div>
+
+
   <div class="card"><h3>📰 资讯速递（日更）</h3>
     <div class="field"><label>精选条数</label><input id="nb_max" type="number" min="1" max="10"></div>
     <div class="field"><label>标题生成 Prompt</label><textarea id="nb_title" rows="3"></textarea></div>

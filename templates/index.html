@@ -102,6 +102,7 @@ const PAGES=[
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
+{id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
 ];
 let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
@@ -133,7 +134,7 @@ function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',m
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,policy:loadPolicy};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -567,5 +568,119 @@ userRole=me.role||'viewer';
 initNav();
 loadPage(curPage);
 }
+
+// === 政策分析 ===
+async function loadPolicy(el){
+const tracks = await api("/api/proxy/tracks");
+var options = '<option value="">全部赛道</option>';
+(tracks||[]).forEach(function(t){options += '<option value="'+t.id+'">'+t.name+'</option>';});
+el.innerHTML = `
+<div class="card"><h3>📜 政策分析 <span style="font-size:12px;color:#999;font-weight:400">自动识别政策类资讯并分析影响</span></h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+    <select id="pol_track" class="search" style="width:200px">${options}</select>
+    <select id="pol_days" class="search" style="width:120px">
+      <option value="7">近7天</option>
+      <option value="30" selected>近30天</option>
+      <option value="90">近90天</option>
+    </select>
+    <button class="btn" onclick="analyzePolicies()">🔍 分析政策</button>
+    <button class="btn btn-ghost" onclick="batchClassify()">🤖 批量AI识别</button>
+  </div>
+  <div id="polStats" style="display:flex;gap:16px;margin-bottom:16px"></div>
+</div>
+<div class="card"><h3>政策列表 <span id="polCount" style="font-size:12px;color:#999;font-weight:400"></span></h3>
+  <div class="filters" id="polFilters">
+    <span class="fb active" data-v="" onclick="filterPol('')">全部</span>
+    <span class="fb" data-v="利好" onclick="filterPol('利好')">🟢 利好</span>
+    <span class="fb" data-v="中性" onclick="filterPol('中性')">⚪ 中性</span>
+    <span class="fb" data-v="利空" onclick="filterPol('利空')">🔴 利空</span>
+  </div>
+  <div id="polList"><div class="empty">选择赛道并点击「分析政策」开始</div></div>
+</div>`;
+}
+
+let _polData = [];
+function filterPol(impact){
+document.querySelectorAll('#polFilters .fb').forEach(b => b.classList.toggle('active', b.dataset.v === impact));
+renderPolList(impact);
+}
+function renderPolList(filterImpact){
+const list = filterImpact ? _polData.filter(p => p.impact === filterImpact) : _polData;
+const container = document.getElementById('polList');
+if(!list.length){container.innerHTML = '<div class="empty">暂无符合条件的政策</div>';return}
+container.innerHTML = list.map(p => `
+<div class="ni" style="border-left:3px solid ${p.impact==='利好'?'#52c41a':p.impact==='利空'?'#ff4d4f':'#999'};padding-left:12px">
+  <div class="t">${p.url?`<a href="${esc(p.url)}" target="_blank" style="color:#333;text-decoration:none">${esc(p.title)}</a>`:esc(p.title)}</div>
+  <div class="m">${(p.publish_time||'').slice(0,16)} · ${p.source} · ${p.category||'未分类'}</div>
+  ${p.summary?`<div class="s" style="font-size:12px;color:#666;margin-top:4px">${esc(p.summary)}</div>`:''}
+  <div style="margin-top:6px"><span class="badge ${p.impact==='利好'?'badge-ok':p.impact==='利空'?'badge-err':'badge-info'}">${p.impact||'未分析'}</span>
+  ${p.track_name?`<span style="font-size:11px;color:#999;margin-left:8px">${esc(p.track_name)}</span>`:''}
+  <span style="font-size:11px;color:#1890ff;cursor:pointer;margin-left:8px" onclick="classifyOne(${p.id},this)">🤖 AI分析</span>
+  </div>
+</div>`).join('');
+}
+
+async function analyzePolicies(){
+const trackId = document.getElementById('pol_track').value;
+const days = document.getElementById('pol_days').value;
+const url = trackId ? "/api/proxy/tracks/"+trackId+"/news?days="+days : "/api/proxy/tracks/1/news?days="+days;
+document.getElementById('polList').innerHTML = '<div class="empty">加载中...</div>';
+const news = await api(url);
+const newsItems = news && news.items ? news.items : (Array.isArray(news) ? news : []);
+if(!newsItems.length){document.getElementById('polList').innerHTML = '<div class="empty">暂无资讯数据</div>';return}
+// 显示全部资讯，由AI识别哪些是政策类
+_polData = newsItems.map(n => ({...n, impact: '', category: '', summary: '', track_name: ''}));
+document.getElementById('polCount').textContent = '共 ' + newsItems.length + ' 条资讯，点击「批量AI识别」筛选政策类';
+const statsEl = document.getElementById('polStats');
+statsEl.innerHTML = '<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">📰 共 '+newsItems.length+' 条资讯</div>';
+renderPolList('');
+}
+
+async function classifyOne(newsId, el){
+el.textContent = '分析中...';
+const newsItem = _polData.find(n => n.id === newsId);
+if(!newsItem) return;
+const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: newsItem.title + ' ' + (newsItem.content||'')})});
+if(result && result.policy && result.policy.is_policy){
+const p = result.policy;
+newsItem.impact = p.impact || '中性';
+newsItem.category = p.category || '';
+newsItem.summary = p.summary || '';
+el.textContent = '✅ 已分析';
+renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '');
+} else {
+el.textContent = '非政策';
+}
+}
+
+async function batchClassify(){
+if(!_polData.length){toast('请先分析政策', true);return}
+let done = 0,利好=0,利空=0,中性=0;
+document.querySelectorAll('#polList .ni').forEach(ni => {
+const btn = ni.querySelector('span[onclick^="classifyOne"]');
+if(btn) btn.textContent = '⏳';
+});
+for(const item of _polData){
+if(item.impact) continue;
+const result = await api('/api/policy/classify', {method:'POST', body: JSON.stringify({content: item.title + ' ' + (item.content||'')})});
+if(result && result.policy && result.policy.is_policy){
+item.impact = result.policy.impact || '中性';
+item.category = result.policy.category || '';
+item.summary = result.policy.summary || '';
+if(item.impact==='利好')利好++; else if(item.impact==='利空')利空++; else 中性++;
+}
+done++;
+}
+document.getElementById('polStats').innerHTML = `
+<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">✅ 批量分析完成</div>
+<div style="padding:8px 16px;background:#f6ffed;border-radius:6px;font-size:13px">🟢 利好: ${利好}</div>
+<div style="padding:8px 16px;background:#f0f5ff;border-radius:6px;font-size:13px">⚪ 中性: ${中性}</div>
+<div style="padding:8px 16px;background:#fff2f0;border-radius:6px;font-size:13px">🔴 利空: ${利空}</div>`;
+renderPolList(document.querySelector('#polFilters .fb.active')?.dataset.v || '');
+toast('批量分析完成: 利好'+利好+' 利空'+利空+' 中性'+中性);
+}
+
+
+
 init();
 </script>
