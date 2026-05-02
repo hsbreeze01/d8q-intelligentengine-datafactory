@@ -1,0 +1,88 @@
+prompts:
+  news_brief_title:
+    name: "资讯速递标题"
+    description: "生成小红书爆款标题"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 100
+    system: ""
+    template: "你是小红书爆款标题专家。根据以下资讯列表，生成一个吸引眼球的标题。要求：带emoji，不超过20字，有悬念感。只输出标题，不要其他内容。"
+
+  news_brief_content:
+    name: "资讯速递正文"
+    description: "生成小红书风格资讯速递"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 2000
+    system: ""
+    template: |
+      你是小红书内容创作专家。根据以下资讯，创作一篇小红书风格的资讯速递。要求：
+      1. 从中筛选最有价值的{{ max_items }}条，去除重复
+      2. 每条用1-2句话精炼概括，前面加数字emoji（1️⃣2️⃣3️⃣）
+      3. 语气轻松专业，适合年轻读者
+      4. 总字数控制在300-500字
+      5. 末尾空一行后加话题标签
+      6. 不要加标题（标题单独生成）
+
+  research_report_title:
+    name: "研究报告标题"
+    description: "生成小红书财经博主风格标题"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 100
+    system: ""
+    template: "你是小红书财经博主。根据以下研报和资讯数据，生成一个专业又吸引人的标题。要求：带emoji，不超过20字，体现深度分析感。只输出标题。"
+
+  research_report_content:
+    name: "研究报告正文"
+    description: "生成小红书风格深度分析文章"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 2000
+    system: ""
+    template: |
+      你是资深财经分析师兼小红书博主。根据以下研报数据和行业资讯，创作一篇小红书风格的深度分析文章。要求：
+      1. 分三个板块：【本周核心】【机构观点】【关注要点】
+      2. 【机构观点】引用具体券商/机构名称和观点，用▪️列表
+      3. 【关注要点】用✅标注机会，⚠️标注风险
+      4. 语气专业但易懂，适合投资小白
+      5. 总字数控制在500-800字
+      6. 末尾空一行后加话题标签
+      7. 不要加标题
+
+  weekly_report:
+    name: "行业周报"
+    description: "生成结构化行业周报"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 2000
+    system: "你是资深行业分析师。"
+    template: |
+      你是专业的投资分析师。根据以下资讯，生成一份结构化的行业周报。
+      包含：1.本周核心事件 2.市场情绪 3.下周展望
+      简洁专业，300-500字。
+
+  announcement_summary:
+    name: "公告解读"
+    description: "解读上市公司公告"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.5
+    max_tokens: 500
+    system: "你是证券分析师，简洁专业地解读公告。"
+    template: "以下是上市公司近期公告标题列表，请用1-2句话概括核心要点和对投资者的影响：\n{{ titles }}"
+
+  track_heat_summary:
+    name: "赛道热度摘要"
+    description: "总结赛道热度和趋势"
+    version: 1
+    model: "deepseek-chat"
+    temperature: 0.5
+    max_tokens: 500
+    system: "你是专业的投资分析师，擅长提炼研报观点。"
+    template: "请根据以下赛道数据，总结热度和趋势变化：\n{{ data }}"

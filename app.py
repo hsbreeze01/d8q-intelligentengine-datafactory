@@ -16,7 +16,9 @@ app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
 from export_weekly import export_bp
+from prompts_api import bp as prompts_bp
 app.register_blueprint(export_bp)
+app.register_blueprint(prompts_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
@@ -52,6 +54,12 @@ def agent_request(method, path, data=None):
 @app.route("/tasks")
 @app.route("/stock")
 @app.route("/report")
+@app.route("/prompts")
+def prompts_page():
+    with open(os.path.join(TMPL_DIR, "prompts.html"), encoding="utf-8") as f:
+        return f.read()
+
+
 @app.route("/settings")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
@@ -96,7 +104,15 @@ def weekly_generate():
     if not news:
         return jsonify({"error": "无资讯数据"}), 404
     news_text = "\n".join("- [" + n["title"] + "] (" + n.get("source","") + ", " + (n.get("publish_time",""))[:10] + ")" for n in news[:20])
-    prompt = f"""你是专业的投资分析师。根据以下资讯，生成一份结构化的行业周报。
+    # 从 prompt 配置加载
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from prompt_loader import PromptManager as _PM
+    _pm = _PM(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompts'))
+    _wk_cfg = _pm.get('weekly_report') or {}
+    _wk_system = _wk_cfg.get('system', '你是资深行业分析师。')
+    _wk_template = _wk_cfg.get('template', '你是专业的投资分析师。根据以下资讯，生成一份结构化的行业周报。')
+    prompt = _wk_template + f"""
 
 赛道：{track_name}
 时间范围：近{days}天
@@ -110,7 +126,7 @@ def weekly_generate():
 4. 总字数 800-1200 字
 5. 语气专业客观"""
     try:
-        content = _llm_call(prompt, system="你是资深行业分析师。")
+        content = _llm_call(prompt, system=_wk_system)
         return jsonify({"content": content, "track": track_name, "news_count": len(news)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

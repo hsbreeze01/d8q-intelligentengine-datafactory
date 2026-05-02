@@ -104,6 +104,7 @@ const PAGES=[
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
+{id:'prompts',icon:'💬',label:'Prompt管理',title:'Prompt配置管理',role:'admin'},
 ];
 let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
 
@@ -134,7 +135,7 @@ function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',m
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,policy:loadPolicy};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,prompts:loadPrompts,policy:loadPolicy};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }

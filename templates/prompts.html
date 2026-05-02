@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q - Prompt 配置管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent}
+.nav a:hover{color:#1890ff}.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card h3{font-size:17px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+.service-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.service-tab{padding:8px 20px;border:1px solid #d9d9d9;border-radius:20px;cursor:pointer;font-size:14px;background:#fff;transition:all .2s}
+.service-tab:hover{border-color:#1890ff;color:#1890ff}
+.service-tab.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.prompt-list{display:flex;flex-direction:column;gap:12px}
+.prompt-item{border:1px solid #e8e8e8;border-radius:8px;padding:16px;transition:all .2s}
+.prompt-item:hover{border-color:#1890ff;box-shadow:0 2px 8px rgba(24,144,255,.1)}
+.prompt-name{font-weight:600;font-size:15px;color:#1890ff;margin-bottom:4px}
+.prompt-desc{font-size:13px;color:#999;margin-bottom:8px}
+.prompt-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e8e8e8}
+.prompt-detail.open{display:block}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:#666;margin-bottom:4px;font-weight:500}
+.field textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;font-family:monospace;line-height:1.6;resize:vertical;min-height:120px}
+.field textarea:focus{border-color:#1890ff;outline:none}
+.field input{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px}
+.field input:focus{border-color:#1890ff;outline:none}
+.meta-row{display:flex;gap:12px;flex-wrap:wrap}
+.meta-row .field{flex:1;min-width:120px}
+.btn{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-primary{background:#1890ff;color:#fff}.btn-primary:hover{background:#40a9ff}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-ghost{background:transparent;color:#1890ff;border:1px solid #1890ff}
+.btn-ghost:hover{background:#e6f7ff}
+.btn-expand{background:transparent;border:none;color:#1890ff;cursor:pointer;font-size:13px}
+.btn-expand:hover{text-decoration:underline}
+.btn-bar{display:flex;gap:8px;margin-top:8px}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.badge-agent{background:#e6f7ff;color:#1890ff}.badge-shark{background:#f6ffed;color:#52c41a}
+.badge-compass{background:#fff7e6;color:#fa8c16}.badge-factory{background:#f9f0ff;color:#722ed1}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}.toast-ok{background:#52c41a}.toast-err{background:#ff4d4f}
+.loading{text-align:center;padding:40px;color:#999}
+.empty{text-align:center;padding:40px;color:#ccc}
+.user-info{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-size:13px;color:#888}
+.user-info .logout{color:#ff4d4f;cursor:pointer;border:none;background:none;font-size:13px}
+.user-info .logout:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="header"><h1>📊 D8Q 智能资讯工厂</h1><p>Prompt 配置管理中心</p></div>
+<div class="nav">
+  <a href="/">📰 资讯浏览</a><a href="/tasks">⚙️ 任务管理</a>
+  <a href="/stock">📈 股票分析</a><a href="/report">📑 研报分析</a>
+  <a href="/settings">🔧 创作配置</a>
+  <a href="/prompts" class="active">💬 Prompt管理</a>
+</div>
+<div class="container">
+  <div class="card">
+    <h3>💬 Prompt 模板管理 <span style="font-size:13px;color:#999">统一管理所有服务的 Prompt 配置</span></h3>
+    <div class="service-tabs" id="serviceTabs"></div>
+    <div id="promptList" class="prompt-list"><div class="loading">加载中...</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SVC_COLORS={agent:'#1890ff',shark:'#52c41a',compass:'#fa8c16',factory:'#722ed1'};
+const SVC_NAMES={agent:'Agent 数据智能',shark:'Shark 股票数据',compass:'Compass 金融分析',factory:'Factory 资讯工厂'};
+let allData={},currentSvc='all';
+
+async function loadAll(){
+  try{
+    const r=await fetch('/api/prompts/all');
+    const d=await r.json();
+    if(d.success) allData=d.services;
+  }catch(e){console.error(e)}
+  renderTabs();renderList();
+}
+
+function renderTabs(){
+  const tabs=document.getElementById('serviceTabs');
+  let h='<div class="service-tab '+(currentSvc==='all'?'active':'')+'" onclick="switchSvc(\'all\')">全部服务</div>';
+  for(const svc of Object.keys(SVC_NAMES)){
+    const cnt=allData[svc]&&typeof allData[svc]==='object'&& !allData[svc].error?Object.keys(allData[svc]).length:0;
+    h+='<div class="service-tab '+(currentSvc===svc?'active':'')+'" onclick="switchSvc(\''+svc+'\')">'+SVC_NAMES[svc]+' ('+cnt+')</div>';
+  }
+  tabs.innerHTML=h;
+}
+
+function switchSvc(svc){currentSvc=svc;renderTabs();renderList();}
+
+function renderList(){
+  const el=document.getElementById('promptList');
+  let items=[];
+  const svcs=currentSvc==='all'?Object.keys(allData):[currentSvc];
+  svcs.forEach(svc=>{
+    const data=allData[svc];
+    if(!data||data.error||typeof data!=='object')return;
+    Object.entries(data).forEach(([key,cfg])=>{
+      items.push({svc,key,cfg});
+    });
+  });
+  if(!items.length){el.innerHTML='<div class="empty">暂无 Prompt 配置</div>';return;}
+  let h='';
+  items.forEach((it,idx)=>{
+    const badge='<span class="badge badge-'+it.svc+'">'+it.svc+'</span>';
+    h+='<div class="prompt-item" id="item-'+idx+'">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +badge+'<span class="prompt-name">'+(it.cfg.name||it.key)+'</span>'
+      +'<span style="color:#999;font-size:12px">v'+(it.cfg.version||1)+'</span>'
+      +'<button class="btn-expand" onclick="toggleDetail('+idx+')">编辑 ▾</button>'
+      +'</div>'
+      +'<div class="prompt-desc">'+(it.cfg.description||'')+'</div>'
+      +'<div class="prompt-detail" id="detail-'+idx+'">'
+      +'<div class="meta-row">'
+      +'<div class="field"><label>模型</label><input id="m-'+idx+'" value="'+(it.cfg.model||'')+'"></div>'
+      +'<div class="field"><label>Temperature</label><input id="t-'+idx+'" type="number" step="0.1" value="'+(it.cfg.temperature||0.3)+'"></div>'
+      +'<div class="field"><label>Max Tokens</label><input id="tk-'+idx+'" type="number" value="'+(it.cfg.max_tokens||2000)+'"></div>'
+      +'</div>'
+      +'<div class="field"><label>System Prompt</label><textarea id="sys-'+idx+'">'+(it.cfg.system||'')+'</textarea></div>'
+      +'<div class="field"><label>Template (支持 {{ var }} 变量)</label><textarea id="tpl-'+idx+'">'+(it.cfg.template||'')+'</textarea></div>'
+      +'<div class="btn-bar">'
+      +'<button class="btn btn-primary btn-sm" onclick="savePrompt(\''+it.svc+'\',\''+it.key+'\','+idx+')">💾 保存</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="resetPrompt('+idx+')">↩ 重置</button>'
+      +'</div></div></div>';
+  });
+  el.innerHTML=h;
+}
+
+function toggleDetail(idx){
+  const el=document.getElementById('detail-'+idx);
+  el.classList.toggle('open');
+}
+
+async function savePrompt(svc,key,idx){
+  const cfg={
+    name:document.querySelector('#item-'+idx+' .prompt-name').textContent,
+    version:1,
+    model:document.getElementById('m-'+idx).value,
+    temperature:parseFloat(document.getElementById('t-'+idx).value),
+    max_tokens:parseInt(document.getElementById('tk-'+idx).value),
+    system:document.getElementById('sys-'+idx).value,
+    template:document.getElementById('tpl-'+idx).value,
+  };
+  // 保留 description
+  if(allData[svc]&&allData[svc][key]&&allData[svc][key].description){
+    cfg.description=allData[svc][key].description;
+  }
+
+  try{
+    let url,method='PUT';
+    if(svc==='factory'){
+      url='/api/prompts/'+key;
+    }else{
+      url='/api/prompts/'+svc+'/'+key;
+    }
+    const r=await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+    const d=await r.json();
+    if(d.success){
+      showToast('保存成功 ✅','ok');
+      allData[svc][key]={...allData[svc][key],...cfg};
+    }else{
+      showToast('保存失败: '+(d.error||'未知错误'),'err');
+    }
+  }catch(e){
+    showToast('网络错误: '+e.message,'err');
+  }
+}
+
+function resetPrompt(idx){renderList();}
+
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast toast-'+(type==='ok'?'ok':'err')+' show';
+  setTimeout(()=>t.className='toast',2500);
+}
+
+loadAll();
+</script>
+</body>
+</html>
