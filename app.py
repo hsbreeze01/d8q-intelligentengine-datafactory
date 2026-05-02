@@ -55,6 +55,7 @@ def agent_request(method, path, data=None):
 @app.route("/stock")
 @app.route("/report")
 @app.route("/settings")
+@app.route("/policy")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()

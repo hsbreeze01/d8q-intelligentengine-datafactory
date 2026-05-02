@@ -167,13 +167,16 @@ return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.ic
 nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();goPage(a.dataset.p)});
 }
 
-function goPage(id){
+function goPage(id,push=true){
 curPage=id;
 document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('active',a.dataset.p===id));
 const p=PAGES.find(x=>x.id===id);
 document.getElementById('pageTitle').textContent=p?p.title:id;
+if(push&&id!==(location.pathname.replace('/','')||'dashboard'))history.pushState({page:id},'', '/'+(id==='dashboard'?'':id));
 loadPage(id);
 }
+window.addEventListener('popstate',e=>{if(e.state&&e.state.page)goPage(e.state.page,false)});
+
 
 function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2500)}
 function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
