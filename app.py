@@ -3,6 +3,7 @@ import sqlite3, json, os
 import urllib.request
 import urllib.parse
 from flask import Flask, request, jsonify, render_template_string, send_from_directory, session
+import time as _time
 
 app = Flask(__name__)
 
@@ -14,6 +15,33 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
 from auth import auth_bp, check_auth
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
+
+@app.before_request
+def _track_start():
+    request._track_start = _time.time()
+
+@app.after_request
+def _track_event(response):
+    path = request.path
+    if not path.startswith("/api/") or path.startswith("/api/auth/") or path.startswith("/api/analytics"):
+        return response
+    username = session.get("username", "")
+    if not username:
+        return response
+    try:
+        duration = int((_time.time() - getattr(request, '_track_start', _time.time())) * 1000)
+        func_name = _classify_function(path)
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO user_events (user_id, event_time, function_name, method, path, status_code, duration_ms) VALUES (?, datetime('now'), ?, ?, ?, ?, ?)",
+            (username, func_name, request.method, path, response.status_code, duration)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    _cleanup_old_events()
+    return response
 
 from export_weekly import export_bp
 from prompts_api import bp as prompts_bp
@@ -30,6 +58,77 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# === 用户行为事件采集 ===
+FUNCTION_MAP = {
+    "/api/proxy/tracks/heat": "赛道热度",
+    "/api/proxy/tracks": "赛道",
+    "/api/news": "资讯",
+    "/api/stock/": "个股分析",
+    "/api/watchlist": "自选股",
+    "/api/report/": "研报",
+    "/api/research/": "研报聚合",
+    "/api/policy/": "政策分析",
+    "/api/weekly/": "周报",
+    "/api/user/": "用户设置",
+    "/api/content/": "内容创作",
+    "/api/prompts": "Prompt管理",
+    "/api/tasks": "采集任务",
+    "/api/meta": "元数据",
+    "/api/service-status": "服务状态",
+    "/api/push/": "推送配置",
+    "/api/notify/": "通知",
+    "/api/llm-config": "LLM配置",
+    "/api/keyword-": "关键词",
+}
+
+def _classify_function(path):
+    for prefix in sorted(FUNCTION_MAP.keys(), key=len, reverse=True):
+        if path.startswith(prefix):
+            return FUNCTION_MAP[prefix]
+    return "其他"
+
+def _init_events_table():
+    conn = get_db()
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.executescript(
+        "CREATE TABLE IF NOT EXISTS user_events ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "user_id TEXT NOT NULL, "
+        "event_time DATETIME NOT NULL, "
+        "function_name TEXT NOT NULL, "
+        "method TEXT, "
+        "path TEXT, "
+        "status_code INTEGER, "
+        "duration_ms INTEGER"
+        "); "
+        "CREATE INDEX IF NOT EXISTS idx_ue_user_time ON user_events(user_id, event_time); "
+        "CREATE INDEX IF NOT EXISTS idx_ue_func_time ON user_events(function_name, event_time);"
+    )
+    conn.commit()
+    conn.close()
+
+try:
+    _init_events_table()
+except Exception:
+    pass
+
+_last_cleanup_date = ""
+def _cleanup_old_events():
+    global _last_cleanup_date
+    from datetime import date as _date
+    today = str(_date.today())
+    if _last_cleanup_date == today:
+        return
+    _last_cleanup_date = today
+    try:
+        conn = get_db()
+        conn.execute("DELETE FROM user_events WHERE event_time < datetime('now', '-90 days')")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def agent_request(method, path, data=None):
@@ -56,6 +155,7 @@ def agent_request(method, path, data=None):
 @app.route("/report")
 @app.route("/settings")
 @app.route("/policy")
+@app.route("/follows")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()
@@ -73,7 +173,7 @@ def proxy_tracks(**kwargs):
     # Inject user_id for personalization (unless admin requests view=all, or user has no subscriptions)
     _username = session.get("username", "")
     _role = session.get("role", "viewer")
-    if _username and not (_role == "admin" and request.args.get("view") == "all"):
+    if _username and request.args.get("view") != "all":
         # Check if user has any subscriptions
         _conn = get_db()
         _has_subs = _conn.execute("SELECT 1 FROM user_subscriptions WHERE user_id=? LIMIT 1", (_username,)).fetchone()
@@ -174,7 +274,7 @@ def news():
     _news_username = session.get("username", "")
     _news_role = session.get("role", "viewer")
     _news_view = request.args.get("view", "")
-    if _news_username and not (_news_role == "admin" and _news_view == "all"):
+    if _news_username and _news_view != "all":
         conn_u = get_db()
         try:
             _sub_rows = conn_u.execute(
@@ -808,6 +908,82 @@ def research_by_track(track_id):
     conn.close()
     result["cached"] = False
     return jsonify(result)
+
+# --- 运营分析 API (admin only) ---
+@app.route("/api/analytics/overview")
+def analytics_overview():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    conn = get_db()
+    try:
+        dau = conn.execute("SELECT COUNT(DISTINCT user_id) FROM user_events WHERE DATE(event_time)=DATE('now')").fetchone()[0]
+        mau = conn.execute("SELECT COUNT(DISTINCT user_id) FROM user_events WHERE event_time >= datetime('now', '-30 days')").fetchone()[0]
+        today_events = conn.execute("SELECT COUNT(*) FROM user_events WHERE DATE(event_time)=DATE('now')").fetchone()[0]
+        top = conn.execute("SELECT function_name, COUNT(*) as c FROM user_events WHERE DATE(event_time)=DATE('now') GROUP BY function_name ORDER BY c DESC LIMIT 1").fetchone()
+        return jsonify({"dau": dau, "mau": mau, "today_events": today_events,
+            "top_function": {"name": top[0], "count": top[1]} if top else {"name": "-", "count": 0}})
+    finally:
+        conn.close()
+
+@app.route("/api/analytics/functions")
+def analytics_functions():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    days = int(request.args.get("days", 30))
+    conn = get_db()
+    try:
+        cutoff = "datetime('now', '-{} days')".format(days) if days < 9999 else "datetime('2000-01-01')"
+        total = conn.execute("SELECT COUNT(*) FROM user_events WHERE event_time >= " + cutoff).fetchone()[0]
+        rows = conn.execute("SELECT function_name, COUNT(*) as c FROM user_events WHERE event_time >= " + cutoff + " GROUP BY function_name ORDER BY c DESC").fetchall()
+        return jsonify({"functions": [{"name": r[0], "count": r[1], "percentage": round(r[1]/max(total,1)*100, 1)} for r in rows], "total": total})
+    finally:
+        conn.close()
+
+@app.route("/api/analytics/users")
+def analytics_users():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    days = int(request.args.get("days", 30))
+    conn = get_db()
+    try:
+        cutoff = "datetime('now', '-{} days')".format(days) if days < 9999 else "datetime('2000-01-01')"
+        rows = conn.execute("SELECT user_id, MAX(event_time) as last_active, COUNT(DISTINCT function_name) as func_count, COUNT(*) as total_calls, ROUND(CAST(COUNT(*) AS FLOAT) / MAX(julianday('now') - julianday(MIN(event_time)), 1), 1) as daily_avg FROM user_events WHERE event_time >= " + cutoff + " GROUP BY user_id ORDER BY total_calls DESC").fetchall()
+        return jsonify({"users": [{"user_id": r[0], "last_active": r[1], "function_count": r[2], "total_calls": r[3], "daily_avg": r[4]} for r in rows]})
+    finally:
+        conn.close()
+
+@app.route("/api/analytics/trends")
+def analytics_trends():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    days = int(request.args.get("days", 30))
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT DATE(event_time) as date, COUNT(DISTINCT user_id) as dau, COUNT(*) as total_calls FROM user_events WHERE event_time >= datetime('now', '-{} days') GROUP BY DATE(event_time) ORDER BY date".format(days)).fetchall()
+        return jsonify({"trends": [{"date": r[0], "dau": r[1], "total_calls": r[2]} for r in rows]})
+    finally:
+        conn.close()
+
+@app.route("/api/analytics/cold-hot")
+def analytics_cold_hot():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    days = int(request.args.get("days", 30))
+    conn = get_db()
+    try:
+        users = [r[0] for r in conn.execute("SELECT DISTINCT user_id FROM user_events WHERE event_time >= datetime('now', '-{} days') ORDER BY user_id".format(days)).fetchall()]
+        functions = [r[0] for r in conn.execute("SELECT DISTINCT function_name FROM user_events WHERE event_time >= datetime('now', '-{} days') ORDER BY function_name".format(days)).fetchall()]
+        user_idx = {u: i for i, u in enumerate(users)}
+        func_idx = {f: i for i, f in enumerate(functions)}
+        matrix = [[0] * len(functions) for _ in range(len(users))]
+        rows = conn.execute("SELECT user_id, function_name, COUNT(*) as c FROM user_events WHERE event_time >= datetime('now', '-{} days') GROUP BY user_id, function_name".format(days)).fetchall()
+        for r in rows:
+            if r[0] in user_idx and r[1] in func_idx:
+                matrix[user_idx[r[0]]][func_idx[r[1]]] = r[2]
+        return jsonify({"users": users, "functions": functions, "matrix": matrix})
+    finally:
+        conn.close()
+
 
 # 启动调度器（gunicorn preload模式下只启动一次）
 from scheduler import start_scheduler
