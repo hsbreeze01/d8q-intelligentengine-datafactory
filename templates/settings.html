@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D8Q - 内容创作配置</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 0;text-align:center}
+.header h1{font-size:28px;font-weight:600;letter-spacing:2px}
+.header p{margin-top:6px;opacity:.8;font-size:14px}
+.nav{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 20px;display:flex;justify-content:center;gap:0;position:relative}
+.nav a{display:inline-block;padding:12px 28px;font-size:15px;color:#666;text-decoration:none;border-bottom:2px solid transparent}
+.nav a:hover{color:#1890ff}.nav a.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.container{max-width:900px;margin:0 auto;padding:20px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.card h3{font-size:17px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f0f0f0}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;color:#666;margin-bottom:4px;font-weight:500}
+.field input,.field select{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;outline:none}
+.field textarea{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;outline:none;font-family:inherit;line-height:1.6;resize:vertical}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#1890ff}
+.field .hint{font-size:12px;color:#999;margin-top:3px}
+.row{display:flex;gap:16px}.row .field{flex:1}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tags input{width:auto;flex:1;min-width:120px}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 10px;background:#f0f5ff;border:1px solid #adc6ff;border-radius:12px;font-size:12px;color:#1890ff}
+.tag .x{cursor:pointer;font-weight:700}
+.btn{padding:10px 24px;background:#1890ff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500}
+.btn:hover{background:#40a9ff}
+.btn-bar{display:flex;justify-content:flex-end;gap:12px;margin-top:8px}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:14px;z-index:999;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}.toast-ok{background:#52c41a}.toast-err{background:#ff4d4f}
+.user-info{position:absolute;right:20px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-size:13px;color:#888}
+.user-info .role{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px}
+.user-info .logout{color:#ff4d4f;cursor:pointer;border:none;background:none;font-size:13px}
+.user-info .logout:hover{text-decoration:underline}
+
+/* === Tab 切换 === */
+.tabs{display:flex;gap:0;border-bottom:2px solid #f0f0f0;margin-bottom:24px}
+.tab-btn{padding:10px 24px;border:none;background:transparent;cursor:pointer;font-size:15px;color:#999;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab-btn:hover{color:#333}
+.tab-btn.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:500}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* === Prompt 管理 === */
+.svc-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.svc-tab{padding:6px 16px;border:1px solid #d9d9d9;border-radius:16px;cursor:pointer;font-size:13px;background:#fff;transition:all .2s}
+.svc-tab:hover{border-color:#1890ff;color:#1890ff}
+.svc-tab.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.prompt-item{border:1px solid #e8e8e8;border-radius:8px;padding:14px;margin-bottom:10px;transition:all .2s}
+.prompt-item:hover{border-color:#1890ff}
+.prompt-head{display:flex;align-items:center;gap:8px}
+.prompt-name{font-weight:600;font-size:14px;color:#1890ff}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.badge-agent{background:#e6f7ff;color:#1890ff}.badge-shark{background:#f6ffed;color:#52c41a}
+.badge-compass{background:#fff7e6;color:#fa8c16}.badge-factory{background:#f9f0ff;color:#722ed1}
+.prompt-desc{font-size:12px;color:#999;margin:4px 0 0}
+.prompt-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e8e8e8}
+.prompt-detail.open{display:block}
+.meta-row{display:flex;gap:12px;flex-wrap:wrap}
+.meta-row .field{flex:1;min-width:100px}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-ghost{background:transparent;color:#1890ff;border:1px solid #1890ff}
+.btn-ghost:hover{background:#e6f7ff}
+.btn-expand{background:transparent;border:none;color:#1890ff;cursor:pointer;font-size:12px}
+.btn-expand:hover{text-decoration:underline}
+.loading{text-align:center;padding:40px;color:#999}
+</style>
+</head>
+<body>
+<div class="header"><h1>📊 D8Q 智能资讯工厂</h1><p>Intelligent Engine DataFactory</p></div>
+<div class="nav">
+  <a href="/">📰 资讯浏览</a><a href="/tasks">⚙️ 任务管理</a>
+  <a href="/stock">📈 股票分析</a><a href="/report">📑 研报分析</a>
+  <a href="/settings" class="active">🔧 创作配置</a>
+</div>
+<div class="container">
+
+<!-- Tab 切换 -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('config')">🎨 内容配置</button>
+  <button class="tab-btn" onclick="switchTab('prompts')">💬 Prompt 管理</button>
+  <button class="tab-btn" onclick="switchTab('users')">👥 用户管理</button>
+</div>
+
+<!-- Tab 1: 原有内容配置 -->
+<div class="tab-panel active" id="panel-config">
+  <div class="card"><h3>🤖 LLM 全局设置</h3>
+    <div class="row">
+      <div class="field"><label>模型</label><input id="llm_model"></div>
+      <div class="field"><label>Temperature</label><input id="llm_temp" type="number" step="0.1" min="0" max="2"></div>
+      <div class="field"><label>Max Tokens</label><input id="llm_tokens" type="number" step="100"></div>
+    </div>
+    <div class="field"><label>API Base URL</label><input id="llm_url"></div>
+    <div class="field"><label>API Key</label><input id="llm_key" type="password"><div class="hint">修改后保存生效，留空保持不变</div></div>
+  </div>
+  <div class="card"><h3>📧 邮件推送设置</h3>
+    <div class="row">
+      <div class="field"><label>SMTP 服务器</label><input id="smtp_server" placeholder="smtp.qq.com"></div>
+      <div class="field"><label>SMTP 端口</label><input id="smtp_port" type="number" placeholder="465"></div>
+    </div>
+    <div class="field"><label>发送邮箱</label><input id="smtp_user" placeholder="your_email@qq.com"></div>
+    <div class="field"><label>授权码/密码</label><input id="smtp_password" type="password"><div class="hint">需要使用 SMTP 授权码，不是登录密码</div></div>
+    <div class="field"><label>接收邮箱</label><input id="smtp_receiver" placeholder="target@email.com"></div>
+    <div style="margin-top:12px"><button class="btn" onclick="testEmail()">🧪 测试邮件发送</button> <span id="email_test_result" style="margin-left:12px;color:#666"></span></div>
+  </div>
+  <div class="card"><h3>📰 资讯速递（日更）</h3>
+    <div class="field"><label>精选条数</label><input id="nb_max" type="number" min="1" max="10"></div>
+    <div class="field"><label>标题生成 Prompt</label><textarea id="nb_title" rows="3"></textarea></div>
+    <div class="field"><label>正文生成 Prompt</label><textarea id="nb_content" rows="6"></textarea><div class="hint">可用变量：{max_items}</div></div>
+    <div class="field"><label>默认标签</label><div class="tags" id="nb_tags_area"></div><div class="hint">回车添加新标签</div></div>
+  </div>
+  <div class="card"><h3>📊 研究报告（周更）</h3>
+    <div class="field"><label>标题生成 Prompt</label><textarea id="rr_title" rows="3"></textarea></div>
+    <div class="field"><label>正文生成 Prompt</label><textarea id="rr_content" rows="6"></textarea></div>
+    <div class="field"><label>默认标签</label><div class="tags" id="rr_tags_area"></div></div>
+  </div>
+  <div class="btn-bar"><button class="btn" onclick="save()">💾 保存配置</button></div>
+</div>
+
+<!-- Tab 2: Prompt 管理 -->
+<div class="tab-panel" id="panel-prompts">
+  <div class="card">
+    <h3>💬 Prompt 模板管理 <span style="font-size:13px;color:#999;font-weight:400">统一管理所有服务的 Prompt 配置</span></h3>
+    <div class="svc-tabs" id="svcTabs"></div>
+    <div id="promptList"><div class="loading">加载中...</div></div>
+  </div>
+</div>
+
+<!-- Tab 3: 用户管理 -->
+<div class="tab-panel" id="panel-users">
+  <div class="card">
+    <table style="width:100%;border-collapse:collapse;font-size:14px" id="userTable">
+      <thead><tr style="border-bottom:2px solid #f0f0f0;text-align:left">
+        <th style="padding:8px">用户名</th><th style="padding:8px">角色</th><th style="padding:8px">创建时间</th><th style="padding:8px;width:180px">操作</th>
+      </tr></thead>
+      <tbody id="userBody"></tbody>
+    </table>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0">
+      <h4 style="font-size:14px;margin-bottom:12px">➕ 创建新用户</h4>
+      <div class="row">
+        <div class="field"><label>用户名</label><input id="new_user"></div>
+        <div class="field"><label>密码（至少8位）</label><input id="new_pass" type="password"></div>
+        <div class="field"><label>角色</label><select id="new_role"><option value="viewer">viewer - 只读</option><option value="editor">editor - 编辑</option><option value="admin">admin - 管理员</option></select></div>
+      </div>
+      <div class="btn-bar"><button class="btn" onclick="createUser()">创建用户</button></div>
+    </div>
+  </div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* === Tab 切换 === */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(function(b,i){b.classList.toggle('active',['config','prompts','users'][i]===name)});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.toggle('active',p.id==='panel-'+name)});
+  if(name==='prompts'&&!window._promptsLoaded){loadAllPrompts();window._promptsLoaded=true;}
+  if(name==='users')loadUsers();
+}
+
+/* === Toast === */
+function toast(msg,ok){var t=document.getElementById("toast");t.textContent=msg;t.className="toast show "+(ok?"toast-ok":"toast-err");setTimeout(function(){t.className="toast"},2500)}
+
+/* === 原有配置逻辑 === */
+var cfg={};var nbTags=[],rrTags=[];
+function renderTags(arr,containerId,arrName){
+  var el=document.getElementById(containerId);
+  var h="";for(var i=0;i<arr.length;i++)h+='<span class="tag">'+esc(arr[i])+' <span class="x" onclick="rmTag(\''+arrName+'\','+i+',\''+containerId+'\')">×</span></span>';
+  h+='<input placeholder="输入标签回车添加" onkeydown="addTag(event,\''+arrName+'\',\''+containerId+'\')">';
+  el.innerHTML=h;
+}
+function addTag(e,arrName,cid){if(e.key!=="Enter")return;var v=e.target.value.trim();if(!v)return;if(!v.startsWith("#"))v="#"+v;window[arrName].push(v);renderTags(window[arrName],cid,arrName);e.target.value=""}
+function rmTag(arrName,i,cid){window[arrName].splice(i,1);renderTags(window[arrName],cid,arrName)}
+function load(){
+  fetch("/api/llm-config").then(function(r){return r.json()}).then(function(d){
+    cfg=d;var l=d.llm||{};
+    document.getElementById("llm_model").value=l.model||"";
+    document.getElementById("llm_temp").value=l.temperature||0.7;
+    document.getElementById("llm_tokens").value=l.max_tokens||2000;
+    document.getElementById("llm_url").value=l.base_url||"";
+    document.getElementById("llm_key").value="";
+    var nb=d.news_brief||{};
+    document.getElementById("nb_max").value=nb.max_items||5;
+    document.getElementById("nb_title").value=nb.title_prompt||"";
+    document.getElementById("nb_content").value=nb.content_prompt||"";
+    nbTags=(nb.default_tags||[]).slice();renderTags(nbTags,"nb_tags_area","nbTags");
+    var rr=d.research_report||{};
+    document.getElementById("rr_title").value=rr.title_prompt||"";
+    document.getElementById("rr_content").value=rr.content_prompt||"";
+    rrTags=(rr.default_tags||[]).slice();renderTags(rrTags,"rr_tags_area","rrTags");
+  })
+}
+function save(){
+  var u={llm:{model:document.getElementById("llm_model").value,temperature:parseFloat(document.getElementById("llm_temp").value),max_tokens:parseInt(document.getElementById("llm_tokens").value),base_url:document.getElementById("llm_url").value},news_brief:{max_items:parseInt(document.getElementById("nb_max").value),title_prompt:document.getElementById("nb_title").value,content_prompt:document.getElementById("nb_content").value,default_tags:nbTags},research_report:{title_prompt:document.getElementById("rr_title").value,content_prompt:document.getElementById("rr_content").value,default_tags:rrTags}};
+  var k=document.getElementById("llm_key").value;if(k)u.llm.api_key=k;
+  fetch("/api/llm-config",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(u)}).then(function(r){return r.json()}).then(function(){toast("配置已保存",true)}).catch(function(e){toast("保存失败: "+e.message,false)})
+}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+load();
+
+/* === 用户管理 === */
+function loadUsers(){
+  fetch("/api/auth/users").then(r=>{if(!r.ok)throw r;return r.json()}).then(users=>{
+    var h="";users.forEach(u=>{
+      var row='<tr style="border-bottom:1px solid #f5f5f5">';
+      row+='<td style="padding:8px">'+esc(u.username)+'</td>';
+      row+='<td style="padding:8px"><span class="tag" style="border:none">'+esc(u.role)+'</span></td>';
+      row+='<td style="padding:8px;color:#999;font-size:12px">'+(u.created_at||"").slice(0,16)+'</td>';
+      row+='<td style="padding:8px">';
+      row+='<button style="padding:3px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px" onclick="resetPw(this)" data-u="'+esc(u.username)+'">重置密码</button>';
+      row+='<button style="padding:3px 10px;border:1px solid #ffa39e;border-radius:4px;background:#fff;color:#ff4d4f;cursor:pointer;font-size:12px" onclick="delUser(this)" data-u="'+esc(u.username)+'">删除</button>';
+      row+='</td></tr>';h+=row;
+    });
+    document.getElementById("userBody").innerHTML=h;
+  }).catch(()=>{});
+}
+function createUser(){
+  var u=document.getElementById("new_user").value.trim(),p=document.getElementById("new_pass").value,r=document.getElementById("new_role").value;
+  if(!u||!p){toast("用户名和密码必填",false);return}
+  fetch("/api/auth/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p,role:r})})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok){toast("用户 "+u+" 创建成功",true);document.getElementById("new_user").value="";document.getElementById("new_pass").value="";loadUsers()}else toast(d.error||"创建失败",false)});
+}
+function resetPw(el){
+  var username=el.getAttribute("data-u");var pw=prompt("请输入 "+username+" 的新密码（至少8位）：");if(!pw)return;
+  fetch("/api/auth/users/"+username+"/password",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok)toast(username+" 密码已重置",true);else toast(d.error||"重置失败",false)});
+}
+function delUser(el){
+  var username=el.getAttribute("data-u");if(!confirm("确定删除用户 "+username+" ？"))return;
+  fetch("/api/auth/users/"+username,{method:"DELETE"})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok){toast(username+" 已删除",true);loadUsers()}else toast(d.error||"删除失败",false)});
+}
+// 延迟加载用户列表
+loadUsers();
+
+/* === Prompt 管理 === */
+var SVC_NAMES={agent:'Agent 数据智能',shark:'Shark 股票数据',compass:'Compass 金融分析',factory:'Factory 资讯工厂'};
+var allPrompts={},curSvc='all';
+function loadAllPrompts(){
+  fetch('/api/prompts/all').then(r=>r.json()).then(d=>{
+    if(d.success) allPrompts=d.services;
+    renderSvcTabs();renderPromptList();
+  }).catch(e=>{document.getElementById('promptList').innerHTML='<div class="loading">加载失败</div>'});
+}
+function renderSvcTabs(){
+  var el=document.getElementById('svcTabs');
+  var h='<div class="svc-tab '+(curSvc==='all'?'active':'')+'" onclick="switchSvc(\'all\')">全部</div>';
+  Object.keys(SVC_NAMES).forEach(function(svc){
+    var data=allPrompts[svc];var cnt=data&&typeof data==='object'&&!data.error?Object.keys(data).length:0;
+    h+='<div class="svc-tab '+(curSvc===svc?'active':'')+'" onclick="switchSvc(\''+svc+'\')">'+SVC_NAMES[svc]+' ('+cnt+')</div>';
+  });
+  el.innerHTML=h;
+}
+function switchSvc(svc){curSvc=svc;renderSvcTabs();renderPromptList();}
+function renderPromptList(){
+  var el=document.getElementById('promptList');var items=[];
+  var svcs=curSvc==='all'?Object.keys(allPrompts):[curSvc];
+  svcs.forEach(function(svc){
+    var data=allPrompts[svc];if(!data||data.error||typeof data!=='object')return;
+    Object.keys(data).forEach(function(key){items.push({svc:svc,key:key,cfg:data[key]});});
+  });
+  if(!items.length){el.innerHTML='<div class="loading">暂无配置</div>';return;}
+  var h='';
+  items.forEach(function(it,idx){
+    h+='<div class="prompt-item" id="pi-'+idx+'"><div class="prompt-head">'
+      +'<span class="badge badge-'+it.svc+'">'+it.svc+'</span>'
+      +'<span class="prompt-name">'+(it.cfg.name||it.key)+'</span>'
+      +'<span style="color:#ccc;font-size:11px">v'+(it.cfg.version||1)+'</span>'
+      +'<button class="btn-expand" onclick="togglePrompt('+idx+')">编辑 ▾</button></div>'
+      +'<div class="prompt-desc">'+(it.cfg.description||'')+'</div>'
+      +'<div class="prompt-detail" id="pd-'+idx+'">'
+      +'<div class="meta-row">'
+      +'<div class="field"><label>模型</label><input id="pm-'+idx+'" value="'+(it.cfg.model||'')+'"></div>'
+      +'<div class="field"><label>Temperature</label><input id="pt-'+idx+'" type="number" step="0.1" value="'+(it.cfg.temperature||0.3)+'"></div>'
+      +'<div class="field"><label>Max Tokens</label><input id="pk-'+idx+'" type="number" value="'+(it.cfg.max_tokens||2000)+'"></div></div>'
+      +'<div class="field"><label>System Prompt</label><textarea id="ps-'+idx+'" rows="3">'+(it.cfg.system||'')+'</textarea></div>'
+      +'<div class="field"><label>Template（支持 {{ var }} 变量）</label><textarea id="ptl-'+idx+'" rows="5">'+(it.cfg.template||'')+'</textarea></div>'
+      +'<div class="btn-bar">'
+      +'<button class="btn btn-sm" onclick="savePrompt(\''+it.svc+'\',\''+it.key+'\','+idx+')">💾 保存</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="renderPromptList()">↩ 取消</button></div></div></div>';
+  });
+  el.innerHTML=h;
+}
+function togglePrompt(idx){document.getElementById('pd-'+idx).classList.toggle('open');}
+function savePrompt(svc,key,idx){
+  var body={name:document.querySelector('#pi-'+idx+' .prompt-name').textContent,version:1,
+    model:document.getElementById('pm-'+idx).value,
+    temperature:parseFloat(document.getElementById('pt-'+idx).value),
+    max_tokens:parseInt(document.getElementById('pk-'+idx).value),
+    system:document.getElementById('ps-'+idx).value,
+    template:document.getElementById('ptl-'+idx).value};
+  if(allPrompts[svc]&&allPrompts[svc][key]&&allPrompts[svc][key].description)body.description=allPrompts[svc][key].description;
+  var url=svc==='factory'?'/api/prompts/'+key:'/api/prompts/'+svc+'/'+key;
+  fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  .then(r=>r.json()).then(d=>{
+    if(d.success){toast('保存成功 ✅',true);allPrompts[svc][key]=Object.assign({},allPrompts[svc][key],body);}
+    else toast('保存失败: '+(d.error||''),false);
+  }).catch(e=>toast('网络错误',false));
+}
+
+/* === 用户信息 === */
+(function(){
+  fetch("/api/auth/me").then(r=>r.json()).then(d=>{
+    if(d.username){
+      var nav=document.querySelector(".nav");
+      if(nav){
+        var el=document.createElement("div");el.className="user-info";
+        el.innerHTML='<span class="role">'+esc(d.role)+'</span><span>'+esc(d.username)+'</span><button class="logout" onclick="fetch(\'/api/auth/logout\',{method:\'POST\'}).then(()=>location.href=\'/login\')">登出</button>';
+        nav.appendChild(el);
+      }
+    }
+  }).catch(()=>{});
+})();
+</script>
+</body>
+</html>

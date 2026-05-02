@@ -54,12 +54,6 @@ def agent_request(method, path, data=None):
 @app.route("/tasks")
 @app.route("/stock")
 @app.route("/report")
-@app.route("/prompts")
-def prompts_page():
-    with open(os.path.join(TMPL_DIR, "prompts.html"), encoding="utf-8") as f:
-        return f.read()
-
-
 @app.route("/settings")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:

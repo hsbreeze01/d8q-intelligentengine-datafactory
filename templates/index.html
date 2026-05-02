@@ -474,15 +474,81 @@ function closeModal(){document.getElementById('taskModal').style.display='none'}
 // === 设置（保留原有） ===
 async function loadSettings(el){
 const cfg=await api('/api/llm-config');
-el.innerHTML=`<div class="card"><h3>LLM 配置</h3>
+el.innerHTML=`<div class="filters" style="margin-bottom:20px">
+<span class="fb active" onclick="settingsTab(this,'cfg')">🎨 内容配置</span>
+<span class="fb" onclick="settingsTab(this,'prompts')">💬 Prompt 管理</span>
+<span class="fb" onclick="settingsTab(this,'users')">👥 用户管理</span>
+</div>
+<div id="st-cfg"><div class="card"><h3>LLM 配置</h3>
 <div class="rcfg"><div class="f"><label>模型</label><input id="sModel" value="${cfg.llm?.model||''}"></div>
 <div class="f"><label>Temperature</label><input id="sTemp" type="number" step="0.1" value="${cfg.llm?.temperature||0.7}"></div>
 <div class="f"><label>Max Tokens</label><input id="sTokens" type="number" value="${cfg.llm?.max_tokens||2000}"></div></div>
 <div style="margin-bottom:12px"><label style="font-size:12px;color:#666">API Base URL</label><input class="search" style="width:100%;margin-top:4px" id="sUrl" value="${cfg.llm?.base_url||''}"></div>
-<div style="text-align:right"><button class="btn" onclick="saveSettings()">保存配置</button></div></div>
-<div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div>`;
+<div style="text-align:right"><button class="btn" onclick="saveSettings()">保存配置</button></div></div></div>
+<div id="st-prompts" style="display:none"><div id="promptsPanel">加载中...</div></div>
+<div id="st-users" style="display:none"><div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div></div>`;
 loadUserMgmt();
 loadServiceStatus();
+}
+function settingsTab(btn,tab){
+btn.parentElement.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+document.getElementById('st-cfg').style.display=tab==='cfg'?'':'none';
+document.getElementById('st-prompts').style.display=tab==='prompts'?'':'none';
+document.getElementById('st-users').style.display=tab==='users'?'':'none';
+if(tab==='prompts'&&!window._pLoaded){loadPromptsPanel();window._pLoaded=true;}
+if(tab==='users')loadUserMgmt();
+}
+var _pAll={},_pSvc='all';
+const _pNames={agent:'Agent 数据智能',shark:'Shark 股票数据',compass:'Compass 金融分析',factory:'Factory 资讯工厂'};
+async function loadPromptsPanel(){
+const d=await api('/api/prompts/all');
+if(d.success) _pAll=d.services;
+renderPromptsPanel();
+}
+function renderPromptsPanel(){
+let tabs='<div class="filters" style="margin-bottom:12px"><span class="fb '+(_pSvc==='all'?'active':'')+'" onclick="_pSvcSwitch(this,\'all\')">全部</span>';
+Object.keys(_pNames).forEach(s=>{const cnt=_pAll[s]&&typeof _pAll[s]==='object'&&!_pAll[s].error?Object.keys(_pAll[s]).length:0;
+tabs+=`<span class="fb ${_pSvc===s?'active':''}" onclick="_pSvcSwitch(this,'${s}')">${_pNames[s]} (${cnt})</span>`;});
+tabs+='</div>';
+let items=[];
+const svcs=_pSvc==='all'?Object.keys(_pAll):[_pSvc];
+svcs.forEach(svc=>{const data=_pAll[svc];if(!data||data.error||typeof data!=='object')return;
+Object.keys(data).forEach(key=>items.push({svc,key,cfg:data[key]}));});
+if(!items.length){document.getElementById('promptsPanel').innerHTML=tabs+'<div class="empty">暂无配置</div>';return;}
+let h=tabs;
+items.forEach((it,i)=>{
+const badges={agent:'tag-policy',shark:'tag-tech',compass:'tag-market',factory:'tag-report'};
+h+=`<div class="card" style="margin-bottom:10px;padding:14px 20px" id="pc-${i}"><div style="display:flex;align-items:center;gap:8px">
+<span class="tag ${badges[it.svc]||''}">${it.svc}</span><b style="font-size:14px;color:#1890ff">${it.cfg.name||it.key}</b>
+<span style="color:#ccc;font-size:11px">v${it.cfg.version||1}</span>
+<span style="font-size:12px;color:#999;margin-left:4px">${it.cfg.description||''}</span>
+<a style="margin-left:auto;font-size:12px;color:#1890ff;cursor:pointer" onclick="togglePEdit(${i})">编辑</a></div>
+<div id="pe-${i}" style="display:none;margin-top:14px;padding-top:14px;border-top:1px dashed #e8e8e8">
+<div class="rcfg"><div class="f"><label>模型</label><input id="pm-${i}" value="${it.cfg.model||''}"></div>
+<div class="f"><label>Temperature</label><input id="pt-${i}" type="number" step="0.1" value="${it.cfg.temperature||0.3}"></div>
+<div class="f"><label>Max Tokens</label><input id="pk-${i}" type="number" value="${it.cfg.max_tokens||2000}"></div></div>
+<div style="margin-bottom:10px"><label style="font-size:12px;color:#666">System Prompt</label><textarea class="search" style="width:100%;margin-top:4px;padding:10px;font-family:inherit;line-height:1.5;min-height:80px;resize:vertical" id="ps-${i}">${it.cfg.system||''}</textarea></div>
+<div style="margin-bottom:10px"><label style="font-size:12px;color:#666">Template（支持 {{ var }} 变量）</label><textarea class="search" style="width:100%;margin-top:4px;padding:10px;font-family:monospace;line-height:1.5;min-height:100px;resize:vertical" id="ptl-${i}">${it.cfg.template||''}</textarea></div>
+<div style="text-align:right;display:flex;gap:8px;justify-content:flex-end">
+<button class="btn" style="font-size:12px;padding:6px 16px" onclick="savePromptCfg('${it.svc}','${it.key}',${i})">💾 保存</button>
+<button class="btn-ghost" style="font-size:12px;padding:6px 16px" onclick="togglePEdit(${i})">取消</button></div>
+</div></div>`;
+});
+document.getElementById('promptsPanel').innerHTML=h;
+}
+function _pSvcSwitch(btn,svc){_pSvc=svc;renderPromptsPanel();}
+function togglePEdit(i){const el=document.getElementById('pe-'+i);el.style.display=el.style.display==='none'?'':'none';}
+async function savePromptCfg(svc,key,i){
+const body={name:document.querySelector('#pc-'+i+' b').textContent,version:1,
+model:document.getElementById('pm-'+i).value,temperature:parseFloat(document.getElementById('pt-'+i).value),
+max_tokens:parseInt(document.getElementById('pk-'+i).value),system:document.getElementById('ps-'+i).value,
+template:document.getElementById('ptl-'+i).value};
+if(_pAll[svc]&&_pAll[svc][key]&&_pAll[svc][key].description)body.description=_pAll[svc][key].description;
+const url=svc==='factory'?'/api/prompts/'+key:'/api/prompts/'+svc+'/'+key;
+const r=await api(url,{method:'PUT',body:JSON.stringify(body)});
+if(r.success){toast('保存成功 ✅');_pAll[svc][key]=Object.assign({},_pAll[svc][key],body);}
+else toast(r.error||'保存失败');
 }
 async function saveSettings(){
 await api('/api/llm-config',{method:'PUT',body:JSON.stringify({llm:{model:document.getElementById('sModel').value,temperature:parseFloat(document.getElementById('sTemp').value),max_tokens:parseInt(document.getElementById('sTokens').value),base_url:document.getElementById('sUrl').value}})});
