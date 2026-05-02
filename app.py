@@ -786,35 +786,24 @@ def test_email_config():
 # --- 政策分析 API ---
 @app.route("/api/policy/classify", methods=["POST"])
 def classify_policy():
-    """使用 LLM 识别政策类资讯"""
-    from datafactory.content.llm_creator import _llm_call
+    """使用 LLM 识别政策类资讯（委托 Agent 服务）"""
     data = request.json or {}
     content = data.get("content", "")
     
     if not content:
         return jsonify({"success": False, "error": "内容为空"}), 400
     
-    prompt = f"""请分析以下新闻内容，判断是否为政策/监管类资讯。
-
-新闻内容：
-{content[:1000]}
-
-请按以下 JSON 格式返回（注意是标准JSON，布尔值用小写true/false）：
-{{
-    "is_policy": true/false,
-    "category": "政策类型（国内政策/海外政策/行业监管/财政政策等）",
-    "summary": "政策要点摘要（50字以内）",
-    "impact": "利好/利空/中性"
-}}
-"""
     try:
-        result = _llm_call(prompt, system="你是专业政策分析师，严格按照JSON格式返回结果。")
-        if result:
-            import re
-            match = re.search(r'\{[\s\S]*\}', result)
-            if match:
-                pol = json.loads(match.group())
-                return jsonify({"success": True, "policy": pol})
-        return jsonify({"success": False, "raw": result}), 500
+        req = urllib.request.Request(
+            AGENT_API + "/api/llm/policy/classify",
+            data=json.dumps({"content": content}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+        return jsonify(result)
+    except urllib.error.HTTPError as e:
+        return jsonify(json.loads(e.read())), e.code
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
