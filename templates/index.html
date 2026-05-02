@@ -145,6 +145,7 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 <div class="content" id="contentArea"></div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>
 </body>
 </html>
 <script>
@@ -513,9 +514,7 @@ el.innerHTML=`
 <tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='paused'?'badge-err':'badge-ok'}">${t.status==='paused'?'已暂停':'运行中'}</span></td>
 <td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
 
-<div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="renderExecLog(1)">刷新</button></h3><div id="execLogBody">加载中...</div><div id="execLogPager" style="text-align:center;margin-top:12px"></div></div>
-
-<div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>`;
+<div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="renderExecLog(1)">刷新</button></h3><div id="execLogBody">加载中...</div><div id="execLogPager" style="text-align:center;margin-top:12px"></div></div>`;
 renderExecLog(1);
 }
 
