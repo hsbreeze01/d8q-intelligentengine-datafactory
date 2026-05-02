@@ -755,12 +755,53 @@ def update_push_config():
 # --- 服务状态 API (admin only, 读取健康检查结果) ---
 @app.route("/api/service-status")
 def service_status():
-    status_file = "/var/log/d8q/service_status.json"
-    try:
-        with open(status_file, encoding="utf-8") as f:
-            return json.loads(f.read()), 200
-    except Exception:
-        return {"error": "状态文件不存在"}, 404
+    """实时检测所有微服务状态"""
+    import subprocess
+    services = {}
+
+    # HTTP 健康检查的服务
+    http_services = {
+        "agent":         {"port": 8000, "path": "/api/health"},
+        "stockshark":    {"port": 5000, "path": "/health"},
+        "compass":       {"port": 8087, "path": "/health"},
+        "factory":       {"port": 8088, "path": "/"},
+        "infopublisher": {"port": 8089, "path": "/api/publish", "method": "GET"},
+    }
+    for name, cfg in http_services.items():
+        try:
+            url = f"http://localhost:{cfg['port']}{cfg['path']}"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                services[name] = {"status": "ok", "type": "http", "port": cfg["port"]}
+        except urllib.error.HTTPError as e:
+            # 405 = route exists (e.g. POST-only), service is alive
+            if e.code == 405:
+                services[name] = {"status": "ok", "type": "http", "port": cfg["port"]}
+            else:
+                services[name] = {"status": "ok" if e.code < 500 else "error", "type": "http", "port": cfg["port"], "code": e.code}
+        except Exception:
+            services[name] = {"status": "down", "type": "http", "port": cfg["port"]}
+
+    # systemd 管理的基础服务
+    for svc in ["xvfb", "ghost_browser"]:
+        try:
+            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace("_", "-")}"],
+                               capture_output=True, text=True, timeout=3)
+            active = r.stdout.strip() == "active"
+            entry = {"status": "active" if active else "inactive", "type": "systemd"}
+            if svc == "ghost_browser" and active:
+                try:
+                    req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
+                    with urllib.request.urlopen(req, timeout=3) as resp:
+                        entry["cdp"] = "ok"
+                except Exception:
+                    entry["cdp"] = "down"
+            services[svc] = entry
+        except Exception:
+            services[svc] = {"status": "unknown", "type": "systemd"}
+
+    from datetime import datetime
+    return jsonify({"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "services": services}), 200
 
 
 

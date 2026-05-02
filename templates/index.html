@@ -767,9 +767,10 @@ async function loadServiceStatus(){
 try{const d=await api('/api/service-status');if(!d.services)return;
 const el=document.getElementById('contentArea');
 const svcs=d.services;
+const nameMap={agent:"数据采集 Agent",stockshark:"股票分析 Shark",compass:"金融计算 Compass",factory:"聚合生产 Factory",infopublisher:"资讯发布 Publisher",xvfb:"虚拟显示 Xvfb",ghost_browser:"浏览器池 Ghost"};
 const html=Object.entries(svcs).map(([name,s])=>{
 const ok=s.status==='ok'||s.status==='active';
-return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:13px">${name}${s.port?' <span style=color:#999;font-size:11px>:'+s.port+'</span>':''}</span><span class="badge ${ok?'badge-ok':'badge-err'}">${ok?'● 正常':'● 异常'}</span></div>`;
+return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5"><span style="font-size:13px">${nameMap[name]||name}${s.port?' <span style=color:#999;font-size:11px>:'+s.port+'</span>':''}</span><span class="badge ${ok?'badge-ok':'badge-err'}">${ok?'● 正常':'● 异常'}</span></div>`;
 }).join('');
 const card=document.createElement('div');card.className='card';card.style.marginTop='16px';
 card.innerHTML=`<h3>🖥️ 服务状态 <span style="font-size:11px;color:#999;font-weight:400">更新于 ${d.timestamp||''}</span></h3>${html}`;
