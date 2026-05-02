@@ -1,5 +1,255 @@
 [
   {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "success",
+    "duration": 64.0,
+    "time": "2026-05-02T08:51:04.585202"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-02T08:30:59.915463"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖美帝AI军事化，战争要变天了？",
+    "duration": 4.8,
+    "time": "2026-05-02T08:30:59.857859"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
+    "duration": 48.1,
+    "time": "2026-05-01T23:07:00.401170"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "error",
+    "duration": 50.5,
+    "time": "2026-05-01T08:53:09.239108"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "error",
+    "duration": 102.3,
+    "time": "2026-05-01T08:52:18.715513"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "⚡核电+新能源狂飙！背后暗藏啥信号？",
+    "duration": 3.5,
+    "time": "2026-05-01T08:30:36.339490"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "AI收入暴涨800%！科技巨头终于赚到钱",
+    "duration": 3.8,
+    "time": "2026-05-01T08:30:32.821267"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "💥核电大爆发？民营首入局，绿色能源新风口",
+    "duration": 4.6,
+    "time": "2026-04-30T15:17:19.895708"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
+    "duration": 47.6,
+    "time": "2026-04-30T09:15:14.467451"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": false,
+    "result_summary": "Remote end closed connection without response",
+    "duration": 9.1,
+    "time": "2026-04-30T09:03:06.704066"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": false,
+    "result_summary": "Remote end closed connection without response",
+    "duration": 48.6,
+    "time": "2026-04-30T09:00:07.134775"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "<urlopen error [Errno 111] Connection refused>",
+    "duration": 0.0,
+    "time": "2026-04-30T08:51:07.181826"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "Remote end closed connection without response",
+    "duration": 54.5,
+    "time": "2026-04-30T08:51:07.163872"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "⚡️长三角首台“华龙一号”投产，核电迎来",
+    "duration": 4.9,
+    "time": "2026-04-30T08:30:20.803711"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤯微软AI年收入暴涨123%，回血了？",
+    "duration": 3.7,
+    "time": "2026-04-30T08:30:15.934922"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "unknown",
+    "duration": 132.3,
+    "time": "2026-04-29T13:46:29.539916"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "🇨🇳核电霸主诞生！112台机组全球第一🤯",
+    "duration": 4.4,
+    "time": "2026-04-29T13:43:44.409843"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
+    "duration": 129.5,
+    "time": "2026-04-29T13:34:58.546276"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "AI数据竟超人类？2025真相是…🤯",
+    "duration": 4.2,
+    "time": "2026-04-29T13:32:48.970389"
+  },
+  {
+    "task_id": "f3e8d57b",
+    "type": "creation",
+    "subject": "测试主题",
+    "trigger": "manual",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-04-29T13:21:35.957009"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
+    "duration": 126.0,
+    "time": "2026-04-29T09:59:00.309665"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "error",
+    "duration": 67.8,
+    "time": "2026-04-29T08:51:53.732644"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI修图革命：手指一动，照片秒变大片！",
+    "duration": 3.8,
+    "time": "2026-04-29T08:30:46.037002"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "test",
+    "success": true,
+    "result_summary": "谷歌员工联名拒做AI武器！🤯",
+    "duration": 3.6,
+    "time": "2026-04-28T10:55:28.851437"
+  },
+  {
     "task_id": "1067d48e",
     "type": "creation",
     "subject": "人工智能",
