@@ -12,7 +12,7 @@ import secrets
 from datetime import timedelta
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
-from auth import auth_bp, check_auth
+from auth import auth_bp, check_auth, INTERNAL_IPS
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
@@ -1519,6 +1519,28 @@ def proxy_cookie_capture_submit_code():
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return jsonify(data), resp.status
+    except urllib.error.HTTPError as e:
+        return jsonify(json.loads(e.read())), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+@app.route("/api/cookie/import", methods=["POST", "OPTIONS"])
+def proxy_cookie_import():
+    if request.method == "OPTIONS":
+        return "", 200
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    try:
+        body = request.json or {}
+        req = urllib.request.Request(
+            PUBLISHER_API + "/api/cookie/import",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
