@@ -857,7 +857,7 @@ document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)"
 if(elapsed%8===0){document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';}
 }else if(s.status==='waiting_phone'){
 document.getElementById('cs2t').textContent='需要短信验证，请输入手机号';
-document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display='none'">';
+document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
 document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="phoneInput" class="search" style="flex:1;padding:10px 12px;font-size:14px" placeholder="请输入11位手机号" maxlength="11"><button class="btn" onclick="submitPhone()">发送验证码</button></div></div>';
 }else if(s.status==='waiting_code'){
 document.getElementById('cs2t').textContent='已发送验证码，请输入';
