@@ -434,7 +434,29 @@ el.innerHTML=`
 <div class="card"><h3>赛道研报 <a class="more" id="trackRefresh" style="display:none" onclick="loadTrackReport(1)">刷新观点</a></h3>
 <div class="filters" id="trackFilter"></div>
 <div id="trackReportArea"><div class="empty">选择赛道查看研报聚合</div></div></div>
-<div class="card"><h3>研报搜索</h3>
+<div class="card"><h3>研报搜索 <button class="btn-ghost" style="margin-left:8px;padding:4px 12px;font-size:12px" onclick="showImportPanel()">📥 导入关注列表</button></h3>
+<div id="importPanel" style="display:none;margin-bottom:16px;padding:16px;background:#fafafa;border-radius:8px;border:1px solid #e8e8e8">
+<div style="font-size:13px;color:#666;margin-bottom:8px"><b>文件格式要求：</b>txt 文件，每行一个股票名称或代码，UTF-8 编码，最多 50 行</div>
+<div style="font-size:12px;color:#999;margin-bottom:12px;padding:8px;background:#fff;border-radius:4px;border:1px dashed #d9d9d9;font-family:monospace;line-height:1.6">示例内容：<br>比亚迪<br>宁德时代<br>002594<br>北特科技</div>
+<div style="display:flex;gap:8px;align-items:center">
+<input type="file" id="stockFileInput" accept=".txt" style="display:none" onchange="handleStockFile(this)">
+<button class="btn" style="padding:6px 16px;font-size:12px" onclick="document.getElementById('stockFileInput').click()">选择文件</button>
+<span id="fileStatus" style="font-size:12px;color:#999">未选择文件</span>
+<button class="btn-ghost" style="padding:4px 12px;font-size:12px;margin-left:auto" onclick="document.getElementById('importPanel').style.display='none'">收起</button>
+</div>
+<div id="filePreview" style="margin-top:12px;display:none"></div>
+</div>
+<div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入股票名称或关键词搜索研报" id="reportInput" onkeydown="if(event.key==='Enter')doReport()"><button class="btn" onclick="doReport()">搜索</button></div>
+<div id="reportResult"><div class="empty">输入关键词开始搜索</div></div></div>`;
+<div style="font-size:12px;color:#999;margin-bottom:12px;padding:8px;background:#fff;border-radius:4px;border:1px dashed #d9d9d9;font-family:monospace;line-height:1.6">示例内容：<br>比亚迪<br>宁德时代<br>002594<br>北特科技</div>
+<div style="display:flex;gap:8px;align-items:center">
+<input type="file" id="stockFileInput" accept=".txt" style="display:none" onchange="handleStockFile(this)">
+<button class="btn" style="padding:6px 16px;font-size:12px" onclick="document.getElementById('stockFileInput').click()">选择文件</button>
+<span id="fileStatus" style="font-size:12px;color:#999">未选择文件</span>
+<button class="btn-ghost" style="padding:4px 12px;font-size:12px;margin-left:auto" onclick="document.getElementById('importPanel').style.display='none'">收起</button>
+</div>
+<div id="filePreview" style="margin-top:12px;display:none"></div>
+</div>
 <div style="display:flex;gap:12px;margin-bottom:16px"><input class="search" style="flex:1;width:auto" placeholder="输入股票名称或关键词搜索研报" id="reportInput" onkeydown="if(event.key==='Enter')doReport()"><button class="btn" onclick="doReport()">搜索</button></div>
 <div id="reportResult"><div class="empty">输入关键词开始搜索</div></div></div>`;
 loadTrackFilters();
@@ -500,6 +522,104 @@ html+='</details>';
 html+='</div>';
 });
 document.getElementById('reportResult').innerHTML=html;
+}
+
+
+function showImportPanel(){document.getElementById('importPanel').style.display='block'}
+function handleStockFile(input){
+var file=input.files[0];if(!file)return;
+document.getElementById('fileStatus').textContent=file.name+' ('+(file.size/1024).toFixed(1)+'KB)';
+var reader=new FileReader();
+reader.onload=function(e){
+var text=e.target.result;
+if(!text||!text.trim()){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a\uff0c\u8bf7\u68c0\u67e5\u6587\u4ef6\u683c\u5f0f</div>';document.getElementById('filePreview').style.display='block';return}
+var lines=text.split(/\\r?\\n/).map(function(l){return l.trim()}).filter(function(l){return l.length>0});
+var truncated=false;if(lines.length>50){lines=lines.slice(0,50);truncated=true}
+if(!lines.length){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a</div>';document.getElementById('filePreview').style.display='block';return}
+var html='<div style="font-size:12px;color:#333;margin-bottom:8px">'+(truncated?'<span style="color:#faad14">\u26a0 \u6587\u4ef6\u8d85\u8fc750\u884c\uff0c\u53ea\u4f7f\u7528\u524d50\u884c</span><br>':'')+'<b>\u8bc6\u522b\u5230 '+lines.length+' \u4e2a\u80a1\u7968\u540d\u79f0\uff1a</b></div>';
+html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
+lines.forEach(function(l){html+='<span style="background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px">'+esc(l)+'</span>'});
+html+='</div>';
+var kwArr=lines.map(function(l){return "'"+l.replace(/'/g,"\\\\'")+"'"});
+html+='<button class="btn" style="padding:6px 20px;font-size:12px" onclick="batchSearchReport(['+kwArr.join(',')+'])">\u5f00\u59cb\u6279\u91cf\u641c\u7d22 ('+lines.length+'\u53ea)</button>';
+document.getElementById('filePreview').innerHTML=html;document.getElementById('filePreview').style.display='block';
+};
+reader.onerror=function(){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25\uff0c\u8bf7\u786e\u8ba4\u4e3a UTF-8 \u7f16\u7801\u7684 txt \u6587\u4ef6</div>';document.getElementById('filePreview').style.display='block'};
+reader.readAsText(file,'UTF-8');
+}
+async function batchSearchReport(keywords){
+var area=document.getElementById('reportResult');
+area.innerHTML='<div class="empty">\ud83d\udd0d \u6279\u91cf\u641c\u7d22\u4e2d... (0/'+keywords.length+')</div>';
+var batchSize=10;var allResults=[];var totalDone=0;
+for(var i=0;i<keywords.length;i+=batchSize){
+var batch=keywords.slice(i,i+batchSize);
+try{var data=await api('/api/report/stock',{method:'POST',body:JSON.stringify({keywords:batch,days:30})});var results=data.results||[];allResults=allResults.concat(results)}catch(e){}
+totalDone+=batch.length;area.innerHTML='<div class="empty">\ud83d\udd0d \u6279\u91cf\u641c\u7d22\u4e2d... ('+Math.min(totalDone,keywords.length)+'/'+keywords.length+')</div>';}
+if(!allResults.length){area.innerHTML='<div class="empty">\u6240\u6709\u80a1\u7968\u5747\u672a\u627e\u5230\u7814\u62a5\uff0c\u8bf7\u68c0\u67e5\u80a1\u7968\u540d\u79f0\u662f\u5426\u6b63\u786e</div>';return}
+var hitCount=allResults.filter(function(r){return r&&(r.reports&&r.reports.length||r.announcements&&r.announcements.length)}).length;
+var missCount=keywords.length-hitCount;
+var html='<div style="font-size:12px;color:#666;margin-bottom:12px;padding:8px;background:#f6ffed;border-radius:4px">\ud83d\udcca \u5171 <b>'+hitCount+'</b> \u53ea\u80a1\u7968\u6709\u7814\u62a5\u7ed3\u679c'+(missCount>0?'\uff0c<span style="color:#999">'+missCount+' \u53ea\u65e0\u7ed3\u679c</span>':'')+'</div>';
+allResults.forEach(function(r){
+if(!r)return;var name=r.stock_name||r.stock_code||'';var reports=r.reports||[];var anns=r.announcements||[];
+if(!reports.length&&!anns.length)return;
+html+='<div class="card" style="padding:16px 20px;margin-bottom:12px">';
+html+='<h4 style="font-size:15px;margin-bottom:12px">'+esc(name)+' <span style="font-size:12px;color:#999;font-weight:400">\u7814\u62a5 '+reports.length+'\u7bc7'+(anns.length?' \u00b7 \u516c\u544a '+anns.length+'\u6761':'')+'</span></h4>';
+if(reports.length){reports.forEach(function(rpt){
+html+='<div class="rpt-item" style="margin-bottom:8px"><div class="rpt-title">'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(rpt.title)+'</a>':esc(rpt.title))+'</div><div class="rpt-meta"><span class="org-tag">'+esc(rpt.org||'\u672a\u77e5')+'</span><span>\ud83d\udcc5 '+esc(rpt.date||'-')+'</span></div>'+(rpt.summary?'<div style="font-size:12px;color:#666;margin-top:4px;line-height:1.5">'+esc(rpt.summary).slice(0,150)+'...</div>':'')+'</div>';})}
+if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:13px;padding:6px 0">\ud83d\udccb \u516c\u544a ('+anns.length+'\u6761)</summary>';
+anns.forEach(function(a){html+='<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(a.title)+'</a>':esc(a.title))+'</div><div class="rpt-meta"><span>\ud83d\udcc5 '+esc(a.date||'-')+'</span></div></div>'});
+html+='</details>';}
+html+='</div>';});
+area.innerHTML=html;
+}
+
+
+function showImportPanel(){document.getElementById('importPanel').style.display='block'}
+function handleStockFile(input){
+var file=input.files[0];if(!file)return;
+document.getElementById('fileStatus').textContent=file.name+' ('+(file.size/1024).toFixed(1)+'KB)';
+var reader=new FileReader();
+reader.onload=function(e){
+var text=e.target.result;
+if(!text||!text.trim()){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a\uff0c\u8bf7\u68c0\u67e5\u6587\u4ef6\u683c\u5f0f</div>';document.getElementById('filePreview').style.display='block';return}
+var lines=text.split(/\\r?\\n/).map(function(l){return l.trim()}).filter(function(l){return l.length>0});
+var truncated=false;if(lines.length>50){lines=lines.slice(0,50);truncated=true}
+if(!lines.length){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a</div>';document.getElementById('filePreview').style.display='block';return}
+var html='<div style="font-size:12px;color:#333;margin-bottom:8px">'+(truncated?'<span style="color:#faad14">\u26a0 \u6587\u4ef6\u8d85\u8fc750\u884c\uff0c\u53ea\u4f7f\u7528\u524d50\u884c</span><br>':'')+'<b>\u8bc6\u522b\u5230 '+lines.length+' \u4e2a\u80a1\u7968\u540d\u79f0\uff1a</b></div>';
+html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
+lines.forEach(function(l){html+='<span style="background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px">'+esc(l)+'</span>'});
+html+='</div>';
+var kwArr=lines.map(function(l){return "'"+l.replace(/'/g,"\\\\'")+"'"});
+html+='<button class="btn" style="padding:6px 20px;font-size:12px" onclick="batchSearchReport(['+kwArr.join(',')+'])">\u5f00\u59cb\u6279\u91cf\u641c\u7d22 ('+lines.length+'\u53ea)</button>';
+document.getElementById('filePreview').innerHTML=html;document.getElementById('filePreview').style.display='block';
+};
+reader.onerror=function(){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25\uff0c\u8bf7\u786e\u8ba4\u4e3a UTF-8 \u7f16\u7801\u7684 txt \u6587\u4ef6</div>';document.getElementById('filePreview').style.display='block'};
+reader.readAsText(file,'UTF-8');
+}
+async function batchSearchReport(keywords){
+var area=document.getElementById('reportResult');
+area.innerHTML='<div class="empty">\ud83d\udd0d \u6279\u91cf\u641c\u7d22\u4e2d... (0/'+keywords.length+')</div>';
+var batchSize=10;var allResults=[];var totalDone=0;
+for(var i=0;i<keywords.length;i+=batchSize){
+var batch=keywords.slice(i,i+batchSize);
+try{var data=await api('/api/report/stock',{method:'POST',body:JSON.stringify({keywords:batch,days:30})});var results=data.results||[];allResults=allResults.concat(results)}catch(e){}
+totalDone+=batch.length;area.innerHTML='<div class="empty">\ud83d\udd0d \u6279\u91cf\u641c\u7d22\u4e2d... ('+Math.min(totalDone,keywords.length)+'/'+keywords.length+')</div>';}
+if(!allResults.length){area.innerHTML='<div class="empty">\u6240\u6709\u80a1\u7968\u5747\u672a\u627e\u5230\u7814\u62a5\uff0c\u8bf7\u68c0\u67e5\u80a1\u7968\u540d\u79f0\u662f\u5426\u6b63\u786e</div>';return}
+var hitCount=allResults.filter(function(r){return r&&(r.reports&&r.reports.length||r.announcements&&r.announcements.length)}).length;
+var missCount=keywords.length-hitCount;
+var html='<div style="font-size:12px;color:#666;margin-bottom:12px;padding:8px;background:#f6ffed;border-radius:4px">\ud83d\udcca \u5171 <b>'+hitCount+'</b> \u53ea\u80a1\u7968\u6709\u7814\u62a5\u7ed3\u679c'+(missCount>0?'\uff0c<span style="color:#999">'+missCount+' \u53ea\u65e0\u7ed3\u679c</span>':'')+'</div>';
+allResults.forEach(function(r){
+if(!r)return;var name=r.stock_name||r.stock_code||'';var reports=r.reports||[];var anns=r.announcements||[];
+if(!reports.length&&!anns.length)return;
+html+='<div class="card" style="padding:16px 20px;margin-bottom:12px">';
+html+='<h4 style="font-size:15px;margin-bottom:12px">'+esc(name)+' <span style="font-size:12px;color:#999;font-weight:400">\u7814\u62a5 '+reports.length+'\u7bc7'+(anns.length?' \u00b7 \u516c\u544a '+anns.length+'\u6761':'')+'</span></h4>';
+if(reports.length){reports.forEach(function(rpt){
+html+='<div class="rpt-item" style="margin-bottom:8px"><div class="rpt-title">'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(rpt.title)+'</a>':esc(rpt.title))+'</div><div class="rpt-meta"><span class="org-tag">'+esc(rpt.org||'\u672a\u77e5')+'</span><span>\ud83d\udcc5 '+esc(rpt.date||'-')+'</span></div>'+(rpt.summary?'<div style="font-size:12px;color:#666;margin-top:4px;line-height:1.5">'+esc(rpt.summary).slice(0,150)+'...</div>':'')+'</div>';})}
+if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:13px;padding:6px 0">\ud83d\udccb \u516c\u544a ('+anns.length+'\u6761)</summary>';
+anns.forEach(function(a){html+='<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(a.title)+'</a>':esc(a.title))+'</div><div class="rpt-meta"><span>\ud83d\udcc5 '+esc(a.date||'-')+'</span></div></div>'});
+html+='</details>';}
+html+='</div>';});
+area.innerHTML=html;
 }
 
 // === 任务管理（完整CRUD） ===
