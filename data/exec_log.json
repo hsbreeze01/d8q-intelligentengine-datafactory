@@ -1,5 +1,45 @@
 [
   {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "扎波罗热核电站遭袭击？真相是……⚡️🤔",
+    "duration": 4.0,
+    "time": "2026-05-04T08:30:15.001911"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.1,
+    "time": "2026-05-04T08:30:11.005384"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-03T08:30:05.993825"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.2,
+    "time": "2026-05-03T08:30:05.974102"
+  },
+  {
     "task_id": "5d3cba25",
     "type": "publish",
     "subject": "人工智能",

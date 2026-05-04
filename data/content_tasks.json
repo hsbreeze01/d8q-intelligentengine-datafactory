@@ -8,7 +8,7 @@
     "created_at": "2026-04-15T00:02:42.066662",
     "status": "active",
     "run_at": "08:30",
-    "last_run": "2026-05-02 08:30:54"
+    "last_run": "2026-05-04 08:30:10"
   },
   {
     "type": "publish",
@@ -19,7 +19,7 @@
     "created_at": "2026-04-15T00:02:42.127723",
     "status": "active",
     "run_at": "08:50",
-    "last_run": "2026-05-02 08:50:00"
+    "last_run": "2026-05-04 08:50:15"
   },
   {
     "type": "creation",
@@ -49,7 +49,7 @@
     "style": "news_brief",
     "id": "6aee9247",
     "created_at": "2026-04-29T13:42:04.550391",
-    "last_run": "2026-05-02 08:30:54"
+    "last_run": "2026-05-04 08:30:10"
   },
   {
     "type": "publish",
@@ -59,6 +59,6 @@
     "channel": "xiaohongshu",
     "id": "fbcfb5f5",
     "created_at": "2026-04-29T13:42:32.092749",
-    "last_run": "2026-05-02 08:50:00"
+    "last_run": "2026-05-04 08:50:15"
   }
 ]
