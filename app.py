@@ -1427,7 +1427,7 @@ def proxy_cookie_capture():
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
@@ -1442,7 +1442,7 @@ def proxy_cookie_capture_status():
         return jsonify({"error": "\u6743\u9650\u4e0d\u8db3"}), 403
     try:
         req = urllib.request.Request(PUBLISHER_API + "/api/cookie/capture-status", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             return jsonify(json.loads(resp.read()))
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500

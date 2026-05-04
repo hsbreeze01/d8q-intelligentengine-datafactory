@@ -840,17 +840,17 @@ try{
 const r=await api('/api/cookie/capture',{method:'POST',body:JSON.stringify({platform:'xiaohongshu'})});
 if(r.error){document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent=r.error;return}
 document.getElementById('cs1').style.background='#52c41a';document.getElementById('cs1').textContent='✓';
-document.getElementById('cs1t').textContent='登录页已打开（二维码模式）';
+document.getElementById('cs1t').textContent='请求已发送，等待登录页加载...';
 document.getElementById('cs2').style.background='#1890ff';document.getElementById('cs2').style.color='#fff';
-document.getElementById('cs2t').style.color='#333';document.getElementById('cs2t').textContent='请用手机小红书App扫描下方二维码...';
+document.getElementById('cs2t').style.color='#333';document.getElementById('cs2t').textContent='正在打开登录页...';
 const qr=document.getElementById('qrArea');
-qr.innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
-document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
+qr.innerHTML='<div style="color:#999;padding:20px">Loading...</div>';
+
 let elapsed=0;
 if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}_cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
 elapsed+=2;
 const s=await api('/api/cookie/capture-status');
-if(s.status==='waiting_login'&&elapsed%8===0){
+if(s.status==='opening'){document.getElementById('cs2t').textContent='正在打开登录页... ('+elapsed+'s)';}else if(s.status==='waiting_login'){document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';if(elapsed%8===0){
 qr.innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
 }
 if(s.status==='completed'){
