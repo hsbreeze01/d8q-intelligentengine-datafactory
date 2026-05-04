@@ -1461,3 +1461,45 @@ def proxy_cookie_capture_screenshot():
         return jsonify({'error':'screenshot not found'}),404
     except Exception as e:
         return jsonify({'error':str(e)[:200]}),500
+
+
+@app.route("/api/cookie/capture-submit-phone", methods=["POST"])
+def proxy_cookie_capture_submit_phone():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    try:
+        body = request.json or {}
+        req = urllib.request.Request(
+            PUBLISHER_API + "/api/cookie/capture-submit-phone",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return jsonify(data), resp.status
+    except urllib.error.HTTPError as e:
+        return jsonify(json.loads(e.read())), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/cookie/capture-submit-code", methods=["POST"])
+def proxy_cookie_capture_submit_code():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    try:
+        body = request.json or {}
+        req = urllib.request.Request(
+            PUBLISHER_API + "/api/cookie/capture-submit-code",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return jsonify(data), resp.status
+    except urllib.error.HTTPError as e:
+        return jsonify(json.loads(e.read())), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
