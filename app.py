@@ -1231,7 +1231,8 @@ def _execute_custom_check(config):
                                 elif warn:
                                     msg = "\u5373\u5c06\u8fc7\u671f: " + ",".join(warn[:3])
                                 else:
-                                    msg = "\u6709\u6548"
+                                    rem = sdata.get("remaining_days")
+                                    msg = "有效 (" + str(rem) + "天)" if rem is not None else "有效"
                         except Exception:
                             pass
                     return "ok", msg, data
