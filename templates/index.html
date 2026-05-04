@@ -840,37 +840,37 @@ try{
 const r=await api('/api/cookie/capture',{method:'POST',body:JSON.stringify({platform:'xiaohongshu'})});
 if(r.error){document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent=r.error;return}
 document.getElementById('cs1').style.background='#52c41a';document.getElementById('cs1').textContent='✓';
-document.getElementById('cs1t').textContent='请求已发送，等待登录页加载...';
+document.getElementById('cs1t').textContent='请求已发送';
 document.getElementById('cs2').style.background='#1890ff';document.getElementById('cs2').style.color='#fff';
 document.getElementById('cs2t').style.color='#333';document.getElementById('cs2t').textContent='正在打开登录页...';
-const qr=document.getElementById('qrArea');
-qr.innerHTML='<div style="color:#999;padding:20px">Loading...</div>';
-
+document.getElementById('qrArea').innerHTML='<div style="color:#999;padding:20px">Loading...</div>';
 let elapsed=0;
 if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}_cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
 elapsed+=2;
-const s=await api('/api/cookie/capture-status');
-if(s.status==='opening'){document.getElementById('cs2t').textContent='正在打开登录页... ('+elapsed+'s)';}else if(s.status==='waiting_login'){document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';if(elapsed%8===0){
-qr.innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
-}
-if(s.status==='completed'){
+var s;
+try{s=await api('/api/cookie/capture-status')}catch(e){return}
+if(s.status==='opening'){
+document.getElementById('cs2t').textContent='正在打开登录页... ('+elapsed+'s)';
+}else if(s.status==='waiting_login'){
+document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';
+document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
+if(elapsed%8===0){document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';}
+}else if(s.status==='completed'){
 clearInterval(poll);
 document.getElementById('cs2').style.background='#52c41a';document.getElementById('cs2').textContent='✓';
 document.getElementById('cs2t').textContent='登录成功，已捕获 '+s.cookie_count+' 个 Cookie';
 document.getElementById('cs3').style.background='#52c41a';document.getElementById('cs3').textContent='✓';document.getElementById('cs3').style.color='#fff';
 document.getElementById('cs3t').style.color='#333';document.getElementById('cs3t').textContent='Cookie 更新成功！';
-qr.innerHTML='<div style="color:#52c41a;font-size:48px">✓</div>';
+document.getElementById('qrArea').innerHTML='<div style="color:#52c41a;font-size:48px">✓</div>';
 document.getElementById('phoneFallback').innerHTML='';
 document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="closeModal();loadMonitor(document.getElementById(\'contentArea\'))">完成</button>';
 }else if(s.status==='timeout'||s.status==='failed'){
 clearInterval(poll);
 document.getElementById('cs2').style.background='#ff4d4f';document.getElementById('cs2').textContent='✗';
 document.getElementById('cs2t').textContent=s.message||'操作失败';
-qr.innerHTML='';
+document.getElementById('qrArea').innerHTML='';
 document.getElementById('phoneFallback').innerHTML='';
 document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="updateCookie()">重试</button><button class="btn-ghost" onclick="closeModal()">关闭</button>';
-}else{
-document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码... (已等待 '+elapsed+'s)';
 }
 },2000);
 }catch(e){
@@ -879,7 +879,8 @@ document.getElementById('cs1').style.background='#ff4d4f';document.getElementByI
 }
 
 async function switchToPhoneMode(){
-const r=await api('/api/cookie/capture-status');
+var r;
+try{r=await api('/api/cookie/capture-status')}catch(e){return}
 if(r.status!=='waiting_login'){toast('当前状态不支持切换',true);return}
 document.getElementById('cs2t').textContent='请输入手机号';
 document.getElementById('qrArea').innerHTML='';
@@ -916,7 +917,7 @@ document.getElementById('cs3t').textContent='验证码已提交，等待登录�
 document.getElementById('phoneFallback').innerHTML='<div style="text-align:center;color:#999;padding:10px">正在验证登录状态...</div>';
 if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}
 _cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
-const s=await api('/api/cookie/capture-status');
+var s;try{s=await api('/api/cookie/capture-status')}catch(e){return}
 if(s.status==='completed'){
 clearInterval(poll);
 document.getElementById('cs3').textContent='✓';
