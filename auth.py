@@ -87,6 +87,20 @@ def _get_required_perm(method, path):
 
 
 # --- before_request 拦截器（由 app.py 注册） ---
+def _sync_session_role():
+    """懒同步 session role：对比 session 与 users.json，不一致则更新"""
+    username = session.get("username")
+    if not username:
+        return
+    try:
+        users = _load_users()
+        user = next((u for u in users if u["username"] == username), None)
+        if user and user.get("role") != session.get("role"):
+            session["role"] = user["role"]
+    except Exception:
+        pass  # users.json 读取失败不影响正常流程
+
+
 def check_auth():
     # 内部调用放行
     if request.remote_addr in INTERNAL_IPS:
@@ -102,6 +116,9 @@ def check_auth():
         if request.path.startswith("/api/"):
             return jsonify({"error": "未登录"}), 401
         return redirect("/login")
+    # Session role 懒同步：users.json 中的 role 可能已被管理员修改
+    _sync_session_role()
+
     # 权限检查
     required = _get_required_perm(request.method, request.path)
     if required:
@@ -231,4 +248,20 @@ def freeze_user(username):
             u["frozen"] = not u.get("frozen", False)
             _save_users(users)
             return jsonify({"ok": True, "frozen": u["frozen"]})
+    return jsonify({"error": "用户不存在"}), 404
+
+@auth_bp.route("/api/auth/users/<username>/role", methods=["PUT"])
+def change_role(username):
+    if username == session.get("username"):
+        return jsonify({"error": "不能修改自己的角色"}), 400
+    body = request.json or {}
+    role = body.get("role", "")
+    if role not in ROLE_PERMS:
+        return jsonify({"error": "无效角色"}), 400
+    users = _load_users()
+    for u in users:
+        if u["username"] == username:
+            u["role"] = role
+            _save_users(users)
+            return jsonify({"ok": True, "username": username, "role": role})
     return jsonify({"error": "用户不存在"}), 404

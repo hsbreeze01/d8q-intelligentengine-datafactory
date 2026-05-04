@@ -211,6 +211,7 @@ function loadUsers(){
       row+='<td style="padding:8px"><span class="tag" style="border:none">'+esc(u.role)+'</span></td>';
       row+='<td style="padding:8px;color:#999;font-size:12px">'+(u.created_at||"").slice(0,16)+'</td>';
       row+='<td style="padding:8px">';
+      row+='<button style="padding:3px 10px;border:1px solid #91d5ff;border-radius:4px;background:#fff;color:#1890ff;cursor:pointer;font-size:12px;margin-right:6px" onclick="changeRole(this)" data-u="'+esc(u.username)+'" data-r="'+esc(u.role)+'">修改角色</button>';
       row+='<button style="padding:3px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px" onclick="resetPw(this)" data-u="'+esc(u.username)+'">重置密码</button>';
       row+='<button style="padding:3px 10px;border:1px solid #ffa39e;border-radius:4px;background:#fff;color:#ff4d4f;cursor:pointer;font-size:12px" onclick="delUser(this)" data-u="'+esc(u.username)+'">删除</button>';
       row+='</td></tr>';h+=row;
@@ -233,6 +234,37 @@ function delUser(el){
   var username=el.getAttribute("data-u");if(!confirm("确定删除用户 "+username+" ？"))return;
   fetch("/api/auth/users/"+username,{method:"DELETE"})
   .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(({ok,d})=>{if(ok){toast(username+" 已删除",true);loadUsers()}else toast(d.error||"删除失败",false)});
+}
+function changeRole(btn){
+  var username=btn.getAttribute("data-u");
+  var currentRole=btn.getAttribute("data-r");
+  // Replace role tag in the same row with a dropdown
+  var tr=btn.closest("tr");
+  var roleTd=tr.children[1];
+  var oldHtml=roleTd.innerHTML;
+  var sel=document.createElement("select");
+  sel.style.cssText="padding:4px 8px;border:1px solid #1890ff;border-radius:4px;font-size:12px";
+  ["viewer","editor","admin"].forEach(function(r){
+    var opt=document.createElement("option");opt.value=r;opt.textContent=r;
+    if(r===currentRole)opt.selected=true;
+    sel.appendChild(opt);
+  });
+  roleTd.innerHTML="";
+  roleTd.appendChild(sel);
+  sel.focus();
+  sel.onchange=function(){
+    var newRole=sel.value;
+    if(newRole===currentRole){roleTd.innerHTML=oldHtml;return;}
+    if(!confirm("确认将用户 "+username+" 的角色从 "+currentRole+" 改为 "+newRole+"？")){
+      sel.value=currentRole;return;
+    }
+    fetch("/api/auth/users/"+username+"/role",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({role:newRole})})
+    .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(function({ok,d}){
+      if(ok){toast(username+" 角色已改为 "+newRole,true);loadUsers();}
+      else{toast(d.error||"修改失败",false);roleTd.innerHTML=oldHtml;}
+    }).catch(function(){toast("网络错误",false);roleTd.innerHTML=oldHtml;});
+  };
+  sel.onblur=function(){setTimeout(function(){if(roleTd.contains(sel))roleTd.innerHTML=oldHtml;},200);};
 }
 // 延迟加载用户列表
 loadUsers();
