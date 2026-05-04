@@ -832,10 +832,16 @@ return '<div class="m-rule"><div style="flex:1"><div style="font-weight:500;font
 
 
 
-async function updateCookie(){
+async function updateCookie(mode){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 更新 Cookie</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">扫码登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">完成</span></div></div><div id="qrArea" style="text-align:center;margin:12px 0;min-height:60px"></div><div id="phoneFallback" style="text-align:center;margin:4px 0"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
+if(!mode){
+modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 更新 Cookie</h3><p style="color:#666;font-size:13px;margin:12px 0 20px">选择 Cookie 更新方式</p><div style="display:flex;gap:12px;flex-direction:column"><div onclick="updateCookie(\'local\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#1890ff\';this.style.background=\'#f0f7ff\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">📥 本地导入（推荐）</div><div style="color:#999;font-size:12px;margin-top:4px">在你本地浏览器登录小红书后，通过书签一键提取 Cookie 导入到平台</div></div><div onclick="updateCookie(\'remote\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#faad14\';this.style.background=\'#fffbe6\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">🖥️ 远端扫码</div><div style="color:#999;font-size:12px;margin-top:4px">通过服务器浏览器扫码登录，可能触发风控验证</div></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
+return;
+}
+if(mode==='local'){importCookieUI();return;}
+// Remote scan mode (original flow)
+modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 远端扫码更新</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">扫码登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">完成</span></div></div><div id="qrArea" style="text-align:center;margin:12px 0;min-height:60px"></div><div id="phoneFallback" style="text-align:center;margin:4px 0"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
 try{
 const r=await api('/api/cookie/capture',{method:'POST',body:JSON.stringify({platform:'xiaohongshu'})});
 if(r.error){document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent=r.error;return}
@@ -850,7 +856,7 @@ elapsed+=2;
 var s;
 try{s=await api('/api/cookie/capture-status')}catch(e){return}
 if(s.status==='opening'){
-document.getElementById('cs2t').textContent='6b635efa8fde63a56d4f89c85668... ('+elapsed+'s/60s)';
+document.getElementById('cs2t').textContent='正在打开登录页... ('+elapsed+'s/60s)';
 }else if(s.status==='waiting_login'){
 document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';
 document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
@@ -862,7 +868,6 @@ document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;
 }else if(s.status==='waiting_code'){
 document.getElementById('cs2t').textContent='已发送验证码，请输入';
 document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="codeInput" class="search" style="flex:1;padding:10px 12px;font-size:14px;letter-spacing:4px" placeholder="请输入验证码" maxlength="6"><button class="btn" onclick="submitCode()">登录</button></div></div>';
-
 }else if(s.status==='completed'){
 clearInterval(poll);
 document.getElementById('cs2').style.background='#52c41a';document.getElementById('cs2').textContent='✓';
@@ -883,6 +888,29 @@ document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="
 },2000);
 }catch(e){
 document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent='启动失败: '+e.message;
+}
+}
+
+function importCookieUI(){
+const modal=document.getElementById('taskModal');
+const host=location.hostname;
+const port=location.port;
+const apiBase=location.protocol+'//'+host+(port?':'+port:'');
+const bookmarklet="javascript:void(function(){var c=document.cookie;var x=new XMLHttpRequest();x.open('POST','"+apiBase+"/api/cookie/import',true);x.setRequestHeader('Content-Type','application/json');x.withCredentials=false;x.onload=function(){if(x.status===200){var r=JSON.parse(x.responseText);alert('Cookie导入成功! 共'+r.cookie_count+'个Cookie')}else{alert('导入失败: '+x.statusText)}};x.onerror=function(){alert('网络错误，请确保平台服务可访问')};x.send(JSON.stringify({platform:'xiaohongshu',cookies:c}))}())";
+modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>📥 本地导入 Cookie</h3><div style="margin:16px 0"><div style="background:#f6ffed;border:1px solid #b7eb8f;border-radius:8px;padding:12px 16px;margin-bottom:16px"><div style="font-weight:500;font-size:13px;color:#52c41a">✅ 操作步骤</div><ol style="margin:8px 0 0;padding-left:20px;font-size:13px;color:#333;line-height:1.8"><li>在本地浏览器打开 <a href="https://creator.xiaohongshu.com" target="_blank" style="color:#1890ff">小红书创作中心</a> 并登录</li><li>将下方按钮<strong>拖拽到浏览器书签栏</strong></li><li>在小红书页面上点击该书签</li><li>Cookie 将自动发送到平台</li></ol></div><div style="text-align:center;margin:16px 0"><a href="'+bookmarklet+'" onclick="event.preventDefault();alert(\'请将此按钮拖拽到书签栏使用，不要直接点击\\n\\n操作方法：\\n1. 按住此按钮不放\\n2. 拖到浏览器书签栏\\n3. 松开鼠标完成添加\\n4. 在小红书页面点击该书签即可\')" style="display:inline-block;padding:12px 24px;background:#1890ff;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:500;cursor:move">📋 一键提取Cookie</a><div style="color:#999;font-size:11px;margin-top:6px">↑ 拖拽此按钮到书签栏</div></div><div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-top:16px"><div style="font-size:13px;color:#666;margin-bottom:8px">或者手动粘贴 Cookie：</div><textarea id="cookiePaste" class="search" style="width:100%;height:80px;padding:10px;font-size:12px;font-family:monospace;resize:vertical" placeholder="从浏览器 DevTools 粘贴 cookie 字符串，格式如：name1=value1; name2=value2"></textarea><div style="text-align:right;margin-top:8px"><button class="btn" onclick="importCookiePaste()">导入</button></div></div></div><div id="importResult" style="margin:8px 0"></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="updateCookie()">返回</button><button class="btn-ghost" onclick="closeModal()">关闭</button></div></div>';
+}
+
+async function importCookiePaste(){
+var v=document.getElementById('cookiePaste').value.trim();
+if(!v){alert('请先粘贴Cookie内容');return}
+try{
+var r=await api('/api/cookie/import',{method:'POST',body:JSON.stringify({platform:'xiaohongshu',cookies:v})});
+if(r.error){document.getElementById('importResult').innerHTML='<div style="color:#ff4d4f;font-size:13px">导入失败: '+r.error+'</div>';return}
+document.getElementById('importResult').innerHTML='<div style="color:#52c41a;font-size:13px">✅ '+r.message+' (共'+r.cookie_count+'个Cookie)</div>';
+document.getElementById('cookiePaste').value='';
+setTimeout(function(){closeModal();loadMonitor(document.getElementById('contentArea'));},1500);
+}catch(e){
+document.getElementById('importResult').innerHTML='<div style="color:#ff4d4f;font-size:13px">网络错误: '+e.message+'</div>';
 }
 }
 
