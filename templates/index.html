@@ -855,6 +855,14 @@ document.getElementById('cs2t').textContent='6b635efa8fde63a56d4f89c85668... ('+
 document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';
 document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
 if(elapsed%8===0){document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';}
+}else if(s.status==='waiting_phone'){
+document.getElementById('cs2t').textContent='需要短信验证，请输入手机号';
+document.getElementById('qrArea').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display='none'">';
+document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="phoneInput" class="search" style="flex:1;padding:10px 12px;font-size:14px" placeholder="请输入11位手机号" maxlength="11"><button class="btn" onclick="submitPhone()">发送验证码</button></div></div>';
+}else if(s.status==='waiting_code'){
+document.getElementById('cs2t').textContent='已发送验证码，请输入';
+document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="codeInput" class="search" style="flex:1;padding:10px 12px;font-size:14px;letter-spacing:4px" placeholder="请输入验证码" maxlength="6"><button class="btn" onclick="submitCode()">登录</button></div></div>';
+
 }else if(s.status==='completed'){
 clearInterval(poll);
 document.getElementById('cs2').style.background='#52c41a';document.getElementById('cs2').textContent='✓';
