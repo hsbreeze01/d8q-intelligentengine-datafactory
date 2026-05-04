@@ -850,7 +850,7 @@ elapsed+=2;
 var s;
 try{s=await api('/api/cookie/capture-status')}catch(e){return}
 if(s.status==='opening'){
-document.getElementById('cs2t').textContent='正在打开登录页... ('+elapsed+'s)';
+document.getElementById('cs2t').textContent='6b635efa8fde63a56d4f89c85668... ('+elapsed+'s/60s)';
 }else if(s.status==='waiting_login'){
 document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码...';
 document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
