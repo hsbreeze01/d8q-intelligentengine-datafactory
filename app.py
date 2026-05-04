@@ -83,6 +83,44 @@ FUNCTION_MAP = {
     "/api/keyword-": "关键词",
 }
 
+
+def _init_monitor_tables():
+    conn = get_db()
+    conn.executescript(
+        "CREATE TABLE IF NOT EXISTS monitor_rules ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "name TEXT NOT NULL, "
+        "type TEXT NOT NULL, "
+        "config_json TEXT NOT NULL, "
+        "severity TEXT NOT NULL DEFAULT 'warning', "
+        "enabled INTEGER NOT NULL DEFAULT 1, "
+        "builtin INTEGER NOT NULL DEFAULT 0, "
+        "interval_sec INTEGER NOT NULL DEFAULT 60, "
+        "created_at DATETIME DEFAULT (datetime('now'))"
+        "); "
+        "CREATE TABLE IF NOT EXISTS monitor_results ("
+        "rule_id INTEGER NOT NULL, "
+        "status TEXT NOT NULL, "
+        "message TEXT, "
+        "detail_json TEXT, "
+        "checked_at DATETIME DEFAULT (datetime('now'))"
+        ")"
+    )
+    count = conn.execute("SELECT count(*) FROM monitor_rules WHERE builtin=1").fetchone()[0]
+    if count == 0:
+        builtin_rules = [
+            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate", "judge": "valid"}), "critical", 300),
+            ("Ghost Browser CDP 连通性", "http", json.dumps({"url": "http://localhost:9222/json/version", "timeout": 5}), "critical", 60),
+            ("发布锁状态", "system", json.dumps({"check": "file_not_exists", "path": "/tmp/d8q_publishing.lock"}), "warning", 30),
+            ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 5}), "critical", 60),
+        ]
+        for name, rtype, cfg, sev, interval in builtin_rules:
+            conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
+                        (name, rtype, cfg, sev, interval))
+        conn.commit()
+    conn.close()
+
+
 def _classify_function(path):
     for prefix in sorted(FUNCTION_MAP.keys(), key=len, reverse=True):
         if path.startswith(prefix):
@@ -111,6 +149,7 @@ def _init_events_table():
 
 try:
     _init_events_table()
+    _init_monitor_tables()
 except Exception:
     pass
 
@@ -156,6 +195,7 @@ def agent_request(method, path, data=None):
 @app.route("/settings")
 @app.route("/policy")
 @app.route("/follows")
+@app.route("/monitor")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()
@@ -785,7 +825,7 @@ def service_status():
     # systemd 管理的基础服务
     for svc in ["xvfb", "ghost_browser"]:
         try:
-            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace("_", "-")}"],
+            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace(chr(95),chr(45))}"],
                                capture_output=True, text=True, timeout=3)
             active = r.stdout.strip() == "active"
             entry = {"status": "active" if active else "inactive", "type": "systemd"}
@@ -1108,3 +1148,244 @@ def classify_policy():
         return jsonify(json.loads(e.read())), e.code
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# === 运行监控 API ===
+
+def _execute_http_check(config):
+    url = config.get("url", "")
+    timeout = config.get("timeout", 5)
+    start = _time.time()
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            elapsed = int((_time.time() - start) * 1000)
+            return "ok", f"响应正常 ({elapsed}ms)", {"status_code": resp.status, "elapsed_ms": elapsed}
+    except urllib.error.HTTPError as e:
+        elapsed = int((_time.time() - start) * 1000)
+        if e.code < 500:
+            return "ok", f"HTTP {e.code} ({elapsed}ms)", {"status_code": e.code, "elapsed_ms": elapsed}
+        return "error", f"HTTP {e.code}", {"status_code": e.code}
+    except Exception as e:
+        return "error", str(e)[:200], {}
+
+def _execute_system_check(config):
+    check = config.get("check", "")
+    if check == "file_not_exists":
+        fpath = config.get("path", "")
+        if not os.path.exists(fpath):
+            return "ok", "正常", {}
+        try:
+            mtime = os.path.getmtime(fpath)
+            age = _time.time() - mtime
+            if age > 600:
+                return "error", f"锁文件已存在 {int(age)}秒", {"age_sec": int(age)}
+            return "ok", f"发布进行中（{int(age)}秒）", {"age_sec": int(age)}
+        except Exception:
+            return "warning", "锁文件存在", {}
+    elif check == "systemd_active":
+        import subprocess
+        svc = config.get("service", "")
+        try:
+            r = subprocess.run(["systemctl", "is-active", svc], capture_output=True, text=True, timeout=3)
+            active = r.stdout.strip() == "active"
+            return ("ok" if active else "error"), ("active" if active else "inactive"), {}
+        except Exception as e:
+            return "error", str(e)[:200], {}
+    elif check == "port_open":
+        import socket
+        host, port = config.get("host", "localhost"), config.get("port", 0)
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(3)
+            result = s.connect_ex((host, port))
+            s.close()
+            return ("ok" if result == 0 else "error"), ("端口开放" if result == 0 else "端口不可达"), {"port": port}
+        except Exception as e:
+            return "error", str(e)[:200], {}
+    return "unknown", f"未知检查: {check}", {}
+
+def _execute_custom_check(config):
+    url = config.get("url", "")
+    timeout = config.get("timeout", 10)
+    judge = config.get("judge", "")
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+            if judge:
+                val = data.get(judge)
+                if val is True or val == "ok":
+                    return "ok", "检查通过", data
+                return "error", f"判断失败: {judge}={val}", data
+            return "ok", "请求成功", data
+    except Exception as e:
+        return "error", str(e)[:200], {}
+
+def _execute_rule_check(rule):
+    cfg = json.loads(rule["config_json"]) if isinstance(rule["config_json"], str) else rule["config_json"]
+    rt = rule["type"]
+    if rt == "http": return _execute_http_check(cfg)
+    if rt == "system": return _execute_system_check(cfg)
+    if rt == "custom": return _execute_custom_check(cfg)
+    return "unknown", f"未知类型: {rt}", {}
+
+@app.route("/api/monitor/rules", methods=["GET"])
+def get_monitor_rules():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    conn = get_db()
+    rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules ORDER BY builtin DESC, id").fetchall()]
+    conn.close()
+    return jsonify({"rules": rules})
+
+@app.route("/api/monitor/rules", methods=["POST"])
+def create_monitor_rule():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    body = request.json or {}
+    name = body.get("name", "")
+    rtype = body.get("type", "http")
+    config = body.get("config", {})
+    severity = body.get("severity", "warning")
+    interval_sec = body.get("interval_sec", 60)
+    if not name:
+        return jsonify({"error": "规则名称不能为空"}), 400
+    if rtype not in ("http", "system", "custom"):
+        return jsonify({"error": "不支持的检查类型"}), 400
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,0,?)",
+        (name, rtype, json.dumps(config), severity, interval_sec))
+    conn.commit()
+    rid = cur.lastrowid
+    conn.close()
+    return jsonify({"id": rid, "success": True}), 201
+
+@app.route("/api/monitor/rules/<int:rule_id>", methods=["PUT"])
+def update_monitor_rule(rule_id):
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    body = request.json or {}
+    conn = get_db()
+    rule = conn.execute("SELECT * FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
+    if not rule:
+        conn.close()
+        return jsonify({"error": "规则不存在"}), 404
+    if rule["builtin"]:
+        if "enabled" in body:
+            conn.execute("UPDATE monitor_rules SET enabled=? WHERE id=?", (int(body["enabled"]), rule_id))
+            conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+    fields, values = [], []
+    for k in ("name", "type", "severity", "interval_sec", "enabled"):
+        if k in body:
+            fields.append(f"{k}=?")
+            values.append(int(body[k]) if k == "enabled" else body[k])
+    if "config" in body:
+        fields.append("config_json=?")
+        values.append(json.dumps(body["config"]))
+    if fields:
+        values.append(rule_id)
+        conn.execute(f"UPDATE monitor_rules SET {','.join(fields)} WHERE id=?", values)
+        conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@app.route("/api/monitor/rules/<int:rule_id>", methods=["DELETE"])
+def delete_monitor_rule(rule_id):
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    conn = get_db()
+    rule = conn.execute("SELECT builtin FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
+    if not rule:
+        conn.close()
+        return jsonify({"error": "规则不存在"}), 404
+    if rule["builtin"]:
+        conn.close()
+        return jsonify({"error": "内置规则不可删除"}), 403
+    conn.execute("DELETE FROM monitor_rules WHERE id=?", (rule_id,))
+    conn.execute("DELETE FROM monitor_results WHERE rule_id=?", (rule_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@app.route("/api/monitor/status", methods=["GET"])
+def monitor_status():
+    if session.get("role") != "admin":
+        return jsonify({"error": "权限不足"}), 403
+    from datetime import datetime as _dt
+    conn = get_db()
+    rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules WHERE enabled=1").fetchall()]
+    rule_results = []
+    alert_count = 0
+    for rule in rules:
+        cached = conn.execute("SELECT * FROM monitor_results WHERE rule_id=? ORDER BY checked_at DESC LIMIT 1", (rule["id"],)).fetchone()
+        should_check = True
+        if cached:
+            try:
+                from datetime import datetime as _dtm
+                checked_ts = _dtm.strptime(cached["checked_at"], "%Y-%m-%d %H:%M:%S").timestamp()
+                if _time.time() - checked_ts < rule["interval_sec"]:
+                    st = cached["status"]
+                    rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
+                        "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"]})
+                    if st != "ok": alert_count += 1
+                    should_check = False
+            except Exception:
+                pass
+        if should_check:
+            try:
+                status, message, detail = _execute_rule_check(rule)
+            except Exception as e:
+                status, message, detail = "error", str(e)[:200], {}
+            checked_at = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute("INSERT INTO monitor_results (rule_id,status,message,detail_json,checked_at) VALUES (?,?,?,?,?)",
+                (rule["id"], status, message, json.dumps(detail) if detail else "", checked_at))
+            conn.commit()
+            if status != "ok": alert_count += 1
+            rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
+                "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at})
+    conn.close()
+    import subprocess
+    services = {}
+    http_svcs = {"agent":{"port":8000,"path":"/api/health"},"stockshark":{"port":5000,"path":"/health"},
+        "compass":{"port":8087,"path":"/health"},"factory":{"port":8088,"path":"/"},
+        "infopublisher":{"port":8089,"path":"/api/publish"}}
+    for name, cfg in http_svcs.items():
+        start = _time.time()
+        try:
+            req = urllib.request.Request(f"http://localhost:{cfg['port']}{cfg['path']}", method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                services[name] = {"status": "ok", "port": cfg["port"], "elapsed_ms": int((_time.time()-start)*1000)}
+        except urllib.error.HTTPError as e:
+            elapsed = int((_time.time()-start)*1000)
+            if e.code == 405:
+                services[name] = {"status": "ok", "port": cfg["port"], "elapsed_ms": elapsed}
+            else:
+                services[name] = {"status": "ok" if e.code < 500 else "error", "port": cfg["port"], "elapsed_ms": elapsed}
+                if e.code >= 500: alert_count += 1
+        except Exception:
+            services[name] = {"status": "down", "port": cfg["port"]}
+            alert_count += 1
+    for svc in ["xvfb", "ghost_browser"]:
+        try:
+            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace('_','-')}"], capture_output=True, text=True, timeout=3)
+            active = r.stdout.strip() == "active"
+            entry = {"status": "active" if active else "inactive", "type": "systemd"}
+            if not active: alert_count += 1
+            if svc == "ghost_browser" and active:
+                try:
+                    start = _time.time()
+                    req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
+                    with urllib.request.urlopen(req, timeout=3) as resp:
+                        entry["cdp"] = "ok"
+                        entry["elapsed_ms"] = int((_time.time()-start)*1000)
+                except Exception:
+                    entry["cdp"] = "down"
+            services[svc] = entry
+        except Exception:
+            services[svc] = {"status": "unknown", "type": "systemd"}
+    return jsonify({"services": services, "rules": rule_results, "alert_count": alert_count,
+        "timestamp": _dt.now().strftime("%Y-%m-%d %H:%M:%S")})

@@ -161,6 +161,8 @@ const PAGES=[
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
+{id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
+{id:'_div2'},
 {id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
 ];
 let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
@@ -196,7 +198,7 @@ function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',m
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -229,7 +231,7 @@ el.innerHTML=`
 // 渲染图表
 loadDashChart(heatData);
 // 服务状态卡片 (admin only)
-if(userRole==='admin'){loadServiceStatus();}
+
 }
 
 async function loadDashChart(latestHeat){
@@ -612,7 +614,6 @@ ${userRole==='admin'?'<span class="fb" onclick="settingsTab(this,\'analytics\')"
 <div id="st-users" style="display:none"><div class="card"><h3>用户管理</h3><div id="userMgmt">加载中...</div></div></div>
 <div id="st-analytics" style="display:none"><div id="analyticsPanel">加载中...</div></div>`;
 loadUserMgmt();
-loadServiceStatus();
 }
 function settingsTab(btn,tab){
 btn.parentElement.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
@@ -780,6 +781,66 @@ if(r&&r.error){toast(r.error,true)}else{toast(name+' 角色已改为 '+newRole);
 }
 
 // === 服务状态 (admin) ===
+
+async function loadMonitor(el){
+let data;
+try{data=await api('/api/monitor/status');}catch(e){el.innerHTML='<div class="empty">监控数据加载失败</div>';return;}
+const svcs=data.services||{};
+const rules=data.rules||[];
+const alerts=data.alert_count||0;
+const ts=data.timestamp||'';
+
+const svcNames={agent:"数据采集 Agent",stockshark:"股票分析 Shark",compass:"金融计算 Compass",factory:"聚合生产 Factory",infopublisher:"资讯发布 Publisher",xvfb:"虚拟显示 Xvfb",ghost_browser:"浏览器池 Ghost"};
+
+el.innerHTML=`
+<style>
+.m-alert{padding:12px 20px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500}
+.m-alert.ok{background:#f6ffed;border:1px solid #b7eb8f;color:#52c41a}
+.m-alert.err{background:#fff2f0;border:1px solid #ffccc7;color:#ff4d4f}
+.m-svc{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f5f5f5}
+.m-svc-name{font-size:13px;display:flex;align-items:center;gap:8px}
+.m-rule{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border:1px solid #f0f0f0;border-radius:8px;margin-bottom:8px}
+.m-rule:hover{background:#fafafa}
+</style>
+<div class="m-alert ${alerts?'err':'ok'}">${alerts?'\u26a0\ufe0f '+alerts+' \u9879\u5f02\u5e38':'\u2705 \u7cfb\u7edf\u8fd0\u884c\u6b63\u5e38'} <span style="margin-left:auto;font-size:12px;font-weight:400;color:#999">\u4e0a\u6b21\u66f4\u65b0: ${ts}</span>
+<button class="btn-ghost" style="padding:4px 12px;font-size:12px;margin-left:12px" onclick="loadMonitor(document.getElementById('contentArea'))">\u{1f504} \u5237\u65b0</button></div>
+<div class="grid-2">
+<div class="card"><h3>\u{1f3e0} \u57fa\u7840\u8bbe\u65bd <span style="font-size:11px;color:#999;font-weight:400">${Object.keys(svcs).length} \u4e2a\u670d\u52a1</span></h3>
+${Object.entries(svcs).map(([k,s])=>{
+const ok=s.status==='ok'||s.status==='active';
+const ms=s.elapsed_ms?' '+s.elapsed_ms+'ms':'';
+const port=s.port?':'+s.port:'';
+return '<div class="m-svc"><span class="m-svc-name"><span class="badge '+(ok?'badge-ok':'badge-err')+'">'+(ok?'\u25cf \u6b63\u5e38':'\u25cf \u5f02\u5e38')+'</span> '+(svcNames[k]||k)+'<span style="color:#999;font-size:11px">'+port+ms+'</span></span></div>';
+}).join('')}
+</div>
+<div class="card"><h3>\u{1f4ca} \u4e1a\u52a1\u76d1\u63a7 <span style="font-size:11px;color:#999;font-weight:400">${rules.length} \u6761\u89c4\u5219</span> <button class="btn" style="float:right;font-size:11px;padding:4px 12px" onclick="addMonitorRule()">+ \u65b0\u589e\u89c4\u5219</button></h3>
+${rules.map(r=>{
+const ok=r.status==='ok';
+const sev=r.severity==='critical'?'\u{1f534}':'\u{1f7e1}';
+return '<div class="m-rule"><div style="flex:1"><div style="font-weight:500;font-size:13px">'+(ok?'\u2705':'\u274c')+' '+esc(r.name)+'</div><div style="font-size:12px;color:#999;margin-top:2px">'+esc(r.message||'')+' <span style="color:#bbb">\u00b7 '+r.type+' \u00b7 '+(r.checked_at||'').slice(11,19)+'</span></div></div><div>'+(ok?'':'<span style="font-size:11px;color:#ff4d4f">'+sev+' '+r.severity+'</span>')+'</div></div>';
+}).join('')}
+</div>
+</div>`;
+}
+
+async function addMonitorRule(){
+const modal=document.getElementById('taskModal');
+modal.style.display='flex';
+modal.innerHTML='<div class="card" style="width:500px;max-width:90vw"><h3 style="margin-bottom:16px">\u65b0\u589e\u76d1\u63a7\u89c4\u5219</h3><div style="display:grid;gap:12px"><div><label style="font-size:12px;color:#666">\u89c4\u5219\u540d\u79f0</label><input id="mr_name" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="\u4f8b: StockShark \u5ef6\u8fdf\u76d1\u63a7"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u7c7b\u578b</label><select id="mr_type" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="http">HTTP</option><option value="system">System</option><option value="custom">Custom</option></select></div><div><label style="font-size:12px;color:#666">\u544a\u8b66\u7ea7\u522b</label><select id="mr_sev" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="warning">Warning</option><option value="critical">Critical</option></select></div></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5 URL / \u914d\u7f6e</label><input id="mr_url" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="http://localhost:8088/"></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u95f4\u9694\uff08\u79d2\uff09</label><input id="mr_interval" type="number" class="search" style="width:100%;padding:8px 12px;margin-top:4px" value="60"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">\u53d6\u6d88</button><button class="btn" onclick="submitAddMonitorRule()">\u786e\u8ba4\u521b\u5efa</button></div></div>';
+}
+
+async function submitAddMonitorRule(){
+const name=document.getElementById('mr_name').value.trim();
+const type=document.getElementById('mr_type').value;
+const severity=document.getElementById('mr_sev').value;
+const url=document.getElementById('mr_url').value.trim();
+const interval=parseInt(document.getElementById('mr_interval').value)||60;
+if(!name||!url){toast('\u8bf7\u586b\u5199\u540d\u79f0\u548c URL');return}
+const config=type==='http'?{url:url,timeout:5}:type==='system'?{check:'file_not_exists',path:url}:{url:url,judge:''};
+const r=await api('/api/monitor/rules',{method:'POST',body:JSON.stringify({name,type,config,severity,interval_sec:interval})});
+if(r.error){toast(r.error,true)}else{toast('\u89c4\u5219\u521b\u5efa\u6210\u529f');closeModal();loadMonitor(document.getElementById('contentArea'))}
+}
+
 async function loadServiceStatus(){
 try{const d=await api('/api/service-status');if(!d.services)return;
 const el=document.getElementById('contentArea');
@@ -886,6 +947,7 @@ if(!subs.subscriptions||!subs.subscriptions.length){window._showGuide=true;}
 }catch(e){}
 initNav();
 loadPage(curPage);
+if(curPage==='monitor'){setInterval(()=>{if(curPage==='monitor')loadMonitor(document.getElementById('contentArea'))},30000)}
 }
 
 // === 政策分析 ===
