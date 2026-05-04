@@ -109,7 +109,7 @@ def _init_monitor_tables():
     count = conn.execute("SELECT count(*) FROM monitor_rules WHERE builtin=1").fetchone()[0]
     if count == 0:
         builtin_rules = [
-            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate", "judge": "valid"}), "critical", 300),
+            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate", "judge": "valid", "timeout": 30, "status_url": PUBLISHER_API + "/api/cookie/status"}), "critical", 300),
             ("Ghost Browser CDP 连通性", "http", json.dumps({"url": "http://localhost:9222/json/version", "timeout": 5}), "critical", 60),
             ("发布锁状态", "system", json.dumps({"check": "file_not_exists", "path": "/tmp/d8q_publishing.lock"}), "warning", 30),
             ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 5}), "critical", 60),
@@ -1209,6 +1209,7 @@ def _execute_custom_check(config):
     url = config.get("url", "")
     timeout = config.get("timeout", 10)
     judge = config.get("judge", "")
+    status_url = config.get("status_url", "")
     try:
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -1216,9 +1217,26 @@ def _execute_custom_check(config):
             if judge:
                 val = data.get(judge)
                 if val is True or val == "ok":
-                    return "ok", "检查通过", data
-                return "error", f"判断失败: {judge}={val}", data
-            return "ok", "请求成功", data
+                    msg = data.get("message", "检查通过")
+                    if status_url:
+                        try:
+                            req2 = urllib.request.Request(status_url, method="GET")
+                            with urllib.request.urlopen(req2, timeout=5) as resp2:
+                                sdata = json.loads(resp2.read())
+                                data["_status"] = sdata
+                                warn = sdata.get("warn_fields", [])
+                                expired = sdata.get("expired_fields", [])
+                                if expired:
+                                    msg = "\u5df2\u8fc7\u671f: " + ",".join(expired[:3])
+                                elif warn:
+                                    msg = "\u5373\u5c06\u8fc7\u671f: " + ",".join(warn[:3])
+                                else:
+                                    msg = "\u6709\u6548"
+                        except Exception:
+                            pass
+                    return "ok", msg, data
+                return "error", data.get("message", f"\u5224\u65ad\u5931\u8d25: {judge}={val}"), data
+            return "ok", data.get("message", "\u8bf7\u6c42\u6210\u529f"), data
     except Exception as e:
         return "error", str(e)[:200], {}
 
@@ -1329,8 +1347,14 @@ def monitor_status():
                 checked_ts = _dtm.strptime(cached["checked_at"], "%Y-%m-%d %H:%M:%S").timestamp()
                 if _time.time() - checked_ts < rule["interval_sec"]:
                     st = cached["status"]
+                    raw = {}
+                    try:
+                        dj = cached.get("detail_json") or ""
+                        if dj: raw = json.loads(dj)
+                    except Exception:
+                        pass
                     rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
-                        "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"]})
+                        "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"], "raw_data": raw})
                     if st != "ok": alert_count += 1
                     should_check = False
             except Exception:
@@ -1346,7 +1370,7 @@ def monitor_status():
             conn.commit()
             if status != "ok": alert_count += 1
             rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
-                "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at})
+                "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
     conn.close()
     import subprocess
     services = {}
@@ -1389,3 +1413,51 @@ def monitor_status():
             services[svc] = {"status": "unknown", "type": "systemd"}
     return jsonify({"services": services, "rules": rule_results, "alert_count": alert_count,
         "timestamp": _dt.now().strftime("%Y-%m-%d %H:%M:%S")})
+
+
+@app.route("/api/cookie/capture", methods=["POST"])
+def proxy_cookie_capture():
+    if session.get("role") != "admin":
+        return jsonify({"error": "\u6743\u9650\u4e0d\u8db3"}), 403
+    try:
+        body = request.json or {}
+        req = urllib.request.Request(
+            PUBLISHER_API + "/api/cookie/capture",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+            return jsonify(data), resp.status
+    except urllib.error.HTTPError as e:
+        return jsonify(json.loads(e.read())), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route("/api/cookie/capture-status", methods=["GET"])
+def proxy_cookie_capture_status():
+    if session.get("role") != "admin":
+        return jsonify({"error": "\u6743\u9650\u4e0d\u8db3"}), 403
+    try:
+        req = urllib.request.Request(PUBLISHER_API + "/api/cookie/capture-status", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return jsonify(json.loads(resp.read()))
+    except Exception as e:
+        return jsonify({"error": str(e)[:200]}), 500
+
+
+@app.route('/api/cookie/capture-screenshot')
+def proxy_cookie_capture_screenshot():
+    if session.get('role') != 'admin':
+        return jsonify({'error': '权限不足'}), 403
+    try:
+        req=urllib.request.Request(PUBLISHER_API+'/api/cookie/capture-screenshot',method='GET')
+        with urllib.request.urlopen(req,timeout=10) as resp:
+            from flask import Response
+            return Response(resp.read(),mimetype='image/png',headers={'Cache-Control':'no-store'})
+    except urllib.error.HTTPError as e:
+        return jsonify({'error':'screenshot not found'}),404
+    except Exception as e:
+        return jsonify({'error':str(e)[:200]}),500
