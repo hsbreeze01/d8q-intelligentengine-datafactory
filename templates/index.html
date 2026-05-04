@@ -687,6 +687,7 @@ document.getElementById('userMgmt').innerHTML=`<div style="margin-bottom:12px"><
 <tbody>${(users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td><span class="badge badge-info">${u.role}</span></td>
 <td>${u.frozen?'<span style="color:#ff4d4f">🔒 已冻结</span>':'<span style="color:#52c41a">正常</span>'}</td>
 <td style="white-space:nowrap">
+<button class="btn-ghost" style="padding:3px 8px;font-size:12px;color:#1890ff" onclick="changeRole('${u.username}','${u.role}')">修改角色</button>
 <button class="btn-ghost" style="padding:3px 8px;font-size:12px" onclick="freezeUser('${u.username}',${u.frozen})">${u.frozen?'解冻':'冻结'}</button>
 <button class="btn-ghost" style="padding:3px 8px;font-size:12px" onclick="resetPw('${u.username}')">重置密码</button>
 <button class="btn-ghost" style="padding:3px 8px;font-size:12px;color:#ff4d4f" onclick="delUser('${u.username}')">删除</button>
@@ -760,6 +761,22 @@ if(pw.length<8){toast('密码至少 8 位',true);return}
 if(pw!==pw2){toast('两次输入的密码不一致',true);return}
 const r=await api('/api/auth/users/'+name+'/password',{method:'PUT',body:JSON.stringify({password:pw})});
 if(r&&r.error){toast(r.error,true)}else{toast('密码重置成功');closeModal()}
+}
+async function changeRole(name,currentRole){
+const modal=document.getElementById('taskModal');
+modal.style.display='flex';
+modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+<h3 style="margin-bottom:20px">🔄 修改角色</h3>
+<div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#e6f7ff;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div><div style="font-size:12px;color:#999">当前角色：<span class="badge badge-info">${currentRole}</span></div></div>
+<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新角色</label><select id="cr_role" class="search" style="width:100%;margin-top:6px;padding:10px 12px"><option value="viewer" ${currentRole==='viewer'?'selected':''}>viewer - 只读</option><option value="editor" ${currentRole==='editor'?'selected':''}>editor - 可编辑</option><option value="admin" ${currentRole==='admin'?'selected':''}>admin - 管理员</option></select></div>
+<div style="background:#fff7e6;border:1px solid #ffe58f;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#d48806;line-height:1.6">角色变更将立即生效，该用户下次操作时自动获得新权限，无需重新登录。</div>
+<div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="submitChangeRole('${name}','${currentRole}')">确认修改</button></div></div>`;
+}
+async function submitChangeRole(name,oldRole){
+const newRole=document.getElementById('cr_role').value;
+if(newRole===oldRole){toast('角色未变更');closeModal();return}
+const r=await api('/api/auth/users/'+name+'/role',{method:'PUT',body:JSON.stringify({role:newRole})});
+if(r&&r.error){toast(r.error,true)}else{toast(name+' 角色已改为 '+newRole);closeModal();loadUserMgmt()}
 }
 
 // === 服务状态 (admin) ===
@@ -873,7 +890,7 @@ loadPage(curPage);
 
 // === 政策分析 ===
 async function loadPolicy(el){
-const tracks = await api("/api/proxy/tracks");
+const tracks = await apiV("/api/proxy/tracks");
 var options = '<option value="">全部赛道</option>';
 (tracks||[]).forEach(function(t){options += '<option value="'+t.id+'">'+t.name+'</option>';});
 el.innerHTML = `
@@ -1002,7 +1019,7 @@ const trackId = document.getElementById('pol_track').value;
 const days = document.getElementById('pol_days').value;
 const url = trackId ? "/api/proxy/tracks/"+trackId+"/news?days="+days : "/api/proxy/tracks/1/news?days="+days;
 document.getElementById('polList').innerHTML = '<div class="pol-empty"><div class="icon"><span class="pol-spin">⏳</span></div><div class="text">正在加载资讯...</div></div>';
-const news = await api(url);
+const news = await apiV(url);
 const newsItems = news && news.items ? news.items : (Array.isArray(news) ? news : []);
 if(!newsItems.length){document.getElementById('polList').innerHTML = '<div class="pol-empty"><div class="icon">📭</div><div class="text">暂无资讯数据</div></div>';return}
 _polData = newsItems.map(n => ({...n, impact: '', category: '', summary: '', track_name: ''}));
