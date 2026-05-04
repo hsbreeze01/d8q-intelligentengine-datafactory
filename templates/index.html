@@ -835,18 +835,56 @@ return '<div class="m-rule"><div style="flex:1"><div style="font-weight:500;font
 async function updateCookie(){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 更新 Cookie</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">输入手机号并发送验证码</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">输入验证码并登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs4" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">4</span><span id="cs4t" style="font-size:14px;color:#999">完成</span></div></div><div id="cookieAction" style="margin:12px 0;min-height:60px"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
+modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 更新 Cookie</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">扫码登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">完成</span></div></div><div id="qrArea" style="text-align:center;margin:12px 0;min-height:60px"></div><div id="phoneFallback" style="text-align:center;margin:4px 0"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
 try{
 const r=await api('/api/cookie/capture',{method:'POST',body:JSON.stringify({platform:'xiaohongshu'})});
 if(r.error){document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent=r.error;return}
 document.getElementById('cs1').style.background='#52c41a';document.getElementById('cs1').textContent='✓';
-document.getElementById('cs1t').textContent='登录页已打开';
+document.getElementById('cs1t').textContent='登录页已打开（二维码模式）';
 document.getElementById('cs2').style.background='#1890ff';document.getElementById('cs2').style.color='#fff';
-document.getElementById('cs2t').style.color='#333';document.getElementById('cs2t').textContent='请输入手机号';
-document.getElementById('cookieAction').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="phoneInput" class="search" style="flex:1;padding:10px 12px;font-size:14px" placeholder="请输入11位手机号" maxlength="11"><button class="btn" onclick="submitPhone()">发送验证码</button></div></div>';
+document.getElementById('cs2t').style.color='#333';document.getElementById('cs2t').textContent='请用手机小红书App扫描下方二维码...';
+const qr=document.getElementById('qrArea');
+qr.innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
+document.getElementById('phoneFallback').innerHTML='<a href="javascript:void(0)" style="color:#999;font-size:12px;text-decoration:underline" onclick="switchToPhoneMode()">无法扫码？使用手机号验证码登录</a>';
+let elapsed=0;
+if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}_cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
+elapsed+=2;
+const s=await api('/api/cookie/capture-status');
+if(s.status==='waiting_login'&&elapsed%8===0){
+qr.innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'">';
+}
+if(s.status==='completed'){
+clearInterval(poll);
+document.getElementById('cs2').style.background='#52c41a';document.getElementById('cs2').textContent='✓';
+document.getElementById('cs2t').textContent='登录成功，已捕获 '+s.cookie_count+' 个 Cookie';
+document.getElementById('cs3').style.background='#52c41a';document.getElementById('cs3').textContent='✓';document.getElementById('cs3').style.color='#fff';
+document.getElementById('cs3t').style.color='#333';document.getElementById('cs3t').textContent='Cookie 更新成功！';
+qr.innerHTML='<div style="color:#52c41a;font-size:48px">✓</div>';
+document.getElementById('phoneFallback').innerHTML='';
+document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="closeModal();loadMonitor(document.getElementById(\'contentArea\'))">完成</button>';
+}else if(s.status==='timeout'||s.status==='failed'){
+clearInterval(poll);
+document.getElementById('cs2').style.background='#ff4d4f';document.getElementById('cs2').textContent='✗';
+document.getElementById('cs2t').textContent=s.message||'操作失败';
+qr.innerHTML='';
+document.getElementById('phoneFallback').innerHTML='';
+document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="updateCookie()">重试</button><button class="btn-ghost" onclick="closeModal()">关闭</button>';
+}else{
+document.getElementById('cs2t').textContent='请用手机小红书App扫描二维码... (已等待 '+elapsed+'s)';
+}
+},2000);
 }catch(e){
 document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent='启动失败: '+e.message;
 }
+}
+
+async function switchToPhoneMode(){
+const r=await api('/api/cookie/capture-status');
+if(r.status!=='waiting_login'){toast('当前状态不支持切换',true);return}
+document.getElementById('cs2t').textContent='请输入手机号';
+document.getElementById('qrArea').innerHTML='';
+document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="phoneInput" class="search" style="flex:1;padding:10px 12px;font-size:14px" placeholder="请输入11位手机号" maxlength="11"><button class="btn" onclick="submitPhone()">发送验证码</button></div></div>';
+try{await api('/api/cookie/capture-switch-phone',{method:'POST'})}catch(e){}
 }
 
 async function submitPhone(){
@@ -860,7 +898,7 @@ document.getElementById('cs2').style.background='#52c41a';document.getElementByI
 document.getElementById('cs2t').textContent='验证码已发送至 '+phone;
 document.getElementById('cs3').style.background='#1890ff';document.getElementById('cs3').style.color='#fff';
 document.getElementById('cs3t').style.color='#333';document.getElementById('cs3t').textContent='请输入收到的验证码';
-document.getElementById('cookieAction').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="codeInput" class="search" style="flex:1;padding:10px 12px;font-size:14px;letter-spacing:4px" placeholder="请输入验证码" maxlength="6"><button class="btn" onclick="submitCode()">登录</button></div></div>';
+document.getElementById('phoneFallback').innerHTML='<div style="max-width:320px;margin:0 auto"><div style="display:flex;gap:8px"><input id="codeInput" class="search" style="flex:1;padding:10px 12px;font-size:14px;letter-spacing:4px" placeholder="请输入验证码" maxlength="6"><button class="btn" onclick="submitCode()">登录</button></div></div>';
 }catch(e){
 toast('发送失败: '+e.message,true);btn.disabled=false;btn.textContent='发送验证码';
 }
@@ -875,28 +913,22 @@ const r=await api('/api/cookie/capture-submit-code',{method:'POST',body:JSON.str
 if(r.error){toast(r.error,true);btn.disabled=false;btn.textContent='登录';return}
 document.getElementById('cs3').style.background='#52c41a';document.getElementById('cs3').textContent='✓';
 document.getElementById('cs3t').textContent='验证码已提交，等待登录完成...';
-document.getElementById('cs4').style.background='#1890ff';document.getElementById('cs4').style.color='#fff';
-document.getElementById('cs4t').style.color='#333';document.getElementById('cs4t').textContent='等待登录完成...';
-document.getElementById('cookieAction').innerHTML='<div style="text-align:center;color:#999;padding:10px">正在验证登录状态...</div>';
-let elapsed=0;
-if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}_cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
-elapsed+=2;
+document.getElementById('phoneFallback').innerHTML='<div style="text-align:center;color:#999;padding:10px">正在验证登录状态...</div>';
+if(_cookiePoll){clearInterval(_cookiePoll);_cookiePoll=null}
+_cookiePoll=setInterval(async()=>{const poll=_cookiePoll;
 const s=await api('/api/cookie/capture-status');
 if(s.status==='completed'){
 clearInterval(poll);
-document.getElementById('cs4').style.background='#52c41a';document.getElementById('cs4').textContent='✓';
-document.getElementById('cs4t').textContent='Cookie 更新成功！共捕获 '+s.cookie_count+' 个 Cookie';
-document.getElementById('cookieAction').innerHTML='<div style="color:#52c41a;font-size:48px;text-align:center">✓</div>';
+document.getElementById('cs3').textContent='✓';
+document.getElementById('cs3t').textContent='Cookie 更新成功！共捕获 '+s.cookie_count+' 个 Cookie';
+document.getElementById('phoneFallback').innerHTML='<div style="color:#52c41a;font-size:48px;text-align:center">✓</div>';
 document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="closeModal();loadMonitor(document.getElementById(\'contentArea\'))">完成</button>';
 }else if(s.status==='timeout'||s.status==='failed'){
 clearInterval(poll);
-document.getElementById('cs4').style.background='#ff4d4f';document.getElementById('cs4').textContent='✗';
-document.getElementById('cs4t').textContent=s.message||'操作失败';
-document.getElementById('cookieAction').innerHTML='';
+document.getElementById('cs3').style.background='#ff4d4f';document.getElementById('cs3').textContent='✗';
+document.getElementById('cs3t').textContent=s.message||'操作失败';
+document.getElementById('phoneFallback').innerHTML='';
 document.getElementById('cookieFooter').innerHTML='<button class="btn" onclick="updateCookie()">重试</button><button class="btn-ghost" onclick="closeModal()">关闭</button>';
-}else{
-document.getElementById('cs4t').textContent='等待登录完成... ('+elapsed+'s)';
-if(elapsed%6===0){document.getElementById('cookieAction').innerHTML='<img src="/api/cookie/capture-screenshot?'+Date.now()+'" style="max-width:100%;border-radius:8px;border:1px solid #f0f0f0" onerror="this.style.display=\'none\'"><div style="text-align:center;color:#999;font-size:12px;margin-top:4px">登录页实时截图</div>'}
 }
 },2000);
 }catch(e){
