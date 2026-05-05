@@ -1,5 +1,45 @@
 [
   {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "timed out",
+    "duration": 300.1,
+    "time": "2026-05-05T09:00:33.707484"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "timed out",
+    "duration": 300.1,
+    "time": "2026-05-05T08:55:33.673895"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "💥扎波罗热核电站突遭袭击，谁在冒险？",
+    "duration": 3.8,
+    "time": "2026-05-05T08:30:36.925725"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.3,
+    "time": "2026-05-05T08:30:33.115636"
+  },
+  {
     "task_id": "6aee9247",
     "type": "creation",
     "subject": "核电",
