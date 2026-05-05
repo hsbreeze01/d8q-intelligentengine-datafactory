@@ -480,36 +480,13 @@ area.innerHTML=html;
 async function doReport(){
 const kw=document.getElementById('reportInput').value.trim();
 if(!kw)return;
-document.getElementById('reportResult').innerHTML='<div class="empty">🔍 搜索中...</div>';
+document.getElementById('reportResult').innerHTML='<div class="empty">\ud83d\udd0d 搜索中...</div>';
 const data=await api('/api/report/stock',{method:'POST',body:JSON.stringify({keywords:[kw],days:30})});
 const results=data.results||[];
 if(!results.length){document.getElementById('reportResult').innerHTML='<div class="empty">未找到相关研报</div>';return}
-let html='';
-results.forEach(r=>{
-if(!r)return;
-const name=r.stock_name||r.stock_code||kw;
-const reports=r.reports||[];
-const anns=r.announcements||[];
-html+=`<div class="card" style="padding:16px 20px;margin-bottom:12px">
-<h4 style="font-size:15px;margin-bottom:12px">${esc(name)} <span style="font-size:12px;color:#999;font-weight:400">研报 ${reports.length}篇 · 公告 ${anns.length}条</span></h4>`;
-if(reports.length){
-reports.forEach(rpt=>{
-html+=`<div class="rpt-item" style="margin-bottom:8px">
-<div class="rpt-title">${rpt.detail_url?`<a href="${esc(rpt.detail_url)}" target="_blank" style="color:#333;text-decoration:none">${esc(rpt.title)}</a>`:esc(rpt.title)}</div>
-<div class="rpt-meta"><span class="org-tag">${esc(rpt.org||'未知')}</span><span>📅 ${esc(rpt.date||'-')}</span></div>
-${rpt.summary?`<div style="font-size:12px;color:#666;margin-top:4px;line-height:1.5">${esc(rpt.summary).slice(0,150)}...</div>`:''}
-</div>`;
-});
-}
-if(anns.length){
-html+=`<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:13px;padding:6px 0">📋 公告 (${anns.length}条)</summary>`;
-anns.forEach(a=>{
-html+=`<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">${a.detail_url?`<a href="${esc(a.detail_url)}" target="_blank" style="color:#333;text-decoration:none">${esc(a.title)}</a>`:esc(a.title)}</div><div class="rpt-meta"><span>📅 ${esc(a.date||'-')}</span></div></div>`;
-});
-html+='</details>';
-}
-html+='</div>';
-});
+window._reportResults=results;
+let html=renderReportResults(results,kw);
+html+='<button class="btn" style="margin-top:12px;padding:6px 16px;font-size:12px" onclick="exportReportCSV()">\ud83d\udcc4 导出CSV</button>';
 document.getElementById('reportResult').innerHTML=html;
 }
 
@@ -559,7 +536,67 @@ if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:po
 anns.forEach(function(a){html+='<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(a.title)+'</a>':esc(a.title))+'</div><div class="rpt-meta"><span>\ud83d\udcc5 '+esc(a.date||'-')+'</span></div></div>'});
 html+='</details>';}
 html+='</div>';});
-area.innerHTML=html;
+var exportHtml='<button class="btn" style="margin-top:12px;padding:6px 16px;font-size:12px" onclick="exportReportCSV()">\ud83d\udcc4 \u5bfc\u51faCSV</button>';
+area.innerHTML=html+exportHtml;
+}
+
+function renderReportResults(results, defaultKw){
+let html='';
+results.forEach(r=>{
+if(!r)return;
+const name=r.stock_name||r.stock_code||defaultKw||'';
+const reports=r.reports||[];
+const anns=r.announcements||[];
+html+='<div class="card" style="padding:16px 20px;margin-bottom:12px">';
+html+='<h4 style="font-size:15px;margin-bottom:12px">'+esc(name)+' <span style="font-size:12px;color:#999;font-weight:400">\u7814\u62a5 '+reports.length+'\u7bc7\u00b7\u516c\u544a '+anns.length+'\u6761</span></h4>';
+if(reports.length){reports.forEach(function(rpt){
+html+='<div class="rpt-item" style="margin-bottom:8px">';
+html+='<div class="rpt-title">'+(rpt.detail_url?'<a href="'+esc(rpt.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(rpt.title)+'</a>':esc(rpt.title))+'</div>';
+var metaParts=[];
+if(rpt.category) metaParts.push('<span class="org-tag">'+esc(rpt.category)+'</span>');
+metaParts.push('<span class="org-tag">'+esc(rpt.org||'\u672a\u77e5')+'</span>');
+if(rpt.authors) metaParts.push('<span>\u270d '+esc(rpt.authors)+'</span>');
+metaParts.push('<span>\ud83d\udcc5 '+esc(rpt.date||'-')+'</span>');
+if(rpt.pages) metaParts.push('<span>\ud83d\udcc4 '+rpt.pages+'\u9875</span>');
+if(rpt.file_size_kb) metaParts.push('<span>'+rpt.file_size_kb+'KB</span>');
+html+='<div class="rpt-meta">'+metaParts.join(' ')+'</div>';
+html+='</div>';});}
+if(anns.length){html+='<details style="margin-top:8px"><summary style="cursor:pointer;color:#1890ff;font-size:13px;padding:6px 0">\ud83d\udccb \u516c\u544a ('+anns.length+'\u6761)</summary>';
+anns.forEach(function(a){
+html+='<div class="rpt-item" style="margin-bottom:6px"><div class="rpt-title" style="font-size:13px">'+(a.detail_url?'<a href="'+esc(a.detail_url)+'" target="_blank" style="color:#333;text-decoration:none">'+esc(a.title)+'</a>':esc(a.title))+'</div>';
+var annMeta=['<span>\ud83d\udcc5 '+esc(a.date||'-')+'</span>'];
+if(a.pdf_url) annMeta.push('<a href="'+esc(a.pdf_url)+'" target="_blank" style="color:#1890ff;font-size:12px">PDF</a>');
+if(a.pdf_size_kb) annMeta.push('<span>'+a.pdf_size_kb+'KB</span>');
+html+='<div class="rpt-meta">'+annMeta.join(' ')+'</div></div>';
+});
+html+='</details>';}
+html+='</div>';});
+return html;
+}
+
+function exportReportCSV(){
+var results=window._reportResults;
+if(!results||!results.length){alert('\u65e0\u53ef\u5bfc\u51fa\u6570\u636e');return}
+var bom='\uFEFF';
+var rows=[['\u80a1\u7968\u540d\u79f0','\u7c7b\u578b','\u6807\u9898','\u673a\u6784','\u4f5c\u8005','\u65e5\u671f','\u5206\u7c7b','\u9875\u6570','\u6587\u4ef6\u5927\u5c0f(KB)','\u94fe\u63a5']];
+results.forEach(function(r){
+if(!r)return;
+var name=r.stock_name||r.stock_code||'';
+var reports=r.reports||[];
+var anns=r.announcements||[];
+reports.forEach(function(rpt){
+rows.push([name,'\u7814\u62a5',rpt.title||'',rpt.org||'',rpt.authors||'',rpt.date||'',rpt.category||'',rpt.pages||'',rpt.file_size_kb||'',rpt.detail_url||'']);
+});
+anns.forEach(function(a){
+rows.push([name,'\u516c\u544a',a.title||'','','',a.date||'','','',a.pdf_size_kb||'',a.detail_url||'']);
+});
+});
+var csv=bom+rows.map(function(row){return row.map(function(cell){var s=String(cell).replace(/"/g,'""');return '"'+s+'"'}).join(',')}).join('\n');
+var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+var url=URL.createObjectURL(blob);
+var a=document.createElement('a');a.href=url;
+var d=new Date();a.download='\u7814\u62a5\u5bfc\u51fa_'+d.getFullYear()+(d.getMonth()+1<10?'0':'')+(d.getMonth()+1)+(d.getDate()<10?'0':'')+d.getDate()+'.csv';
+document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
 // === 任务管理（完整CRUD） ===
