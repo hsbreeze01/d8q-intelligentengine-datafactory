@@ -408,6 +408,40 @@ def _publisher_request(method, path, data=None):
         return {"error": str(e)}, 502
 
 
+
+import time as _time
+
+class ReportCache:
+    def __init__(self):
+        self._store = {}
+
+    def get(self, key):
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        if _time.time() > entry["expire_at"]:
+            del self._store[key]
+            return None
+        return entry["data"]
+
+    def set(self, key, data, ttl_seconds):
+        self._store[key] = {"data": data, "expire_at": _time.time() + ttl_seconds}
+
+    def get_or_fetch(self, key, fetch_fn, ttl_seconds):
+        cached = self.get(key)
+        if cached is not None:
+            return cached, True
+        data = fetch_fn()
+        self.set(key, data, ttl_seconds)
+        return data, False
+
+    def stats(self):
+        now = _time.time()
+        active = sum(1 for e in self._store.values() if e["expire_at"] > now)
+        return {"active": active, "total_entries": len(self._store)}
+
+_report_cache = ReportCache()
+
 def shark_request(method, path, data=None):
     """Proxy request to StockShark API"""
     url = SHARK_API + urllib.parse.quote(path, safe='/:?=&')
@@ -483,7 +517,18 @@ def stock_announcements():
 @app.route("/api/stock/reports", methods=["GET"])
 def stock_reports():
     keyword = request.args.get("keyword", "")
-    data, status = shark_request("GET", "/api/report/search?keyword=" + keyword + "&limit=20")
+    limit = request.args.get("limit", "20")
+    cache_key = "report:" + keyword + ":" + limit
+    def fetch():
+        data, status = shark_request("GET", "/api/report/search?keyword=" + keyword + "&limit=" + limit)
+        return (data, status) if status == 200 else None
+    cached = _report_cache.get(cache_key)
+    if cached is not None:
+        return jsonify(cached), 200
+    data, status = shark_request("GET", "/api/report/search?keyword=" + keyword + "&limit=" + limit)
+    if status == 200:
+        empty = not data.get("reports")
+        _report_cache.set(cache_key, data, 300 if empty else 1800)
     return jsonify(data), status
 
 
@@ -498,28 +543,61 @@ def stock_quote():
 
 @app.route("/api/report/stock", methods=["POST"])
 def report_stock_query():
-    """批量查询股票研报 - 并行代理到 StockShark"""
+    """批量查询股票研报 - 缓存优先，减少远端调用"""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     body = request.json or {}
-    keywords = body.get("keywords", [])
+    keywords = body.get("keywords", [])[:20]
     days = body.get("days", 7)
 
-    def _query_one(kw):
-        # 研报用 search 接口（按关键词精确匹配）
-        rpt_data, rpt_code = shark_request("GET", "/api/report/search?keyword=" + kw + "&limit=20")
-        reports = rpt_data.get("reports", []) if rpt_code == 200 else []
-        # 公告用 announcement 接口（需要股票代码）
-        code, name = resolve_stock(kw)
-        ann_data, ann_code = shark_request("GET", "/api/announcement/stock/" + code + "?days=" + str(days))
-        anns = ann_data.get("announcements", []) if ann_code == 200 else []
-        return {"stock_code": code, "stock_name": name, "reports": reports, "announcements": anns}
+    results = [None] * len(keywords)
+    cache_hits = 0
 
-    results = [None] * min(len(keywords), 20)
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_query_one, kw): i for i, kw in enumerate(keywords[:20])}
-        for f in as_completed(futures):
-            results[futures[f]] = f.result()
-    return jsonify({"results": results}), 200
+    # Phase 1: check cache for each keyword
+    missed_indices = []
+    for i, kw in enumerate(keywords):
+        rpt_key = "report:" + kw + ":20"
+        code, name = resolve_stock(kw)
+        ann_key = "announcement:" + code + ":" + str(days)
+        rpt_cached = _report_cache.get(rpt_key)
+        ann_cached = _report_cache.get(ann_key)
+        if rpt_cached is not None and ann_cached is not None:
+            results[i] = {
+                "stock_code": code,
+                "stock_name": name,
+                "reports": rpt_cached,
+                "announcements": ann_cached,
+            }
+            cache_hits += 1
+        else:
+            missed_indices.append((i, kw, code, name, rpt_key, ann_key, rpt_cached, ann_cached))
+
+    # Phase 2: fetch missed items (partial cache supported)
+    def _fetch_one(idx, kw, code, name, rpt_key, ann_key, rpt_cached, ann_cached):
+        if rpt_cached is None:
+            rpt_data, rpt_code = shark_request("GET", "/api/report/search?keyword=" + kw + "&limit=20")
+            reports = rpt_data.get("reports", []) if rpt_code == 200 else []
+            empty = not reports
+            _report_cache.set(rpt_key, reports, 300 if empty else 1800)
+        else:
+            reports = rpt_cached
+        if ann_cached is None:
+            ann_data, ann_code = shark_request("GET", "/api/announcement/stock/" + code + "?days=" + str(days))
+            anns = ann_data.get("announcements", []) if ann_code == 200 else []
+            _report_cache.set(ann_key, anns, 300 if not anns else 900)
+        else:
+            anns = ann_cached
+        return idx, {"stock_code": code, "stock_name": name, "reports": reports, "announcements": anns}
+
+    if missed_indices:
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = [pool.submit(_fetch_one, *args) for args in missed_indices]
+            for f in as_completed(futures):
+                idx, result = f.result()
+                results[idx] = result
+
+    resp = jsonify({"results": results})
+    resp.headers["X-Cache-Hits"] = str(cache_hits) + "/" + str(len(keywords))
+    return resp, 200
 
 
 
