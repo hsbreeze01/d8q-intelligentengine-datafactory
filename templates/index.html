@@ -522,15 +522,15 @@ var reader=new FileReader();
 reader.onload=function(e){
 var text=e.target.result;
 if(!text||!text.trim()){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a\uff0c\u8bf7\u68c0\u67e5\u6587\u4ef6\u683c\u5f0f</div>';document.getElementById('filePreview').style.display='block';return}
-var lines=text.split(/\\r?\\n/).map(function(l){return l.trim()}).filter(function(l){return l.length>0});
+var lines=text.split(/\r?\n/).map(function(l){return l.trim()}).filter(function(l){return l.length>0});
 var truncated=false;if(lines.length>50){lines=lines.slice(0,50);truncated=true}
 if(!lines.length){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u5185\u5bb9\u4e3a\u7a7a</div>';document.getElementById('filePreview').style.display='block';return}
 var html='<div style="font-size:12px;color:#333;margin-bottom:8px">'+(truncated?'<span style="color:#faad14">\u26a0 \u6587\u4ef6\u8d85\u8fc750\u884c\uff0c\u53ea\u4f7f\u7528\u524d50\u884c</span><br>':'')+'<b>\u8bc6\u522b\u5230 '+lines.length+' \u4e2a\u80a1\u7968\u540d\u79f0\uff1a</b></div>';
 html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
 lines.forEach(function(l){html+='<span style="background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px">'+esc(l)+'</span>'});
 html+='</div>';
-var kwArr=lines.map(function(l){return "'"+l.replace(/'/g,"\\\\'")+"'"});
-html+='<button class="btn" style="padding:6px 20px;font-size:12px" onclick="batchSearchReport(['+kwArr.join(',')+'])">\u5f00\u59cb\u6279\u91cf\u641c\u7d22 ('+lines.length+'\u53ea)</button>';
+window._importKeywords=lines;
+html+='<button class="btn" style="padding:6px 20px;font-size:12px" onclick="batchSearchReport(window._importKeywords)">\u5f00\u59cb\u6279\u91cf\u641c\u7d22 ('+lines.length+'\u53ea)</button>';
 document.getElementById('filePreview').innerHTML=html;document.getElementById('filePreview').style.display='block';
 };
 reader.onerror=function(){document.getElementById('filePreview').innerHTML='<div style="color:#ff4d4f;font-size:12px">\u6587\u4ef6\u8bfb\u53d6\u5931\u8d25\uff0c\u8bf7\u786e\u8ba4\u4e3a UTF-8 \u7f16\u7801\u7684 txt \u6587\u4ef6</div>';document.getElementById('filePreview').style.display='block'};
