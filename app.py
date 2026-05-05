@@ -109,10 +109,10 @@ def _init_monitor_tables():
     count = conn.execute("SELECT count(*) FROM monitor_rules WHERE builtin=1").fetchone()[0]
     if count == 0:
         builtin_rules = [
-            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate", "judge": "valid", "timeout": 30, "status_url": PUBLISHER_API + "/api/cookie/status"}), "critical", 300),
+            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate?mode=fast", "judge": "valid", "timeout": 10, "status_url": PUBLISHER_API + "/api/cookie/status"}), "critical", 120),
             ("Ghost Browser CDP 连通性", "http", json.dumps({"url": "http://localhost:9222/json/version", "timeout": 5}), "critical", 60),
             ("发布锁状态", "system", json.dumps({"check": "file_not_exists", "path": "/tmp/d8q_publishing.lock"}), "warning", 30),
-            ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 5}), "critical", 60),
+            ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 10}), "critical", 120),
         ]
         for name, rtype, cfg, sev, interval in builtin_rules:
             conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
