@@ -262,7 +262,7 @@ el.innerHTML=`
 <span class="sc" style="cursor:pointer" onclick="goPage('feed')">${t.score!=null?t.score:'-'}</span>
 <span class="ch ${(t.change||0)>=0?'up':'dn'}" style="cursor:pointer" onclick="goPage('feed')">${t.change!=null?(t.change>=0?'↑':'↓')+Math.abs(t.change).toFixed(1):''}</span>
 <div class="st"><span>资讯 <b>${t.news_count||0}条</b></span><span>政策 <b>${t.policy_count||0}条</b></span><span>研报 <b>${t.report_count||0}次</b></span><span>融资 <b>${t.funding_count||0}笔</b></span></div>
-<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.06);padding-top:8px"><a style="font-size:12px;color:#1890ff;cursor:pointer;text-decoration:none" onclick="event.stopPropagation();showKeywordManager(${t.id},'${esc(t.name)}')">🔑 管理关键词</a></div>
+${userRole==='admin'?'<div style=\"margin-top:8px;border-top:1px solid rgba(0,0,0,.06);padding-top:8px\"><a style=\"font-size:12px;color:#1890ff;cursor:pointer;text-decoration:none\" onclick=\"event.stopPropagation();showKeywordManager('+t.id+',\\''+esc(t.name)+'\\')\">🔑 管理关键词</a></div>':''}
 </div>`).join('')}</div>`;
 loadTrackChart(7);
 }

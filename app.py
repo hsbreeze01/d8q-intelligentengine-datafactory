@@ -234,6 +234,8 @@ def proxy_tracks(**kwargs):
 @app.route("/api/proxy/tracks/<int:track_id>/keywords", methods=["POST"])
 @app.route("/api/proxy/tracks/<int:track_id>/keywords/<path:keyword>", methods=["DELETE"])
 def proxy_tracks_keywords_write(track_id, keyword=None):
+    if session.get("role") != "admin":
+        return {"error": "仅管理员可管理关键词"}, 403
     if request.method == "POST":
         path = f"/api/tracks/{track_id}/keywords"
         url = AGENT_API + path
