@@ -393,19 +393,34 @@ def toggle_task(task_id):
     return jsonify(data), code
 
 
-def _publisher_request(method, path, data=None):
-    """Proxy request to InfoPublisher API"""
+def _publisher_request(method, path, data=None, max_retries=1):
+    """Proxy request to InfoPublisher API (with retry on 500/502)"""
     url = PUBLISHER_API + path
     body = json.dumps(data).encode() if data else None
-    req = urllib.request.Request(url, data=body, method=method)
-    req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            return json.loads(resp.read()), resp.status
-    except urllib.error.HTTPError as e:
-        return json.loads(e.read()), e.code
-    except Exception as e:
-        return {"error": str(e)}, 502
+    last_result = None
+    last_code = 502
+    for attempt in range(max_retries + 1):
+        req = urllib.request.Request(url, data=body, method=method)
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return json.loads(resp.read()), resp.status
+        except urllib.error.HTTPError as e:
+            last_result = json.loads(e.read())
+            last_code = e.code
+            # Only retry on server errors (500/502/503), not client errors
+            if e.code < 500 or attempt >= max_retries:
+                return last_result, last_code
+            logger.info("publisher %s retry %d/%d (HTTP %d)", path, attempt+1, max_retries, e.code)
+            time.sleep(3 * (attempt + 1))
+        except Exception as e:
+            last_result = {"error": str(e)}
+            last_code = 502
+            if attempt >= max_retries:
+                return last_result, last_code
+            logger.info("publisher %s retry %d/%d (%s)", path, attempt+1, max_retries, str(e)[:60])
+            time.sleep(3 * (attempt + 1))
+    return last_result, last_code
 
 
 
