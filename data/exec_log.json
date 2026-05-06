@@ -7,6 +7,36 @@
     "success": false,
     "result_summary": "timed out",
     "duration": 300.1,
+    "time": "2026-05-06T08:58:27.029396"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "⚡扎波罗热核电站遇袭，核安全红线谁在踩？",
+    "duration": 4.3,
+    "time": "2026-05-06T08:30:25.846175"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.4,
+    "time": "2026-05-06T08:30:21.475417"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "timed out",
+    "duration": 300.1,
     "time": "2026-05-05T09:00:33.707484"
   },
   {

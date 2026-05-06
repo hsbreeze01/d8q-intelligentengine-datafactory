@@ -3,6 +3,7 @@ import fcntl
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from datetime import datetime
@@ -16,6 +17,9 @@ logger.setLevel(logging.INFO)
 
 TASKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "content_tasks.json")
 LOCK_PATH = "/tmp/d8q_scheduler.lock"
+
+# 热度聚合脚本路径
+sys.path.insert(0, "/home/ecs-assist-user/d8q-data-agent/scripts")
 
 # 各任务类型的默认执行时间 (HH:MM)
 DEFAULT_RUN_AT = {"creation": "08:30", "publish": "08:50"}
@@ -87,7 +91,7 @@ _daily_extras_last_run = ""
 
 
 def _run_daily_extras():
-    """每日 07:00 执行：热度异动检测 + 政策分析"""
+    """每日 07:00 执行：热度聚合 → 热度异动检测 + 政策分析"""
     global _daily_extras_last_run
     today = datetime.now().strftime("%Y-%m-%d")
     if _daily_extras_last_run == today:
@@ -97,6 +101,14 @@ def _run_daily_extras():
         return
     _daily_extras_last_run = today
     try:
+        # 1. 先聚合热度（确保今日 track_heat_daily 有数据）
+        from heat_aggregator import aggregate_today
+        heat_result = aggregate_today(days=1)
+        logger.info("热度聚合结果: %d 条, %s", len(heat_result), heat_result)
+    except Exception as e:
+        logger.error("热度聚合失败: %s", e)
+    try:
+        # 2. 热度异动检测 + 政策分析（依赖步骤1的数据）
         from heat_anomaly import detect_heat_anomaly, run_policy_analysis, run_investment_collection
         logger.info("执行每日附加任务: 热度异动检测 + 政策分析")
         r1 = detect_heat_anomaly()
