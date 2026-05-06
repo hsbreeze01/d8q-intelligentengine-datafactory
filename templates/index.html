@@ -605,14 +605,17 @@ var d=new Date();a.download='\u7814\u62a5\u5bfc\u51fa_'+d.getFullYear()+(d.getMo
 document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
 }
 
-// === 任务管理（完整CRUD） ===
+ // === 任务管理（完整CRUD） ===
+var _trackCache=null;
+async function _loadTracks(){if(_trackCache)return _trackCache;_trackCache=await api('/api/proxy/tracks');return _trackCache||[]}
 async function loadTasks(el){
-const[tasks,ctasks]=await Promise.all([api('/api/tasks'),api('/api/content/tasks')]);
+const[tasks,ctasks,tracks]=await Promise.all([api('/api/tasks'),api('/api/content/tasks'),_loadTracks()]);
+var trackMap={};(tracks||[]).forEach(function(t){trackMap[t.id]=t});
 el.innerHTML=`
 <div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
 <table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(tasks||[]).map(t=>`<tr><td><b>${esc(t.subject)}</b></td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
-<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+<tbody>${(tasks||[]).map(t=>{var badge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span>':'';return `<tr><td><b>${esc(t.subject)}</b>${badge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
+<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`}).join('')}</tbody></table></div>
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
 <table class="et"><thead><tr><th>类型</th><th>主题</th><th>风格/渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr></thead>
@@ -642,13 +645,48 @@ function showCollectForm(){
 document.getElementById('taskModal').style.display='flex';
 document.getElementById('taskModal').innerHTML=`<div class="card" style="width:520px;max-width:90vw;max-height:85vh;overflow-y:auto">
 <h3 style="margin-bottom:20px">📥 新建采集任务</h3>
-<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">采集主题 *</label><input class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mSubject" placeholder="输入主题关键词，如：碳纤维、固态电池" onfocus="document.getElementById('kwPanel').style.display='block'">
+<div style="display:flex;border:1px solid #d9d9d9;border-radius:6px;overflow:hidden;margin-bottom:16px"><button type="button" id="modeTrack" style="flex:1;padding:8px;border:none;background:#fafafa;cursor:pointer;font-size:14px" onclick="switchCollectMode('track')">🏁 按赛道</button><button type="button" id="modeCustom" style="flex:1;padding:8px;border:none;background:#1890ff;color:#fff;cursor:pointer;font-size:14px" onclick="switchCollectMode('custom')">✏️ 自定义</button></div>
+<div id="trackSection" style="display:none;margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">选择赛道</label><select style="width:100%;margin-top:6px;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px" id="mTrack" onchange="onTrackSelect()"><option value="">-- 请选择赛道 --</option></select>
+<div id="trackKwArea" style="display:none;margin-top:8px;border:1px solid #f0f0f0;border-radius:8px;padding:8px;background:#fafafa;max-height:120px;overflow-y:auto"></div></div>
+<div id="subjectSection" style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">采集主题 *</label><input class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mSubject" placeholder="输入主题关键词，如：碳纤维、固态电池" onfocus="document.getElementById('kwPanel').style.display='block'">
 <div id="kwPanel" style="display:none;margin-top:8px;border:1px solid #f0f0f0;border-radius:8px;padding:10px;background:#fafafa;max-height:180px;overflow-y:auto"></div></div>
-<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">数据来源</label><div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap"><label style="font-size:13px"><input type="checkbox" value="cailianshe" checked> 财联社</label><label style="font-size:13px"><input type="checkbox" value="nbd" checked> 每经网</label><label style="font-size:13px"><input type="checkbox" value="36kr" checked> 36氪</label><label style="font-size:13px"><input type="checkbox" value="weibo"> 微博</label></div></div>
+<div id="sourcesSection" style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">数据来源</label><div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap"><label style="font-size:13px"><input type="checkbox" value="cailianshe" checked> 财联社</label><label style="font-size:13px"><input type="checkbox" value="nbd" checked> 每经网</label><label style="font-size:13px"><input type="checkbox" value="36kr" checked> 36氪</label><label style="font-size:13px"><input type="checkbox" value="weibo"> 微博</label></div></div>
 <div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">调度频率</label><select class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mCron"><option value="0 */1 * * *">每小时</option><option value="0 */2 * * *" selected>每2小时</option><option value="0 */4 * * *">每4小时</option><option value="0 */6 * * *">每6小时</option><option value="0 8,12,18 * * *">每天3次(8/12/18点)</option><option value="0 9 * * *">每天1次(9点)</option><option value="0 9 * * 1-5">工作日每天1次</option></select></div>
 <div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">每次最大采集数</label><input type="number" class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mMax" value="20" min="5" max="100"></div>
 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="saveCollect()">保存任务</button></div></div>`;
+window._collectMode='custom';
 loadKwSuggestions();
+}
+async function switchCollectMode(mode){
+window._collectMode=mode;
+var mb=document.getElementById('modeTrack'),mc=document.getElementById('modeCustom');
+mb.style.background=mode==='track'?'#1890ff':'#fafafa';mb.style.color=mode==='track'?'#fff':'#333';
+mc.style.background=mode==='custom'?'#1890ff':'#fafafa';mc.style.color=mode==='custom'?'#fff':'#333';
+document.getElementById('trackSection').style.display=mode==='track'?'':'none';
+document.getElementById('subjectSection').style.opacity=mode==='track'?'0.5':'1';
+document.getElementById('subjectSection').style.pointerEvents=mode==='track'?'none':'';
+document.getElementById('sourcesSection').style.opacity=mode==='track'?'0.5':'1';
+document.getElementById('sourcesSection').style.pointerEvents=mode==='track'?'none':'';
+if(mode==='track'){
+var tracks=await _loadTracks();
+var sel=document.getElementById('mTrack');
+sel.innerHTML='<option value="">-- 请选择赛道 --</option>';
+(tracks||[]).forEach(function(t){var o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o)});
+}else{
+document.getElementById('trackKwArea').style.display='none';
+document.getElementById('mSubject').value='';
+}
+}
+async function onTrackSelect(){
+var trackId=document.getElementById('mTrack').value;
+if(!trackId){document.getElementById('mSubject').value='';document.getElementById('trackKwArea').style.display='none';return}
+var track=(_trackCache||[]).find(function(t){return t.id==trackId});
+if(track) document.getElementById('mSubject').value=track.name;
+try{var data=await api('/api/proxy/tracks/'+trackId+'/keywords');
+var kws=data.keywords||[];
+if(kws.length){document.getElementById('trackKwArea').style.display='';
+document.getElementById('trackKwArea').innerHTML=kws.map(function(kw){return '<span style="display:inline-block;padding:3px 10px;background:#fff;border:1px solid #e8e8e8;border-radius:14px;font-size:12px;margin:2px">'+esc(kw)+'</span>'}).join('')}else{document.getElementById('trackKwArea').style.display='none'}
+}catch(e){}
 }
 async function loadKwSuggestions(){
 try{const d=await api('/api/keyword-suggestions');const panel=document.getElementById('kwPanel');if(!d||!d.categories)return;
@@ -656,11 +694,18 @@ panel.innerHTML=d.categories.map(cat=>`<div style="margin-bottom:10px"><div styl
 }catch(e){}}
 
 async function saveCollect(){
+var cron=document.getElementById('mCron').value;
+var max=parseInt(document.getElementById('mMax').value)||20;
+if(window._collectMode==='track'){
+var trackId=document.getElementById('mTrack').value;
+if(!trackId){toast('请选择赛道',true);return}
+await api('/api/tasks',{method:'POST',body:JSON.stringify({track_id:parseInt(trackId),cron_expr:cron,max_results:max})});
+}else{
 var subject=document.getElementById('mSubject').value.trim();
 if(!subject){toast('主题必填',true);return}
 var sources=[];document.querySelectorAll('#taskModal input[type=checkbox]:checked').forEach(c=>sources.push(c.value));
-var cron=document.getElementById('mCron').value;
-await api('/api/tasks',{method:'POST',body:JSON.stringify({subject,sources,cron_expr:cron,max_results:20})});
+await api('/api/tasks',{method:'POST',body:JSON.stringify({subject,sources,cron_expr:cron,max_results:max})});
+}
 toast('采集任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
 }
 

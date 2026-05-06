@@ -205,6 +205,7 @@ def index():
 @app.route("/api/proxy/tracks/heat", methods=["GET"])
 @app.route("/api/proxy/tracks/heat/latest", methods=["GET"])
 @app.route("/api/proxy/tracks/<int:track_id>/news", methods=["GET"])
+@app.route("/api/proxy/tracks/<int:track_id>/keywords", methods=["GET"])
 def proxy_tracks(**kwargs):
     """Proxy track API to Agent"""
     path = request.path.replace("/api/proxy/", "/api/")
