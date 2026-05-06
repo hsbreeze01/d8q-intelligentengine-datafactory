@@ -257,11 +257,12 @@ el.innerHTML=`
 </div>
 <div class="card"><h3>热度趋势对比</h3><div id="trackChart" style="height:250px"></div></div>
 <div class="tg">${(latest||[]).map(t=>`
-<div class="tc" style="border-left-color:${t.color||'#1890ff'}" onclick="goPage('feed')">
-<div class="n">${esc(t.name)}</div>
-<span class="sc">${t.score!=null?t.score:'-'}</span>
-<span class="ch ${(t.change||0)>=0?'up':'dn'}">${t.change!=null?(t.change>=0?'↑':'↓')+Math.abs(t.change).toFixed(1):''}</span>
+<div class="tc" style="border-left-color:${t.color||'#1890ff'}">
+<div class="n" style="cursor:pointer" onclick="goPage('feed')">${esc(t.name)}</div>
+<span class="sc" style="cursor:pointer" onclick="goPage('feed')">${t.score!=null?t.score:'-'}</span>
+<span class="ch ${(t.change||0)>=0?'up':'dn'}" style="cursor:pointer" onclick="goPage('feed')">${t.change!=null?(t.change>=0?'↑':'↓')+Math.abs(t.change).toFixed(1):''}</span>
 <div class="st"><span>资讯 <b>${t.news_count||0}条</b></span><span>政策 <b>${t.policy_count||0}条</b></span><span>研报 <b>${t.report_count||0}次</b></span><span>融资 <b>${t.funding_count||0}笔</b></span></div>
+<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.06);padding-top:8px"><a style="font-size:12px;color:#1890ff;cursor:pointer;text-decoration:none" onclick="event.stopPropagation();showKeywordManager(${t.id},'${esc(t.name)}')">🔑 管理关键词</a></div>
 </div>`).join('')}</div>`;
 loadTrackChart(7);
 }
@@ -613,8 +614,8 @@ const[tasks,ctasks,tracks]=await Promise.all([api('/api/tasks'),api('/api/conten
 var trackMap={};(tracks||[]).forEach(function(t){trackMap[t.id]=t});
 el.innerHTML=`
 <div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
-<table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(tasks||[]).map(t=>{var badge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span><button class="btn-ghost" style="padding:2px 6px;font-size:10px;margin-left:4px;border-color:'+(trackMap[t.track_id].color||'#999')+';color:'+(trackMap[t.track_id].color||'#999')+'" onclick="event.stopPropagation();showKeywordManager('+t.track_id+',\''+esc(trackMap[t.track_id].name)+'\')">管理关键词</button>':'';return `<tr><td><b>${esc(t.subject)}</b>${badge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
+<table class="et"><thead><tr><th>主题</th><th>类型</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
+<tbody>${(tasks||[]).map(t=>{var typeBadge=t.track_id&&trackMap[t.track_id]?'<span class="badge badge-info">赛道采集</span>':'<span class="badge" style="background:#d9d9d6;color:#666">自定义采集</span>';var trackBadge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span>':'';return `<tr><td><b>${esc(t.subject)}</b>${trackBadge}</td><td>${typeBadge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
 <td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`}).join('')}</tbody></table></div>
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
