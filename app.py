@@ -392,13 +392,7 @@ def create_task():
 
 @app.route("/api/tasks/<task_id>", methods=["PUT"])
 def update_task(task_id):
-    """Edit = delete old + create new with same id"""
-    agent_request("DELETE", "/api/tasks/" + task_id)
-    body = request.json
-    body["id"] = task_id
-    # Agent POST /api/tasks auto-generates id, so we create via direct DB + reload
-    # Simpler: just create new task (agent assigns new id)
-    data, code = agent_request("POST", "/api/tasks", body)
+    data, code = agent_request("PUT", "/api/tasks/" + task_id, request.json)
     return jsonify(data), code
 
 
@@ -768,6 +762,20 @@ def delete_content_task(task_id):
     tasks = [t for t in _load_content_tasks() if t.get("id") != task_id]
     _save_content_tasks(tasks)
     return jsonify({"ok": True}), 200
+
+
+@app.route("/api/content/tasks/<task_id>", methods=["PUT"])
+def update_content_task(task_id):
+    body = request.json or {}
+    tasks = _load_content_tasks()
+    for t in tasks:
+        if t.get("id") == task_id:
+            for k in ("subject", "style", "channel", "freq", "run_at"):
+                if k in body:
+                    t[k] = body[k]
+            _save_content_tasks(tasks)
+            return jsonify(t), 200
+    return jsonify({"error": "任务不存在"}), 404
 
 
 @app.route("/api/content/tasks/<task_id>/toggle", methods=["POST"])

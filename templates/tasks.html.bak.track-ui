@@ -71,15 +71,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .user-info .role{background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px}
 .user-info .logout{color:#ff4d4f;cursor:pointer;border:none;background:none;font-size:13px}
 .user-info .logout:hover{text-decoration:underline}
-.mode-toggle{display:flex;border:1px solid #d9d9d9;border-radius:6px;overflow:hidden;margin-bottom:16px}
-.mode-btn{flex:1;padding:8px 16px;border:none;background:#fafafa;cursor:pointer;font-size:14px;text-align:center;transition:all .2s}
-.mode-btn.active{background:#1890ff;color:#fff}
-.mode-btn:hover:not(.active){background:#e6f7ff}
-.track-select{width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;margin-bottom:12px}
-.kw-display{max-height:120px;overflow-y:auto;border:1px solid #f0f0f0;border-radius:8px;padding:8px;background:#fafafa;margin-bottom:12px}
-.kw-display-chip{display:inline-block;padding:3px 10px;background:#fff;border:1px solid #e8e8e8;border-radius:14px;font-size:12px;margin:2px;white-space:nowrap}
-.track-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;vertical-align:middle}
-.field-disabled{opacity:.6;pointer-events:none;background:#f5f5f5}
 </style>
 </head>
 <body>
@@ -99,11 +90,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <div class="modal-overlay" id="collectModal"><div class="modal">
   <h3 id="cModalTitle">新建采集任务</h3>
   <input type="hidden" id="cEditId">
-  <div class="mode-toggle"><button class="mode-btn" id="modeTrack" type="button" onclick="switchMode('track')">🏁 按赛道</button><button class="mode-btn active" id="modeCustom" type="button" onclick="switchMode('custom')">✏️ 自定义</button></div>
-  <div id="trackSection" style="display:none">
-    <div class="form-group"><label>选择赛道</label><select class="track-select" id="cTrack" onchange="onTrackChange()"><option value="">-- 请选择赛道 --</option></select></div>
-    <div id="trackKwDisplay" class="kw-display" style="display:none"></div>
-  </div>
   <div class="form-group"><label>采集主题 * <span class="kw-toggle" onclick="toggleKwPanel('cKwPanel')">💡 关键词推荐</span></label><input type="text" id="cSubject" placeholder="如：碳纤维、固态电池、光刻胶" onfocus="toggleKwPanel('cKwPanel',true)"><div class="kw-panel" id="cKwPanel"></div></div>
   <div class="form-group"><label>数据来源</label><div class="checkbox-group" id="cSources">
     <label><input type="checkbox" value="cailianshe" checked> 财联社</label>
@@ -172,8 +158,6 @@ var STYLE_NAMES={"news_brief":"资讯速递","deep_analysis":"深度分析","inv
 var STYLE_CLS={"news_brief":"style-news","deep_analysis":"style-deep","investment_weekly":"style-invest"};
 var FREQ_NAMES={"daily":"每日","weekly":"每周","monthly":"每月"};
 var SOURCE_NAMES={"cailianshe":"财联社","nbd":"每经网","36kr":"36氪","weibo":"微博"};
-var _trackCache=null;var _currentMode="custom";
-function loadTracks(){if(_trackCache)return Promise.resolve(_trackCache);return api("/api/proxy/tracks").then(function(t){_trackCache=t||[];return _trackCache})}
 function api(u,o){o=o||{};o.headers={"Content-Type":"application/json"};return fetch(u,o).then(function(r){return r.json()})}
 function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
 function toast(m,t){var e=document.getElementById("toast");e.textContent=m;e.className="toast toast-"+(t||"info")+" show";setTimeout(function(){e.classList.remove("show")},3000)}
@@ -190,81 +174,30 @@ function parseCron(expr){var p=(expr||"").split(" ");var h=p.length>=2?p[1]:"?";
 function loadCollect(){
   api("/api/tasks").then(function(tasks){
     if(!tasks||!tasks.length){document.getElementById("collectTable").innerHTML='<div class="empty">暂无采集任务</div>';return}
-    var trackMap={};
-    loadTracks().then(function(tracks){tracks.forEach(function(t){trackMap[t.id]=t})}).then(function(){
-      var h='<table><tr><th>主题</th><th>来源</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr>';
-      tasks.forEach(function(t){
-        var src="";(t.sources||[]).forEach(function(s){src+='<span class="source-tag">'+(SOURCE_NAMES[s]||s)+'</span>'});
-        var cp=parseCron(t.cron_expr);
-        var badge="";
-        if(t.track_id&&trackMap[t.track_id]){var tr=trackMap[t.track_id];badge='<span class="track-badge" style="background:'+esc(tr.color||'#999')+'">'+esc(tr.name)+'</span>'}
-        h+='<tr><td><strong>'+esc(t.subject)+'</strong>'+badge+'</td><td>'+src+'</td><td><span class="freq-tag">'+cp.freq+'</span></td><td>'+cp.time+'</td>';
-        h+='<td>'+(t.enabled?'<span class="status-on">● 运行中</span>':'<span class="status-off">● 停止</span>')+'</td>';
-        h+='<td><div class="actions">';
-        h+='<button class="btn btn-sm btn-ghost" onclick="editCollect(\''+esc(t.id)+'\')">编辑</button>';
-        h+='<button class="btn btn-sm btn-success" onclick="runCollect(\''+esc(t.id)+'\')">执行</button>';
-        h+='<button class="btn btn-sm btn-danger" onclick="delCollect(\''+esc(t.id)+'\')">删除</button>';
-        h+='</div></td></tr>'
-      });
-      document.getElementById("collectTable").innerHTML=h+'</table>'
-    })
-  })
-}
-function switchMode(mode){
-  _currentMode=mode;
-  var trackSection=document.getElementById("trackSection");
-  var subjectInput=document.getElementById("cSubject");
-  var sourcesGroup=document.getElementById("cSources");
-  document.getElementById("modeTrack").className="mode-btn"+(mode==="track"?" active":"");
-  document.getElementById("modeCustom").className="mode-btn"+(mode==="custom"?" active":"");
-  if(mode==="track"){
-    trackSection.style.display="";
-    subjectInput.classList.add("field-disabled");
-    sourcesGroup.classList.add("field-disabled");
-    loadTracks().then(function(tracks){
-      var sel=document.getElementById("cTrack");
-      sel.innerHTML='<option value="">-- 请选择赛道 --</option>';
-      tracks.forEach(function(t){var o=document.createElement("option");o.value=t.id;o.textContent=t.name;sel.appendChild(o)});
+    var h='<table><tr><th>主题</th><th>来源</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr>';
+    tasks.forEach(function(t){
+      var src="";(t.sources||[]).forEach(function(s){src+='<span class="source-tag">'+(SOURCE_NAMES[s]||s)+'</span>'});
+      var cp=parseCron(t.cron_expr);
+      h+='<tr><td><strong>'+esc(t.subject)+'</strong></td><td>'+src+'</td><td><span class="freq-tag">'+cp.freq+'</span></td><td>'+cp.time+'</td>';
+      h+='<td>'+(t.enabled?'<span class="status-on">● 运行中</span>':'<span class="status-off">● 停止</span>')+'</td>';
+      h+='<td><div class="actions">';
+      h+='<button class="btn btn-sm btn-ghost" onclick="editCollect(\''+esc(t.id)+'\')">编辑</button>';
+      h+='<button class="btn btn-sm btn-success" onclick="runCollect(\''+esc(t.id)+'\')">执行</button>';
+      h+='<button class="btn btn-sm btn-danger" onclick="delCollect(\''+esc(t.id)+'\')">删除</button>';
+      h+='</div></td></tr>'
     });
-  }else{
-    trackSection.style.display="none";
-    subjectInput.classList.remove("field-disabled");
-    sourcesGroup.classList.remove("field-disabled");
-    document.getElementById("trackKwDisplay").style.display="none";
-    subjectInput.value="";
-    var checks=document.querySelectorAll("#cSources input");
-    checks.forEach(function(c){c.checked=["cailianshe","nbd","36kr","weibo"].indexOf(c.value)>-1});
-  }
-}
-function onTrackChange(){
-  var trackId=document.getElementById("cTrack").value;
-  var subjectInput=document.getElementById("cSubject");
-  var kwDisplay=document.getElementById("trackKwDisplay");
-  if(!trackId){subjectInput.value="";kwDisplay.style.display="none";return}
-  var track=(_trackCache||[]).find(function(t){return t.id==trackId});
-  if(track) subjectInput.value=track.name;
-  api("/api/proxy/tracks/"+trackId+"/keywords").then(function(data){
-    var kws=data.keywords||[];
-    if(!kws.length){kwDisplay.style.display="none";return}
-    kwDisplay.style.display="";
-    kwDisplay.innerHTML=kws.map(function(kw){return '<span class="kw-display-chip">'+esc(kw)+'</span>'}).join("");
-  });
+    document.getElementById("collectTable").innerHTML=h+'</table>'
+  })
 }
 function openCollectModal(task){
   document.getElementById("cEditId").value=task?task.id:"";
   document.getElementById("cModalTitle").textContent=task?"编辑采集任务":"新建采集任务";
+  document.getElementById("cSubject").value=task?task.subject:"";
   document.getElementById("cCron").value=task?task.cron_expr:"0 */2 * * *";
   document.getElementById("cMax").value=task?task.max_results:20;
-  if(task&&task.track_id){
-    switchMode("track");
-    loadTracks().then(function(){document.getElementById("cTrack").value=task.track_id;onTrackChange()});
-  }else{
-    switchMode("custom");
-    document.getElementById("cSubject").value=task?task.subject:"";
-    var checks=document.querySelectorAll("#cSources input");
-    var taskSrc=task?task.sources:ALL_SOURCES;
-    checks.forEach(function(c){c.checked=taskSrc.indexOf(c.value)>-1});
-  }
+  var checks=document.querySelectorAll("#cSources input");
+  var taskSrc=task?task.sources:ALL_SOURCES;
+  checks.forEach(function(c){c.checked=taskSrc.indexOf(c.value)>-1});
   document.getElementById("collectModal").classList.add("show")
 }
 function editCollect(id){
@@ -273,29 +206,17 @@ function editCollect(id){
   })
 }
 function saveCollect(){
-  if(_currentMode==="track"){
-    var trackId=document.getElementById("cTrack").value;
-    if(!trackId){toast("请选择赛道","error");return}
-    var body={track_id:parseInt(trackId),cron_expr:document.getElementById("cCron").value,max_results:parseInt(document.getElementById("cMax").value)||20};
-    var editId=document.getElementById("cEditId").value;
-    var doSave=function(){return api("/api/tasks",{method:"POST",body:JSON.stringify(body)})};
-    (editId?api("/api/tasks/"+editId,{method:"DELETE"}).then(doSave):doSave()).then(function(r){
-      if(r.detail){toast(r.detail,"error");return}
-      closeAll();toast(editId?"采集任务已更新":"采集任务已创建","success");loadCollect()
-    });
+  var s=document.getElementById("cSubject").value.trim();if(!s){toast("请输入主题","error");return}
+  var src=[];document.querySelectorAll("#cSources input:checked").forEach(function(c){src.push(c.value)});
+  if(!src.length){toast("请至少选择一个数据来源","error");return}
+  var body={subject:s,sources:src,cron_expr:document.getElementById("cCron").value,max_results:parseInt(document.getElementById("cMax").value)||20};
+  var editId=document.getElementById("cEditId").value;
+  if(editId){
+    api("/api/tasks/"+editId,{method:"DELETE"}).then(function(){
+      return api("/api/tasks",{method:"POST",body:JSON.stringify(body)})
+    }).then(function(){closeAll();toast("采集任务已更新，调度变更将在第二天生效","success");loadCollect()})
   }else{
-    var s=document.getElementById("cSubject").value.trim();if(!s){toast("请输入主题","error");return}
-    var src=[];document.querySelectorAll("#cSources input:checked").forEach(function(c){src.push(c.value)});
-    if(!src.length){toast("请至少选择一个数据来源","error");return}
-    var body={subject:s,sources:src,cron_expr:document.getElementById("cCron").value,max_results:parseInt(document.getElementById("cMax").value)||20};
-    var editId=document.getElementById("cEditId").value;
-    if(editId){
-      api("/api/tasks/"+editId,{method:"DELETE"}).then(function(){
-        return api("/api/tasks",{method:"POST",body:JSON.stringify(body)})
-      }).then(function(){closeAll();toast("采集任务已更新，调度变更将在第二天生效","success");loadCollect()})
-    }else{
-      api("/api/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){closeAll();toast("采集任务已创建","success");loadCollect()})
-    }
+    api("/api/tasks",{method:"POST",body:JSON.stringify(body)}).then(function(){closeAll();toast("采集任务已创建","success");loadCollect()})
   }
 }
 function runCollect(id){toast("执行中...","info");api("/api/tasks/"+id+"/run",{method:"POST"}).then(function(r){toast("完成，采集"+(r.total_count||0)+"条","success")})}

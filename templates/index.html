@@ -194,6 +194,8 @@ function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/jso
 function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',market:'市场',report:'研报'};return`<span class="tag tag-${type||'tech'}">${m[type]||type||''}</span>`}
+function cronToLabel(c){if(!c)return'-';const m={'0 */1 * * *':'每小时','0 */2 * * *':'每2小时','0 */4 * * *':'每4小时','0 */6 * * *':'每6小时','0 8,12,18 * * *':'每天3次(8/12/18点)','0 9 * * *':'每天1次(9点)','0 9 * * 1-5':'工作日每天1次'};return m[c]||c}
+function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',monthly:'每月'};return m[f]||f}
 
 // === 页面加载 ===
 function loadPage(id){
@@ -615,13 +617,13 @@ var trackMap={};(tracks||[]).forEach(function(t){trackMap[t.id]=t});
 el.innerHTML=`
 <div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
 <table class="et"><thead><tr><th>主题</th><th>类型</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(tasks||[]).map(t=>{var typeBadge=t.track_id&&trackMap[t.track_id]?'<span class="badge badge-info">赛道采集</span>':'<span class="badge" style="background:#d9d9d6;color:#666">自定义采集</span>';var trackBadge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span>':'';return `<tr><td><b>${esc(t.subject)}</b>${trackBadge}</td><td>${typeBadge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
-<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`}).join('')}</tbody></table></div>
+<tbody>${(tasks||[]).map(t=>{var typeBadge=t.track_id&&trackMap[t.track_id]?'<span class="badge badge-info">赛道采集</span>':'<span class="badge" style="background:#d9d9d6;color:#666">自定义采集</span>';var trackBadge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span>':'';return `<tr><td><b>${esc(t.subject)}</b>${trackBadge}</td><td>${typeBadge}</td><td>${(t.sources||[]).join(', ')}</td><td>${cronToLabel(t.cron_expr)}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
+<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="editCollectForm('${t.id}')">编辑</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`}).join('')}</tbody></table></div>
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
 <table class="et"><thead><tr><th>类型</th><th>主题</th><th>风格/渠道</th><th>频率</th><th>执行时间</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${t.freq}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='paused'?'badge-err':'badge-ok'}">${t.status==='paused'?'已暂停':'运行中'}</span></td>
-<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
+<tbody>${(ctasks||[]).map(t=>`<tr><td><span class="badge ${t.type==='creation'?'badge-info':'badge-ok'}">${t.type==='creation'?'创作':'发布'}</span></td><td>${esc(t.subject)}</td><td>${t.style||t.channel||'-'}</td><td>${freqToLabel(t.freq)}</td><td>${t.run_at||'-'}</td><td><span class="badge ${t.status==='paused'?'badge-err':'badge-ok'}">${t.status==='paused'?'已暂停':'运行中'}</span></td>
+<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="editContentForm('${t.id}')">编辑</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runContent('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleContent('${t.id}')">暂停/恢复</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delContent('${t.id}')">删除</button></td></tr>`).join('')}</tbody></table></div>
 
 <div class="card"><h3>📋 执行记录 <button class="btn-ghost" style="padding:3px 8px;font-size:11px" onclick="renderExecLog(1)">刷新</button></h3><div id="execLogBody">加载中...</div><div id="execLogPager" style="text-align:center;margin-top:12px"></div></div>`;
 renderExecLog(1);
@@ -697,18 +699,52 @@ panel.innerHTML=d.categories.map(cat=>`<div style="margin-bottom:10px"><div styl
 async function saveCollect(){
 var cron=document.getElementById('mCron').value;
 var max=parseInt(document.getElementById('mMax').value)||20;
-if(window._collectMode==='track'){
+if(window._editTaskId){
+var body={cron_expr:cron,max_results:max};
+if(window._collectMode!=='track'){
+body.subject=document.getElementById('mSubject').value.trim();
+if(!body.subject){toast('主题必填',true);return}
+body.sources=[];document.querySelectorAll('#taskModal input[type=checkbox]:checked').forEach(c=>body.sources.push(c.value));
+}
+await api('/api/tasks/'+window._editTaskId,{method:'PUT',body:JSON.stringify(body)});
+toast('采集任务已更新');window._editTaskId=null;
+}else if(window._collectMode==='track'){
 var trackId=document.getElementById('mTrack').value;
 if(!trackId){toast('请选择赛道',true);return}
 await api('/api/tasks',{method:'POST',body:JSON.stringify({track_id:parseInt(trackId),cron_expr:cron,max_results:max})});
+toast('采集任务已创建');
 }else{
 var subject=document.getElementById('mSubject').value.trim();
 if(!subject){toast('主题必填',true);return}
 var sources=[];document.querySelectorAll('#taskModal input[type=checkbox]:checked').forEach(c=>sources.push(c.value));
 await api('/api/tasks',{method:'POST',body:JSON.stringify({subject,sources,cron_expr:cron,max_results:max})});
+toast('采集任务已创建');
 }
-toast('采集任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
+closeModal();loadTasks(document.getElementById('contentArea'));
  }
+
+async function editCollectForm(taskId){
+var tasks=await api('/api/tasks');
+var task=(tasks||[]).find(function(t){return t.id===taskId});
+if(!task){toast('任务不存在',true);return}
+window._editTaskId=taskId;
+showCollectForm();
+document.querySelector('#taskModal h3').textContent='📥 编辑采集任务';
+document.querySelector('#taskModal .btn:last-child').textContent='保存修改';
+document.getElementById('mCron').value=task.cron_expr||'';
+document.getElementById('mMax').value=task.max_results||20;
+if(task.track_id){
+window._collectMode='track';
+switchCollectMode('track');
+var tracks=await _loadTracks();
+var sel=document.getElementById('mTrack');
+sel.value=task.track_id;
+onTrackSelect();
+}else{
+document.getElementById('mSubject').value=task.subject||'';
+(task.sources||[]).forEach(function(s){var cb=document.querySelector('#taskModal input[type=checkbox][value="'+s+'"]');if(cb)cb.checked=true});
+}
+}
 
 async function showKeywordManager(trackId,trackName){
 window._kwTrackId=trackId;
@@ -761,8 +797,30 @@ if(!subject){toast('主题必填',true);return}
 var body={type,subject,freq:document.getElementById('mFreq').value,run_at:document.getElementById('mRunAt').value};
 if(type==='creation')body.style=document.getElementById('mStyle').value;
 else body.channel=document.getElementById('mChannel').value;
+if(window._editContentId){
+await api('/api/content/tasks/'+window._editContentId,{method:'PUT',body:JSON.stringify(body)});
+toast('任务已更新');window._editContentId=null;
+}else{
 await api('/api/content/tasks',{method:'POST',body:JSON.stringify(body)});
-toast('任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
+toast('任务已创建');
+}
+closeModal();loadTasks(document.getElementById('contentArea'));
+}
+
+async function editContentForm(taskId){
+var ctasks=await api('/api/content/tasks');
+var task=(ctasks||[]).find(function(t){return t.id===taskId});
+if(!task){toast('任务不存在',true);return}
+window._editContentId=taskId;
+var type=task.type||'creation';
+showContentForm(type);
+document.querySelector('#taskModal h3').textContent=(type==='creation'?'✍️ 编辑创作任务':'📤 编辑发布任务');
+document.querySelector('#taskModal .btn:last-child').textContent='保存修改';
+document.getElementById('mCSubject').value=task.subject||'';
+document.getElementById('mFreq').value=task.freq||'daily';
+document.getElementById('mRunAt').value=task.run_at||'08:30';
+if(type==='creation'&&document.getElementById('mStyle'))document.getElementById('mStyle').value=task.style||'news_brief';
+if(type==='publish'&&document.getElementById('mChannel'))document.getElementById('mChannel').value=task.channel||'xiaohongshu';
 }
 
 async function runContent(id){toast('执行中，请稍候...');var r=await api('/api/content/tasks/'+id+'/run',{method:'POST'});toast(r.title||r.status||r.error||'完成');loadTasks(document.getElementById('contentArea'))}
