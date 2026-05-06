@@ -231,6 +231,31 @@ def proxy_tracks(**kwargs):
         return {"error": str(e)}, 502
 
 
+@app.route("/api/proxy/tracks/<int:track_id>/keywords", methods=["POST"])
+@app.route("/api/proxy/tracks/<int:track_id>/keywords/<path:keyword>", methods=["DELETE"])
+def proxy_tracks_keywords_write(track_id, keyword=None):
+    if request.method == "POST":
+        path = f"/api/tracks/{track_id}/keywords"
+        url = AGENT_API + path
+        data = json.dumps(request.json or {}).encode()
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    else:
+        kw_enc = urllib.parse.quote(keyword, safe="")
+        url = AGENT_API + f"/api/tracks/{track_id}/keywords/{kw_enc}"
+        req = urllib.request.Request(url, method="DELETE")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read()), resp.status
+    except urllib.error.HTTPError as e:
+        body = e.read()
+        try:
+            return json.loads(body), e.code
+        except Exception:
+            return {"error": body.decode()[:200]}, e.code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
 @app.route("/api/weekly/generate", methods=["POST"])
 def weekly_generate():
     """Generate weekly report via LLM"""

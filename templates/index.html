@@ -614,7 +614,7 @@ var trackMap={};(tracks||[]).forEach(function(t){trackMap[t.id]=t});
 el.innerHTML=`
 <div class="card"><h3>📥 采集任务 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showCollectForm()">+ 新建</button></h3>
 <table class="et"><thead><tr><th>主题</th><th>来源</th><th>频率</th><th>状态</th><th>操作</th></tr></thead>
-<tbody>${(tasks||[]).map(t=>{var badge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span>':'';return `<tr><td><b>${esc(t.subject)}</b>${badge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
+<tbody>${(tasks||[]).map(t=>{var badge=t.track_id&&trackMap[t.track_id]?'<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;color:#fff;margin-left:6px;background:'+(trackMap[t.track_id].color||'#999')+'">'+esc(trackMap[t.track_id].name)+'</span><button class="btn-ghost" style="padding:2px 6px;font-size:10px;margin-left:4px;border-color:'+(trackMap[t.track_id].color||'#999')+';color:'+(trackMap[t.track_id].color||'#999')+'" onclick="event.stopPropagation();showKeywordManager('+t.track_id+',\''+esc(trackMap[t.track_id].name)+'\')">管理关键词</button>':'';return `<tr><td><b>${esc(t.subject)}</b>${badge}</td><td>${(t.sources||[]).join(', ')}</td><td>${t.cron_expr||''}</td><td><span class="badge badge-ok">${t.enabled?'运行中':'停止'}</span></td>
 <td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="runCollect('${t.id}')">执行</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:6px" onclick="toggleCollect('${t.id}')">${t.enabled?'暂停':'恢复'}</button><button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="delCollect('${t.id}')">删除</button></td></tr>`}).join('')}</tbody></table></div>
 
 <div class="card"><h3>✍️ 创作/发布任务 <button class="btn" style="padding:5px 12px;font-size:12px;background:#722ed1" onclick="showContentForm('creation')">+ 创作</button> <button class="btn" style="padding:5px 12px;font-size:12px;background:#fa8c16" onclick="showContentForm('publish')">+ 发布</button></h3>
@@ -707,6 +707,32 @@ var sources=[];document.querySelectorAll('#taskModal input[type=checkbox]:checke
 await api('/api/tasks',{method:'POST',body:JSON.stringify({subject,sources,cron_expr:cron,max_results:max})});
 }
 toast('采集任务已创建');closeModal();loadTasks(document.getElementById('contentArea'));
+ }
+
+async function showKeywordManager(trackId,trackName){
+window._kwTrackId=trackId;
+document.getElementById('taskModal').style.display='flex';
+document.getElementById('taskModal').innerHTML='<div class="card" style="width:520px;max-width:90vw;max-height:85vh;overflow-y:auto"><h3 style="margin-bottom:20px">🔑 关键词管理 — '+esc(trackName)+'</h3><div id="kwList" style="margin-bottom:16px;min-height:60px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start">加载中...</div><div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #f0f0f0"><input class="search" style="flex:1;padding:8px 12px;font-size:14px" id="kwInput" placeholder="输入新关键词" onkeydown="if(event.key===\'Enter\')addKeyword()"><button class="btn" style="padding:8px 16px;font-size:13px" onclick="addKeyword()">添加</button></div><div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">关闭</button></div></div>';
+loadKeywordList(trackId);
+}
+async function loadKeywordList(trackId){
+var data=await api('/api/proxy/tracks/'+trackId+'/keywords');
+var kws=data.keywords||[];
+var el=document.getElementById('kwList');
+if(!kws.length){el.innerHTML='<div class="empty" style="width:100%;text-align:center;padding:20px;color:#999">暂无关键词，请添加</div>';return}
+el.innerHTML=kws.map(function(kw){return '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#f0f5ff;border:1px solid #adc6ff;border-radius:14px;font-size:13px">'+esc(kw)+'<span style="cursor:pointer;color:#ff4d4f;font-size:14px;margin-left:2px;line-height:1" onclick="removeKeyword(\''+esc(kw).replace(/'/g,"\\'")+'\')">&times;</span></span>'}).join('');
+}
+async function addKeyword(){
+var input=document.getElementById('kwInput');
+var kw=input.value.trim();
+if(!kw){toast('关键词不能为空',true);return}
+try{await api('/api/proxy/tracks/'+window._kwTrackId+'/keywords',{method:'POST',body:JSON.stringify({keyword:kw})});
+toast('关键词已添加');input.value='';loadKeywordList(window._kwTrackId);
+}catch(e){var msg=e.message||'';if(msg.indexOf('already')>-1||msg.indexOf('已存在')>-1||msg.indexOf('exist')>-1){toast('关键词已存在',true)}else{toast('添加失败: '+msg,true)}}
+}
+async function removeKeyword(kw){
+await api('/api/proxy/tracks/'+window._kwTrackId+'/keywords/'+encodeURIComponent(kw),{method:'DELETE'});
+toast('关键词已删除');loadKeywordList(window._kwTrackId);
 }
 
 async function runCollect(id){toast('执行中...');var r=await api('/api/tasks/'+id+'/run',{method:'POST'});toast('采集完成: '+(r.total_count||0)+'条');loadTasks(document.getElementById('contentArea'))}
