@@ -1308,7 +1308,8 @@ def _execute_system_check(config):
             mtime = os.path.getmtime(fpath)
             age = _time.time() - mtime
             if age > 600:
-                return "error", f"锁文件已存在 {int(age)}秒", {"age_sec": int(age)}
+                os.remove(fpath)
+                return "warning", f"锁残留已自动清理（存在{int(age)}秒）", {"age_sec": int(age), "auto_cleaned": True}
             return "ok", f"发布进行中（{int(age)}秒）", {"age_sec": int(age)}
         except Exception:
             return "warning", "锁文件存在", {}
