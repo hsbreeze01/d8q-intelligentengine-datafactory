@@ -207,7 +207,7 @@ else area.innerHTML='<div class="empty">页面开发中...</div>';
 
 // === Dashboard ===
 async function loadDashboard(el){
-if(window._showGuide){const gb=document.createElement('div');gb.className='guide-banner';gb.innerHTML='👋 欢迎使用 D8Q！请先选择您关注的赛道，我们将为您个性化推荐内容。<a onclick="goPage(\'follows\')">去关注 →</a>';el.parentElement.insertBefore(gb,el);}
+if(window._showGuide){el.parentElement.querySelectorAll('.guide-banner').forEach(b=>b.remove());const gb=document.createElement('div');gb.className='guide-banner';gb.innerHTML='👋 欢迎使用 D8Q！请先选择您关注的赛道，我们将为您个性化推荐内容。<a onclick="goPage(\'follows\')">去关注 →</a>';el.parentElement.insertBefore(gb,el);window._showGuide=false;}
 const[heat,news]=await Promise.all([
 apiV('/api/proxy/tracks/heat/latest'),
 apiV('/api/news?size=5')
