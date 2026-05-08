@@ -1752,6 +1752,34 @@ function drawMockKline(){
   window.addEventListener('resize',()=>chart.resize());
 }
 
+// === 技术指标计算函数 ===
+function calcEMA(data, period) {
+  if (!data || data.length === 0) return [];
+  var result = new Array(data.length);
+  var k = 2 / (period + 1);
+  result[0] = data[0];
+  for (var i = 1; i < data.length; i++) {
+    result[i] = data[i] * k + result[i - 1] * (1 - k);
+  }
+  return result;
+}
+
+function calcMA(closes, periods) {
+  var result = {};
+  for (var pi = 0; pi < periods.length; pi++) {
+    var p = periods[pi];
+    var arr = new Array(closes.length);
+    for (var i = 0; i < closes.length; i++) {
+      if (i < p - 1) { arr[i] = null; continue; }
+      var sum = 0;
+      for (var j = i - p + 1; j <= i; j++) sum += closes[j];
+      arr[i] = sum / p;
+    }
+    result[p] = arr;
+  }
+  return result;
+}
+
 // === 推荐页 ===
 function loadRecommend(el){
   el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div class="empty">待实现 — 由 zsiga stock-recommendation-page propose 填充</div></div>';
