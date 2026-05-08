@@ -1693,10 +1693,10 @@ function switchSDTab(tab,el){
   switch(tab){
     case 'quote':loadSDQuote(c);break;
     case 'tech':loadSDTech(c);break;
-    case 'ai':c.innerHTML='<div class="card"><h3>🤖 AI 分析</h3><div class="empty">待实现 — 由 zsiga stock-ai-analysis propose 填充</div></div>';break;
-    case 'valuation':c.innerHTML='<div class="card"><h3>💰 估值分析</h3><div class="empty">待实现 — 由 zsiga stock-valuation propose 填充</div></div>';break;
-    case 'announcement':c.innerHTML='<div class="card"><h3>📋 公告</h3><div class="empty">待实现 — 由 zsiga stock-announcement-tab propose 填充</div></div>';break;
-    case 'supply':c.innerHTML='<div class="card"><h3>🔗 供应链</h3><div class="empty">待实现 — 由 zsiga stock-supply-chain-tab propose 填充</div></div>';break;
+    case 'ai':loadSDAI(c);break;
+    case 'valuation':loadSDValuation(c);break;
+    case 'announcement':loadSDAnnouncement(c);break;
+    case 'supply':loadSDSupply(c);break;
   }
 }
 
@@ -1931,6 +1931,134 @@ function evalTechSignals(closes,highs,lows){
     var verdict=buys>sells?'短期偏多':sells>buys?'短期偏空':'多空平衡';
     var vcolor=buys>sells?'#ff4d4f':sells>buys?'#52c41a':'#999';
     vd.innerHTML='<b style="color:#333">综合判定：</b><span style="color:'+vcolor+';font-weight:700">'+verdict+'</span>。'+signals.map(s=>s.name+s.val).join('，')+'。';
+  }
+}
+
+
+
+
+async function loadSDAI(el){
+  el.innerHTML='<div class="card"><h3>AI 综合分析</h3><div id="aiContent" style="min-height:200px"><div class="empty">正在分析中...</div></div></div>';
+  try{
+    const d=await api('/api/stock/comprehensive','POST',{symbol:_stockDetailCode});
+    var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+    if(d&&d.data){
+      var r=d.data;
+      if(r.score!==undefined) html+='<div class="card" style="text-align:center"><div style="font-size:12px;color:#999">综合评分</div><div style="font-size:42px;font-weight:700;color:'+(r.score>=70?'#52c41a':r.score>=40?'#faad14':'#ff4d4f')+'">'+r.score+'</div><div style="font-size:12px;color:#999">/100</div></div>';
+      if(r.recommendation) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">操作建议</div><div style="font-size:18px;font-weight:600;color:#333">'+r.recommendation+'</div></div>';
+      if(r.risk_level) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">风险等级</div><div style="font-size:18px;font-weight:600;color:'+(r.risk_level==='high'?'#ff4d4f':r.risk_level==='low'?'#52c41a':'#faad14')+'">'+({high:'高风险',medium:'中风险',low:'低风险'}[r.risk_level]||r.risk_level)+'</div></div>';
+      if(r.trend) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">趋势判断</div><div style="font-size:18px;font-weight:600;color:#333">'+r.trend+'</div></div>';
+    }
+    html+='</div>';
+    if(d&&d.data&&d.data.analysis){
+      html+='<div class="card" style="margin-top:16px"><h4 style="margin-bottom:12px">详细分析</h4><div style="font-size:14px;line-height:1.8;color:#555;white-space:pre-wrap">'+d.data.analysis+'</div></div>';
+    }
+    if(!d||!d.data||d.error) html='<div class="empty">暂无分析数据 — 请确认stockshark服务正常运行</div>';
+    document.getElementById('aiContent').innerHTML=html;
+  }catch(e){
+    document.getElementById('aiContent').innerHTML='<div class="empty">AI分析请求失败: '+e.message+'</div>';
+  }
+}
+
+async function loadSDValuation(el){
+  el.innerHTML='<div class="card"><h3>估值分析</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnAnnual" onclick="loadValData('annual')">年报</button><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnQuarter" onclick="loadValData('quarterly')">季报</button></div><div id="valContent" style="min-height:200px"><div class="empty">加载中...</div></div></div>';
+  loadValData('annual');
+}
+
+async function loadValData(reportType){
+  var el=document.getElementById('valContent');
+  el.innerHTML='<div class="empty">加载估值数据...</div>';
+  try{
+    var vd=await api('/api/stock/valuation?symbol='+encodeURIComponent(_stockDetailCode));
+    var fd=await api('/api/stock/financial?symbol='+encodeURIComponent(_stockDetailCode)+'&report_type='+reportType);
+    var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">';
+    if(vd&&vd.data){
+      var v=Array.isArray(vd.data)?vd.data[0]||{}:vd.data;
+      var metrics=[
+        {label:'PE(TTM)',val:v.pe_ttm||v.pe||'--',color:v.pe_ttm>50?'#ff4d4f':v.pe_ttm<15?'#52c41a':'#333'},
+        {label:'PB',val:v.pb||'--',color:v.pb>5?'#ff4d4f':v.pb<1?'#52c41a':'#333'},
+        {label:'PS',val:v.ps||'--',color:'#333'},
+        {label:'总市值(亿)',val:v.total_mv?(v.total_mv/100000000).toFixed(1):v.market_cap||'--',color:'#1890ff'}
+      ];
+      metrics.forEach(function(m){html+='<div style="background:#f8f9fa;border-radius:8px;padding:14px 16px;text-align:center"><div style="font-size:12px;color:#999;margin-bottom:6px">'+m.label+'</div><div style="font-size:22px;font-weight:700;color:'+m.color+'">'+(typeof m.val==='number'?m.val.toFixed(2):m.val)+'</div></div>';});
+    }
+    html+='</div>';
+    if(fd&&fd.data&&fd.data.length){
+      html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#fafafa"><th style="padding:8px 12px;text-align:left;border-bottom:2px solid #f0f0f0">指标</th><th style="padding:8px 12px;text-align:right;border-bottom:2px solid #f0f0f0">最新</th><th style="padding:8px 12px;text-align:right;border-bottom:2px solid #f0f0f0">上期</th><th style="padding:8px 12px;text-align:right;border-bottom:2px solid #f0f0f0">同比</th></tr></thead><tbody>';
+      fd.data.slice(0,8).forEach(function(row){
+        html+='<tr style="border-bottom:1px solid #f5f5f5"><td style="padding:8px 12px;color:#333">'+(row.item||row.name||row.indicator||'--')+'</td><td style="padding:8px 12px;text-align:right">'+(row.latest||row.value||row.current||'--')+'</td><td style="padding:8px 12px;text-align:right">'+(row.previous||'--')+'</td><td style="padding:8px 12px;text-align:right">'+(row.yoy||row.change||'--')+'</td></tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+    if((!vd||!vd.data||vd.error)&&(!fd||!fd.data||fd.error)) html='<div class="empty">暂无估值数据</div>';
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+  }
+}
+
+async function loadSDAnnouncement(el){
+  el.innerHTML='<div class="card"><h3>公告列表</h3><div style="display:flex;gap:8px;margin-bottom:16px"><select id="annDays" style="padding:4px 8px;border:1px solid #d9d9d9;border-radius:4px;font-size:12px"><option value="7">近7天</option><option value="30" selected>近30天</option><option value="90">近90天</option></select><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadAnnData()">刷新</button></div><div id="annContent" style="min-height:200px"><div class="empty">加载中...</div></div></div>';
+  loadAnnData();
+}
+
+async function loadAnnData(){
+  var el=document.getElementById('annContent');
+  var days=document.getElementById('annDays')?document.getElementById('annDays').value:'30';
+  el.innerHTML='<div class="empty">加载公告...</div>';
+  try{
+    var d=await api('/api/stock/announcements?stock_code='+encodeURIComponent(_stockDetailCode)+'&days='+days);
+    if(d&&d.announcements&&d.announcements.length){
+      var html='';
+      d.announcements.forEach(function(a,i){
+        html+='<div style="padding:12px 0;'+(i?'border-top:1px solid #f0f0f0':'')+'"><div style="display:flex;justify-content:space-between;align-items:center"><a href="'+(a.url||a.link||'#')+'" target="_blank" style="font-size:14px;color:#1890ff;text-decoration:none">'+(a.title||a.announcement_title||'公告')+'</a><span style="font-size:12px;color:#999">'+(a.date||a.publish_date||'')+'</span></div>'+(a.type||a.announcement_type?'<div style="font-size:12px;color:#999;margin-top:4px">'+(a.type||a.announcement_type)+'</div>':'')+'</div>';
+      });
+      el.innerHTML=html;
+    }else if(d&&d.ai_summary){
+      el.innerHTML='<div class="card"><h4>AI 公告摘要</h4><div style="font-size:14px;line-height:1.8;color:#555">'+d.ai_summary+'</div></div>';
+    }else{
+      el.innerHTML='<div class="empty">近期无公告</div>';
+    }
+  }catch(e){
+    el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+  }
+}
+
+async function loadSDSupply(el){
+  el.innerHTML='<div class="card"><h3>供应链分析</h3><div id="supplyContent" style="min-height:200px"><div class="empty">加载中...</div></div></div>';
+  try{
+    var qd=await api('/api/stock/quote?symbol='+encodeURIComponent(_stockDetailCode));
+    var company=qd&&qd.data&&qd.data.name?qd.data.name:_stockDetailCode;
+    var d=await api('/api/stock/supply-chain?company_name='+encodeURIComponent(company));
+    if(d&&d.data){
+      var r=d.data;
+      var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+      if(r.suppliers&&r.suppliers.length){
+        html+='<div class="card"><h4>上游供应商</h4>';
+        r.suppliers.forEach(function(s){
+          html+='<div style="padding:8px 0;border-bottom:1px solid #f5f5f5"><div style="font-size:14px;font-weight:500">'+(s.name||s.company||'--')+'</div>'+(s.product||s.category?'<div style="font-size:12px;color:#999">'+(s.product||s.category)+'</div>':'')+'</div>';
+        });
+        html+='</div>';
+      }
+      if(r.customers&&r.customers.length){
+        html+='<div class="card"><h4>下游客户</h4>';
+        r.customers.forEach(function(c){
+          html+='<div style="padding:8px 0;border-bottom:1px solid #f5f5f5"><div style="font-size:14px;font-weight:500">'+(c.name||c.company||'--')+'</div>'+(c.product||c.category?'<div style="font-size:12px;color:#999">'+(c.product||c.category)+'</div>':'')+'</div>';
+        });
+        html+='</div>';
+      }
+      if(r.summary||r.analysis){
+        html+='</div><div class="card" style="margin-top:16px"><h4>供应链分析</h4><div style="font-size:14px;line-height:1.8;color:#555">'+(r.summary||r.analysis)+'</div></div>';
+      }
+      if(!r.suppliers&&!r.customers&&!r.summary&&!r.analysis){
+        html='<div class="empty">暂无供应链数据</div>';
+      }
+      document.getElementById('supplyContent').innerHTML=html;
+    }else{
+      document.getElementById('supplyContent').innerHTML='<div class="empty">暂无供应链数据 ('+company+')</div>';
+    }
+  }catch(e){
+    document.getElementById('supplyContent').innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
 }
 

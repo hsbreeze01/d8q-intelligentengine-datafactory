@@ -591,6 +591,34 @@ def stock_quote():
 
 
 
+
+
+@app.route("/api/stock/valuation", methods=["GET"])
+def stock_valuation():
+    symbol = request.args.get("symbol", "")
+    code, _ = resolve_stock(symbol)
+    data, status = shark_request("GET", "/api/analysis/stock/valuation?symbol=" + code)
+    return jsonify(data), status
+
+
+@app.route("/api/stock/financial", methods=["GET"])
+def stock_financial():
+    symbol = request.args.get("symbol", "")
+    report_type = request.args.get("report_type", "annual")
+    code, _ = resolve_stock(symbol)
+    data, status = shark_request("GET", "/api/analysis/stock/financial?symbol=" + code + "&report_type=" + report_type)
+    return jsonify(data), status
+
+
+@app.route("/api/stock/supply-chain", methods=["GET"])
+def stock_supply_chain():
+    company = request.args.get("company_name", "")
+    if not company:
+        return jsonify({"success": False, "error": "missing company_name"}), 400
+    data, status = shark_request("GET", "/api/supply-chain/company/supply-chain?company_name=" + company)
+    return jsonify(data), status
+
+
 @app.route("/api/report/stock", methods=["POST"])
 def report_stock_query():
     """批量查询股票研报 - 缓存优先，减少远端调用"""
