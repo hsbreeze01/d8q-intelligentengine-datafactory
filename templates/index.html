@@ -2205,29 +2205,58 @@ async function loadHotSectors(){
 
 
 async function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecReports()">📑 热门研报</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecTracks()">🔥 赛道热度</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecTheme()">🎯 主题搜索</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
-  loadRecReports();
+  el.innerHTML='<div class="card"><h3>📊 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnStocks" onclick="loadRecStocks()">📈 每日荐股</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业板块</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHeat" onclick="loadRecTracks()">🔥 赛道热度</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
+  loadRecStocks();
 }
-async function loadRecReports(){
+async function loadRecStocks(){
   var el=document.getElementById('recContent');
-  el.innerHTML='<div class="empty">加载研报...</div>';
+  el.innerHTML='<div class="empty">加载推荐股票...</div>';
   try{
-    var d=await api('/api/stock/reports?keyword=&limit=12');
-    if(d&&d.reports&&d.reports.length){
-      var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-      d.reports.forEach(function(r){
-        var title=r.title||'--';
-        var org=r.org||r.institution||'';
-        var date=(r.date||'').slice(0,10);
-        var cat=r.category||'';
-        var url=r.detail_url||r.url||'#';
-        var summary=(r.summary||'').slice(0,80);
-        html+='<div class="card" style="padding:16px;cursor:pointer" onclick="window.open(\''+url+'\',\'_blank\')"><div style="font-size:14px;font-weight:600;margin-bottom:6px;line-height:1.4">'+title+'</div><div style="font-size:12px;color:#999;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span>'+org+'</span><span>'+date+'</span>'+(cat?'<span style="background:#e6f7ff;color:#1890ff;padding:1px 6px;border-radius:10px;font-size:11px">'+cat+'</span>':'')+'</div>'+(summary?'<div style="font-size:12px;color:#666;line-height:1.5;margin-top:4px">'+summary+'...</div>':'')+'</div>';
+    var d=await api('/api/proxy/recommendation/daily?limit=10');
+    var recs=d.recommendations||[];
+    if(recs.length){
+      var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
+      recs.forEach(function(r){
+        var code=r.stock_code||'';
+        var name=r.stock_name||'--';
+        var score=r.total_score||0;
+        var tech=r.technical_score||0;
+        var trend=r.trend_score||0;
+        var fund=r.fundamental_score||0;
+        var vol=r.volume_score||0;
+        var reason=r.reason||'';
+        var risk=r.risk_warning||'';
+        var scoreColor=score>=80?'#22c55e':score>=60?'#1890ff':'#faad14';
+        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="showStockDetail(\''+code+'\')"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><span style="font-size:15px;font-weight:600">'+name+'</span><span style="font-size:12px;color:#999;margin-left:6px">'+code+'</span></div><span style="font-size:24px;font-weight:700;color:'+scoreColor+'">'+score+'</span></div><div style="display:flex;gap:4px;margin-bottom:8px;font-size:11px"><span style="background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:10px">技术 '+tech+'</span><span style="background:#f6ffed;color:#52c41a;padding:2px 8px;border-radius:10px">趋势 '+trend+'</span><span style="background:#fff7e6;color:#faad14;padding:2px 8px;border-radius:10px">基本 '+fund+'</span><span style="background:#fff1f0;color:#ff4d4f;padding:2px 8px;border-radius:10px">量能 '+vol+'</span></div>'+(reason?'<div style="font-size:12px;color:#666;line-height:1.5">💡 '+reason.slice(0,100)+'</div>':'')+(risk?'<div style="font-size:11px;color:#ff4d4f;margin-top:4px">⚠️ '+risk.slice(0,60)+'</div>':'')+'</div>';
       });
       html+='</div>';
       el.innerHTML=html;
     }else{
-      el.innerHTML='<div class="empty">暂无研报数据</div>';
+      el.innerHTML='<div class="card" style="padding:24px;text-align:center"><div style="font-size:16px;color:#999;margin-bottom:12px">暂无推荐数据</div><div style="font-size:13px;color:#bbb">推荐引擎需要股票基础数据，请确保 compass 服务已同步数据</div></div>';
+    }
+  }catch(e){
+    el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+  }
+}
+async function loadRecIndustry(){
+  var el=document.getElementById('recContent');
+  el.innerHTML='<div class="empty">加载行业板块...</div>';
+  try{
+    var d=await api('/api/search/industries/summary');
+    if(d&&d.data&&d.data.length){
+      var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
+      d.data.slice(0,10).forEach(function(s){
+        var name=s.name||s.sector||'--';
+        var change=s.change_pct||s.change||0;
+        var color=change>0?'#ff4d4f':change<0?'#52c41a':'#999';
+        var arrow=change>0?'↑':change<0?'↓':'—';
+        var count=s.stock_count||s.count||'';
+        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="searchByDimValue('industry',''+name+'')"><div style="font-size:15px;font-weight:600;margin-bottom:6px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:22px;font-weight:700;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</span></div>'+(count?'<div style="font-size:12px;color:#999;margin-top:4px">成分股 '+count+'</div>':'')+'</div>';
+      });
+      html+='</div>';
+      el.innerHTML=html;
+    }else{
+      el.innerHTML='<div class="card" style="padding:24px;text-align:center"><div style="font-size:16px;color:#999;margin-bottom:12px">暂无行业数据</div><div style="font-size:13px;color:#bbb">stockshark 行业板块数据依赖 akshare 实时接口，服务器网络环境可能无法连接东方财富 API</div></div>';
     }
   }catch(e){
     el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
@@ -2248,7 +2277,7 @@ async function loadRecTracks(){
         var arrow=change>0?'↑':change<0?'↓':'—';
         var newsC=t.news_count||0;
         var policyC=t.policy_count||0;
-        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="goPage(\'track\')"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:28px;font-weight:700;color:#1890ff">'+score+'</span><span style="font-size:16px;font-weight:600;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(1)+'</span></div><div style="font-size:12px;color:#999;margin-top:6px">资讯 '+newsC+' · 政策 '+policyC+'</div></div>';
+        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="goPage('track')"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:28px;font-weight:700;color:#1890ff">'+score+'</span><span style="font-size:16px;font-weight:600;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(1)+'</span></div><div style="font-size:12px;color:#999;margin-top:6px">资讯 '+newsC+' · 政策 '+policyC+'</div></div>';
       });
       html+='</div>';
       el.innerHTML=html;
@@ -2258,55 +2287,6 @@ async function loadRecTracks(){
   }catch(e){
     el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
-}
-async function loadRecTheme(){
-  var el=document.getElementById('recContent');
-  el.innerHTML='<div style="margin-bottom:16px"><input class="search" id="themeInput" placeholder="输入关键词搜索研报和个股，如 AI、新能源、半导体" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d9d9d9;border-radius:8px;box-sizing:border-box"></div><div id="themeReports"></div><div id="themeStocks" style="margin-top:16px"></div>';
-  var _themeTimer=null;
-  document.getElementById('themeInput').addEventListener('input',function(){
-    clearTimeout(_themeTimer);
-    var v=this.value.trim();
-    if(v.length<2)return;
-    _themeTimer=setTimeout(function(){execThemeSearch(v)},300);
-  });
-  document.getElementById('themeInput').focus();
-}
-async function execThemeSearch(input){
-  var rEl=document.getElementById('themeReports');
-  var sEl=document.getElementById('themeStocks');
-  rEl.innerHTML='<div class="empty">搜索中...</div>';
-  sEl.innerHTML='';
-  try{
-    var d=await api('/api/stock/reports?keyword='+encodeURIComponent(input)+'&limit=6');
-    if(d&&d.reports&&d.reports.length){
-      var html='<div style="font-size:13px;color:#999;margin-bottom:8px">研报（「'+input+'」）</div>';
-      d.reports.forEach(function(r){
-        var title=r.title||'--';
-        var org=r.org||'';
-        var date=(r.date||'').slice(0,10);
-        var url=r.detail_url||'#';
-        html+='<div style="padding:10px 0;border-bottom:1px solid #f5f5f5"><a href="'+url+'" target="_blank" style="font-size:14px;color:#333;text-decoration:none">'+title+'</a><div style="font-size:12px;color:#999;margin-top:2px">'+org+' · '+date+'</div></div>';
-      });
-      rEl.innerHTML=html;
-    }else{
-      rEl.innerHTML='<div class="empty">未找到相关研报</div>';
-    }
-  }catch(e){
-    rEl.innerHTML='<div class="empty">研报搜索失败</div>';
-  }
-  try{
-    var sd=await api('/api/search/by-keyword?keyword='+encodeURIComponent(input)+'&limit=8');
-    if(sd&&sd.data&&sd.data.length){
-      var html='<div style="font-size:13px;color:#999;margin-bottom:8px">相关个股</div><div class="stock-grid">';
-      sd.data.forEach(function(s){
-        var code=s.code||s.symbol||'';
-        var name=s.name||'--';
-        html+='<div class="stock-card" onclick="showStockDetail(\''+code+'\')"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div></div>';
-      });
-      html+='</div>';
-      sEl.innerHTML=html;
-    }
-  }catch(e){}
 }
 
 init();

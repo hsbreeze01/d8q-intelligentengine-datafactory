@@ -1,18 +1,27 @@
 """D8Q 智能资讯工厂 - 前后端一体 Web 应用 v2 (含任务管理)"""
-import sqlite3, json, os
+import sqlite3
+import json
+import logging
+import os
+import secrets
+import sys
 import urllib.request
 import urllib.parse
-from flask import Flask, request, jsonify, render_template_string, send_from_directory, session
+from datetime import timedelta
+from flask import Flask, request, jsonify, session
 import time as _time
+
+logger = logging.getLogger(__name__)
+
+from auth import auth_bp, check_auth
+from export_weekly import export_bp
+from prompts_api import bp as prompts_bp
 
 app = Flask(__name__)
 
 # --- 认证与权限 ---
-import secrets
-from datetime import timedelta
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
-from auth import auth_bp, check_auth, INTERNAL_IPS
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
@@ -43,8 +52,6 @@ def _track_event(response):
     _cleanup_old_events()
     return response
 
-from export_weekly import export_bp
-from prompts_api import bp as prompts_bp
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
@@ -343,15 +350,20 @@ def news():
     news_type = request.args.get("news_type", "")
     where, params = [], []
     if subject:
-        where.append("subject=?"); params.append(subject)
+        where.append("subject=?")
+        params.append(subject)
     if source:
-        where.append("source=?"); params.append(source)
+        where.append("source=?")
+        params.append(source)
     if date:
-        where.append("DATE(publish_time)=?"); params.append(date)
+        where.append("DATE(publish_time)=?")
+        params.append(date)
     if keyword:
-        where.append("(title LIKE ? OR entities LIKE ?)"); params.extend(['%'+keyword+'%', '%'+keyword+'%'])
+        where.append("(title LIKE ? OR entities LIKE ?)")
+        params.extend(['%'+keyword+'%', '%'+keyword+'%'])
     if news_type:
-        where.append("news_type=?"); params.append(news_type)
+        where.append("news_type=?")
+        params.append(news_type)
     # User subscription filtering
     _news_username = session.get("username", "")
     _news_role = session.get("role", "viewer")
@@ -452,19 +464,18 @@ def _publisher_request(method, path, data=None, max_retries=1):
             if e.code < 500 or attempt >= max_retries:
                 return last_result, last_code
             logger.info("publisher %s retry %d/%d (HTTP %d)", path, attempt+1, max_retries, e.code)
-            time.sleep(3 * (attempt + 1))
+            _time.sleep(3 * (attempt + 1))
         except Exception as e:
             last_result = {"error": str(e)}
             last_code = 502
             if attempt >= max_retries:
                 return last_result, last_code
             logger.info("publisher %s retry %d/%d (%s)", path, attempt+1, max_retries, str(e)[:60])
-            time.sleep(3 * (attempt + 1))
+            _time.sleep(3 * (attempt + 1))
     return last_result, last_code
 
 
 
-import time as _time
 
 class ReportCache:
     def __init__(self):
@@ -782,7 +793,6 @@ def report_stock_query():
 
 
 # --- Content Creation API ---
-import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
 ARTICLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "articles")
@@ -875,7 +885,8 @@ def _append_exec_log(task, result, duration, trigger="manual"):
             logs = __import__("json").load(f)
             logs.insert(0, entry)
             logs = logs[:200]  # keep last 200
-            f.seek(0); f.truncate()
+            f.seek(0)
+            f.truncate()
             __import__("json").dump(logs, f, ensure_ascii=False, indent=2)
     except (FileNotFoundError, __import__("json").JSONDecodeError):
         with open(EXEC_LOG_PATH, "w", encoding="utf-8") as f:
@@ -1739,7 +1750,7 @@ def proxy_cookie_capture_screenshot():
         with urllib.request.urlopen(req,timeout=10) as resp:
             from flask import Response
             return Response(resp.read(),mimetype='image/png',headers={'Cache-Control':'no-store'})
-    except urllib.error.HTTPError as e:
+    except urllib.error.HTTPError:
         return jsonify({'error':'screenshot not found'}),404
     except Exception as e:
         return jsonify({'error':str(e)[:200]}),500
