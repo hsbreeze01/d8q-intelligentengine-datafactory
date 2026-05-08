@@ -299,7 +299,7 @@ el.innerHTML=`
 
 </div>
 <div class="grid-2">
-<div class="card"><h3>赛道热度趋势 (7日) <a class="more" onclick="goPage('track')">查看全部 →</a></h3><div id="dashChart" style="height:220px"></div></div>
+<div class="card"><h3>赛道热度趋势 (7日) <a class="more" onclick="goPage(&#39;track&#39;)">查看全部 →</a></h3><div id="dashChart" style="height:220px"></div></div>
 <div class="card"><h3>今日要闻 <a class="more" onclick="goPage('feed')">更多 →</a></h3>${newsItems.slice(0,5).map(n=>`<div class="ni"><div class="t">${n.url?`<a href="${n.url}" target="_blank" style="color:#333;text-decoration:none">${esc(n.title)}</a>`:esc(n.title)}</div><div class="m">${(n.publish_time||'').slice(5,16)} · ${n.source}</div></div>`).join('')}</div>
 </div>
 `;
@@ -2277,7 +2277,7 @@ async function loadRecTracks(){
         var arrow=change>0?'↑':change<0?'↓':'—';
         var newsC=t.news_count||0;
         var policyC=t.policy_count||0;
-        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="goPage('track')"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:28px;font-weight:700;color:#1890ff">'+score+'</span><span style="font-size:16px;font-weight:600;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(1)+'</span></div><div style="font-size:12px;color:#999;margin-top:6px">资讯 '+newsC+' · 政策 '+policyC+'</div></div>';
+        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="goPage(&#39;track&#39;)"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:28px;font-weight:700;color:#1890ff">'+score+'</span><span style="font-size:16px;font-weight:600;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(1)+'</span></div><div style="font-size:12px;color:#999;margin-top:6px">资讯 '+newsC+' · 政策 '+policyC+'</div></div>';
       });
       html+='</div>';
       el.innerHTML=html;
