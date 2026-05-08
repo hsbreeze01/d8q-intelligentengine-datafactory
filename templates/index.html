@@ -154,6 +154,17 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .breadcrumb{font-size:13px;color:#999;margin-bottom:16px;display:flex;align-items:center;gap:6px}
 .breadcrumb a{color:#1890ff;cursor:pointer;text-decoration:none}
 .breadcrumb a:hover{text-decoration:underline}
+.drawer-overlay{display:none;position:fixed;top:0;right:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:900;opacity:0;transition:opacity .25s}
+.drawer-overlay.open{display:block;opacity:1}
+.drawer-panel{position:fixed;top:0;right:0;width:60%;max-width:800px;min-width:380px;height:100%;background:#fff;z-index:901;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.1)}
+.drawer-panel.open{transform:translateX(0)}
+.drawer-header{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid #f0f0f0;flex-shrink:0}
+.drawer-header .back{width:28px;height:28px;border-radius:6px;border:1px solid #e8e8e8;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:#666;transition:all .15s}
+.drawer-header .back:hover{border-color:#1890ff;color:#1890ff;background:#f0f7ff}
+.drawer-header h3{font-size:16px;font-weight:600;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer-header .close-drawer{width:28px;height:28px;border-radius:6px;border:1px solid #e8e8e8;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#999;transition:all .15s}
+.drawer-header .close-drawer:hover{border-color:#ff4d4f;color:#ff4d4f;background:#fff1f0}
+.drawer-body{flex:1;overflow-y:auto;padding:20px}
 </style>
 </head>
 <body>
@@ -168,10 +179,49 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 </div>
 <div class="toast" id="toast"></div>
 <div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer-panel" id="drawerPanel">
+  <div class="drawer-header">
+    <div class="back" id="drawerBack" onclick="drawerGoBack()" title="返回">←</div>
+    <h3 id="drawerTitle">详情</h3>
+    <div class="close-drawer" onclick="closeDrawer()" title="关闭">✕</div>
+  </div>
+  <div class="drawer-body" id="drawerBody"><div class="empty">加载中...</div></div>
+</div>
 </body>
 </html>
 <script>
 // === 导航与路由 ===
+var _drawerStack=[];
+function openDrawer(title,html){
+  var ov=document.getElementById('drawerOverlay');
+  var pn=document.getElementById('drawerPanel');
+  document.getElementById('drawerTitle').textContent=title||'详情';
+  document.getElementById('drawerBody').innerHTML=html||'<div class="empty">加载中...</div>';
+  ov.classList.add('open');
+  pn.classList.add('open');
+  document.getElementById('drawerBack').style.display=_drawerStack.length>0?'flex':'none';
+  document.addEventListener('keydown',_drawerEsc);
+}
+function closeDrawer(){
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawerPanel').classList.remove('open');
+  document.removeEventListener('keydown',_drawerEsc);
+  _drawerStack=[];
+}
+function _drawerEsc(e){if(e.key==='Escape')closeDrawer()}
+function drawerPush(title,html){
+  _drawerStack.push({title:document.getElementById('drawerTitle').textContent,html:document.getElementById('drawerBody').innerHTML});
+  openDrawer(title,html);
+}
+function drawerGoBack(){
+  if(!_drawerStack.length)return;
+  var prev=_drawerStack.pop();
+  document.getElementById('drawerTitle').textContent=prev.title;
+  document.getElementById('drawerBody').innerHTML=prev.html;
+  document.getElementById('drawerBack').style.display=_drawerStack.length>0?'flex':'none';
+}
+
 const PAGES=[
 {id:'dashboard',icon:'📊',label:'概览',title:'概览'},
 {id:'track',icon:'🔥',label:'赛道',title:'赛道热度'},
@@ -1688,10 +1738,10 @@ let _stockDetailCode='';
 
 function showStockDetail(code){
   _stockDetailCode=code;
-  const area=document.getElementById('contentArea');
-  area.innerHTML='<div class="breadcrumb"><a onclick="goPage(\'stock\')">📈 个股</a> <span style="color:#ccc">/</span> <span style="color:#1890ff" id="bcStockName">加载中...</span></div><div id="stockHeaderArea"></div><div class="stock-tabs" id="sTabs"><div class="stock-tab active" onclick="switchSDTab(\'quote\',this)">📊 实时行情</div><div class="stock-tab" onclick="switchSDTab(\'tech\',this)">📈 技术分析</div><div class="stock-tab" onclick="switchSDTab(\'ai\',this)">🤖 AI 分析</div><div class="stock-tab" onclick="switchSDTab(\'valuation\',this)">💰 估值</div><div class="stock-tab" onclick="switchSDTab(\'announcement\',this)">📋 公告</div><div class="stock-tab" onclick="switchSDTab(\'supply\',this)">🔗 供应链</div></div><div id="sTabContent"><div class="empty">加载中...</div></div>';
+  var html='<div id="stockHeaderArea"></div><div class="stock-tabs" id="sTabs" style="display:flex;gap:0;border-bottom:1px solid #f0f0f0;margin-bottom:16px"><div class="stock-tab active" onclick="switchSDTab(\'quote\',this)">📊 实时行情</div><div class="stock-tab" onclick="switchSDTab(\'tech\',this)">📈 技术分析</div><div class="stock-tab" onclick="switchSDTab(\'ai\',this)">🤖 AI 分析</div><div class="stock-tab" onclick="switchSDTab(\'valuation\',this)">💰 估值</div><div class="stock-tab" onclick="switchSDTab(\'announcement\',this)">📋 公告</div><div class="stock-tab" onclick="switchSDTab(\'supply\',this)">🔗 供应链</div></div><div id="sTabContent"><div class="empty">加载中...</div></div>';
+  openDrawer('加载中...',html);
   loadStockHeader(code);
-  switchSDTab('quote',document.querySelector('.stock-tab'));
+  switchSDTab('quote',document.getElementById('sTabs').querySelector('.stock-tab'));
 }
 
 function switchSDTab(tab,el){
@@ -1719,8 +1769,8 @@ async function loadStockHeader(code){
     const change=d.change||0;const pct=d.change_pct||d.pct_chg||0;
     const cls=change>=0?'up':'dn';const sg=change>=0?'+':'';
     if(bc)bc.textContent=name+' ('+code+')';
-    document.getElementById('pageTitle').innerHTML='<span style="cursor:pointer" onclick="goPage(\'stock\')">📈 个股</span> <span style="color:#ccc">/</span> <span style="color:#1890ff">'+esc(name)+'</span>';
-    el.innerHTML='<div class="stock-header"><div class="sh-back" onclick="goPage(\'stock\')">← 返回个股列表</div><div style="position:relative;z-index:1"><div class="sh-name">'+esc(name)+'</div><div class="sh-code">'+esc(code)+'</div><div class="sh-price">'+parseFloat(price).toFixed(2)+'<span class="sh-change '+cls+'">'+sg+parseFloat(change).toFixed(2)+' ('+sg+parseFloat(pct).toFixed(2)+'%)</span></div><div class="sh-metrics">'+(d.open?'<div class="sh-metric"><div class="label">开盘</div><div class="value">'+parseFloat(d.open).toFixed(2)+'</div></div>':'')+(d.high?'<div class="sh-metric"><div class="label">最高</div><div class="value">'+parseFloat(d.high).toFixed(2)+'</div></div>':'')+(d.low?'<div class="sh-metric"><div class="label">最低</div><div class="value">'+parseFloat(d.low).toFixed(2)+'</div></div>':'')+(d.volume?'<div class="sh-metric"><div class="label">成交量</div><div class="value">'+esc(String(d.volume))+'</div></div>':'')+'<div class="sh-metric"><div class="label">PE</div><div class="value">'+(d.pe?parseFloat(d.pe).toFixed(1):'-')+'</div></div><div class="sh-metric"><div class="label">PB</div><div class="value">'+(d.pb?parseFloat(d.pb).toFixed(1):'-')+'</div></div></div></div></div>';
+    document.getElementById('drawerTitle').textContent=name+' ('+code+')';
+    el.innerHTML='<div style="position:relative;z-index:1"><div style="font-size:20px;font-weight:700">'+esc(name)+'<span style="font-size:13px;color:#999;margin-left:8px">'+esc(code)+'</span></div><div style="font-size:28px;font-weight:700;margin:8px 0">'+parseFloat(price).toFixed(2)+'<span class="sh-change '+cls+'" style="font-size:16px;margin-left:8px">'+sg+parseFloat(change).toFixed(2)+' ('+sg+parseFloat(pct).toFixed(2)+'%)</span></div><div class="sh-metrics">'+(d.open?'<div class="sh-metric"><div class="label">开盘</div><div class="value">'+parseFloat(d.open).toFixed(2)+'</div></div>':'')+(d.high?'<div class="sh-metric"><div class="label">最高</div><div class="value">'+parseFloat(d.high).toFixed(2)+'</div></div>':'')+(d.low?'<div class="sh-metric"><div class="label">最低</div><div class="value">'+parseFloat(d.low).toFixed(2)+'</div></div>':'')+(d.volume?'<div class="sh-metric"><div class="label">成交量</div><div class="value">'+esc(String(d.volume))+'</div></div>':'')+'<div class="sh-metric"><div class="label">PE</div><div class="value">'+(d.pe?parseFloat(d.pe).toFixed(1):'-')+'</div></div><div class="sh-metric"><div class="label">PB</div><div class="value">'+(d.pb?parseFloat(d.pb).toFixed(1):'-')+'</div></div></div></div>';
   }catch(e){document.getElementById('stockHeaderArea').innerHTML='<div class="card"><div class="empty">加载失败: '+esc(e.message)+'</div></div>'}
 }
 
@@ -2105,29 +2155,27 @@ function searchByDim(dim){
   searchByDimValue(dim,input);
 }
 async function searchByDimValue(dim,value){
-  var el=document.getElementById('dimResults');
-  if(!el)return;
-  el.style.display='block';
-  el.innerHTML='<div class="card" style="padding:16px"><div class="empty">搜索「'+value+'」中...</div></div>';
+  var dimLabel={industry:'行业',concept:'概念',theme:'主题'}[dim]||'';
+  openDrawer(dimLabel+'「'+value+'」','<div class="empty">搜索中...</div>');
   try{
     var url='/api/search/by-'+dim+'?'+dim+'_name='+encodeURIComponent(value)+'&limit=20';
     var d=await api(url);
     if(d&&d.data&&d.data.length){
-      var html='<div class="card" style="padding:16px"><h4>「'+value+'」'+({industry:'行业',concept:'概念',theme:'主题'}[dim]||'')+'搜索结果 ('+d.data.length+')</h4><div class="stock-grid">';
+      var html='<div style="font-size:13px;color:#999;margin-bottom:12px">找到 '+d.data.length+' 只相关股票</div><div class="stock-grid">';
       d.data.forEach(function(s){
         var code=s.code||s.symbol||'';
         var name=s.name||'--';
         var change=s.change_pct||s.change||0;
         var color=change>0?'#ff4d4f':change<0?'#52c41a':'#333';
-        html+='<div class="stock-card" data-code="'+code+'" onclick="showStockDetail(this.dataset.code)"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div><div style="font-size:14px;font-weight:600;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
+        html+='<div class="stock-card" data-code="'+code+'" onclick="drawerPush(this.querySelector(\'.sc-name\').textContent+\' (\'+this.dataset.code+\')\',\'<div class="empty">加载中...</div>\');showStockDetail(this.dataset.code)"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div><div style="font-size:14px;font-weight:600;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
       });
-      html+='</div></div>';
-      el.innerHTML=html;
+      html+='</div>';
+      document.getElementById('drawerBody').innerHTML=html;
     }else{
-      el.innerHTML='<div class="card" style="padding:16px"><div class="empty">未找到相关股票</div></div>';
+      document.getElementById('drawerBody').innerHTML='<div class="empty">未找到相关股票</div>';
     }
   }catch(e){
-    el.innerHTML='<div class="card" style="padding:16px"><div class="empty">搜索失败: '+e.message+'</div></div>';
+    document.getElementById('drawerBody').innerHTML='<div class="empty">搜索失败: '+e.message+'</div>';
   }
 }
 async function loadHotSectors(){
@@ -2207,28 +2255,31 @@ async function loadRecConcept(){
   }
 }
 async function loadRecTheme(){
-  document.getElementById('recContent').innerHTML='<div class="empty">输入主题关键词分析...</div>';
-  var input=prompt('请输入主题关键词，如 AI、新能源车、半导体：');
-  if(!input)return;
-  document.getElementById('recContent').innerHTML='<div class="empty">分析中...</div>';
+  openDrawer('🎯 主题投资','<div style="margin-bottom:16px"><input class="search" id="themeInput" placeholder="输入主题关键词，如 AI、新能源车、半导体" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d9d9d9;border-radius:8px;box-sizing:border-box"></div><div id="themeResults"><div class="empty" style="padding:40px 0">输入关键词后按回车搜索</div></div>');
+  document.getElementById('themeInput').addEventListener('keydown',function(e){if(e.key==='Enter'&&this.value.trim())execThemeSearch(this.value.trim())});
+  document.getElementById('themeInput').focus();
+}
+async function execThemeSearch(input){
+  var area=document.getElementById('themeResults');
+  area.innerHTML='<div class="empty">分析中...</div>';
   try{
     var d=await api('/api/search/by-theme?theme='+encodeURIComponent(input)+'&limit=10');
     if(d&&d.data&&d.data.length){
-      var html='<div style="font-size:16px;font-weight:600;margin-bottom:12px">🎯「'+input+'」相关股票</div><div class="stock-grid">';
+      var html='<div style="font-size:13px;color:#999;margin-bottom:12px">「'+input+'」找到 '+d.data.length+' 只相关股票</div><div class="stock-grid">';
       d.data.forEach(function(s){
         var code=s.code||s.symbol||'';
         var name=s.name||'--';
         var change=s.change_pct||0;
         var color=change>0?'#ff4d4f':change<0?'#52c41a':'#333';
-        html+='<div class="stock-card" data-code="'+code+'" onclick="showStockDetail(this.dataset.code)"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div><div style="font-size:14px;font-weight:600;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
+        html+='<div class="stock-card" data-code="'+code+'" onclick="drawerPush(this.querySelector(\'.sc-name\').textContent+\' (\'+this.dataset.code+\')\',\'<div class="empty">加载中...</div>\');showStockDetail(this.dataset.code)"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div><div style="font-size:14px;font-weight:600;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
       });
       html+='</div>';
-      document.getElementById('recContent').innerHTML=html;
+      area.innerHTML=html;
     }else{
-      document.getElementById('recContent').innerHTML='<div class="empty">未找到相关股票</div>';
+      area.innerHTML='<div class="empty">未找到相关股票</div>';
     }
   }catch(e){
-    document.getElementById('recContent').innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+    area.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
 }
 
