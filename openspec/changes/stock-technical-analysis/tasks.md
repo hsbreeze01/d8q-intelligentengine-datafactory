@@ -3,7 +3,7 @@
 ## 1. 技术指标计算函数
 
 - [x] **1.1** 在 `templates/index.html` 的 `<script>` 块中新增纯函数 `calcMA(closes, periods)`、`calcEMA(closes, period)`（EMA 为 MACD 的基础）
-- [ ] **1.2** 在 `templates/index.html` 中新增 `calcMACD(closes, short, long, signal)` 函数，返回 `{dif[], dea[], macd[]}`
+- [x] **1.2** 在 `templates/index.html` 中新增 `calcMACD(closes, short, long, signal)` 函数，返回 `{dif[], dea[], macd[]}`
 - [ ] **1.3** 在 `templates/index.html` 中新增 `calcKDJ(highs, lows, closes, n, m1, m2)` 函数，返回 `{k[], d[], j[]}`
 - [ ] **1.4** 在 `templates/index.html` 中新增 `calcBOLL(closes, n, k)` 函数，返回 `{upper[], mid[], lower[]}`
 - [ ] **1.5** 在 `templates/index.html` 中新增 `calcRSI(closes, periods)` 函数，返回各周期 RSI 值数组

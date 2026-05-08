@@ -33,5 +33,23 @@ class TestCalcMACalcEMA(unittest.TestCase):
         self.assertIn("function calcEMA(", self.html)
 
 
+# ── Task 1.2: calcMACD ──────────────────────────────────────────────────────
+
+class TestCalcMACD(unittest.TestCase):
+    """Task 1.2: calcMACD(closes, short, long, signal) must exist and return dif/dea/macd."""
+
+    def setUp(self):
+        self.html = _read_html()
+
+    def test_calcmacd_exists(self):
+        self.assertIn("function calcMACD(", self.html)
+
+    def test_calcmacd_returns_dif_dea_macd(self):
+        self.assertIn("dif: dif, dea: dea, macd: macd", self.html)
+
+    def test_calcmacd_uses_calcema(self):
+        self.assertIn("calcEMA(dif,", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()
