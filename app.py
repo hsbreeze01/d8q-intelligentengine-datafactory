@@ -202,6 +202,13 @@ def index():
         return f.read()
 
 
+@app.route("/stock/<code>")
+def stock_detail(code):
+    """Serve SPA shell for stock detail page — frontend router handles the rest."""
+    with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
+        return f.read()
+
+
 @app.route("/api/proxy/tracks", methods=["GET"])
 @app.route("/api/proxy/tracks/heat", methods=["GET"])
 @app.route("/api/proxy/tracks/heat/latest", methods=["GET"])

@@ -6,6 +6,36 @@
     "trigger": "manual",
     "success": true,
     "result_summary": "success",
+    "duration": 50.7,
+    "time": "2026-05-08T10:59:06.425478"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-08T08:30:21.941186"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖马斯克亲手砍掉xAI，真相是？",
+    "duration": 4.7,
+    "time": "2026-05-08T08:30:21.826879"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
     "duration": 65.6,
     "time": "2026-05-07T11:06:08.232444"
   },
