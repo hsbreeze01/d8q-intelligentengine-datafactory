@@ -132,28 +132,6 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .guide-banner{background:linear-gradient(135deg,#e6f7ff 0%,#bae7ff 100%);border:1px solid #91d5ff;border-radius:8px;padding:14px 20px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:#1890ff;animation:slideDown .3s ease}
 .guide-banner a{color:#0050b3;font-weight:600;text-decoration:underline;cursor:pointer}
 @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-
-/* === 个股详情页 === */
-.stock-header{background:linear-gradient(135deg,#0f3460,#16213e);color:#fff;border-radius:12px;padding:24px 28px;margin-bottom:16px;position:relative;overflow:hidden}
-.stock-header::before{content:'';position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:rgba(24,144,255,.08);border-radius:50%}
-.sh-back{position:relative;z-index:1;display:inline-flex;align-items:center;gap:6px;font-size:13px;opacity:.7;cursor:pointer;margin-bottom:12px;padding:4px 10px;border-radius:4px;transition:all .15s}
-.sh-back:hover{opacity:1;background:rgba(255,255,255,.1)}
-.sh-name{font-size:28px;font-weight:700;margin-bottom:4px}
-.sh-code{font-size:14px;opacity:.7;margin-bottom:16px}
-.sh-price{font-size:42px;font-weight:700}
-.sh-change{font-size:18px;margin-left:12px;font-weight:500}
-.sh-change.up{color:#ff4d4f}.sh-change.dn{color:#52c41a}
-.sh-metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:20px;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.15)}
-.sh-metric{text-align:center}
-.sh-metric .label{font-size:11px;opacity:.6;margin-bottom:4px}
-.sh-metric .value{font-size:16px;font-weight:600}
-.stock-tabs{display:flex;border-bottom:2px solid #f0f0f0;margin-bottom:20px;gap:0}
-.stock-tab{padding:12px 24px;font-size:14px;color:#666;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;position:relative}
-.stock-tab:hover{color:#1890ff}
-.stock-tab.active{color:#1890ff;border-bottom-color:#1890ff;font-weight:600}
-.breadcrumb{font-size:13px;color:#999;margin-bottom:16px;display:flex;align-items:center;gap:6px}
-.breadcrumb a{color:#1890ff;cursor:pointer;text-decoration:none}
-.breadcrumb a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -178,7 +156,6 @@ const PAGES=[
 {id:'feed',icon:'📰',label:'资讯',title:'资讯'},
 {id:'weekly',icon:'📝',label:'周报',title:'周报工作台'},
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
-{id:'recommend',icon:'💡',label:'推荐',title:'每日推荐'},
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
@@ -223,7 +200,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -394,7 +371,7 @@ async function loadWatchlist(){
 const data=await api('/api/watchlist');
 const el=document.getElementById('watchlistArea');
 if(!data||!data.length){el.innerHTML='<div class="empty" style="grid-column:1/-1;padding:40px">暂无自选股，搜索后点击「+ 自选」添加</div>';return}
-el.innerHTML=data.map(s=>`<div class="stock-card" onclick="showStockDetail('${s.stock_code}')">
+el.innerHTML=data.map(s=>`<div class="stock-card" onclick="document.getElementById('stockInput').value='${s.stock_code}';doStock()">
 <div class="sc-name">${esc(s.stock_name||s.stock_code)}</div>
 <div class="sc-code">${s.stock_code}</div>
 <span class="sc-del" onclick="event.stopPropagation();delWatchlist('${s.stock_code}')">×</span>
@@ -1674,90 +1651,5 @@ async function loadColdHotChart() {
 }
 
 
-
-// === 个股详情页 ===
-let _stockDetailCode='';
-
-function showStockDetail(code){
-  _stockDetailCode=code;
-  const area=document.getElementById('contentArea');
-  area.innerHTML='<div class="breadcrumb"><a onclick="goPage(\'stock\')">📈 个股</a> <span style="color:#ccc">/</span> <span style="color:#1890ff" id="bcStockName">加载中...</span></div><div id="stockHeaderArea"></div><div class="stock-tabs" id="sTabs"><div class="stock-tab active" onclick="switchSDTab(\'quote\',this)">📊 实时行情</div><div class="stock-tab" onclick="switchSDTab(\'tech\',this)">📈 技术分析</div><div class="stock-tab" onclick="switchSDTab(\'ai\',this)">🤖 AI 分析</div><div class="stock-tab" onclick="switchSDTab(\'valuation\',this)">💰 估值</div><div class="stock-tab" onclick="switchSDTab(\'announcement\',this)">📋 公告</div><div class="stock-tab" onclick="switchSDTab(\'supply\',this)">🔗 供应链</div></div><div id="sTabContent"><div class="empty">加载中...</div></div>';
-  loadStockHeader(code);
-  switchSDTab('quote',document.querySelector('.stock-tab'));
-}
-
-function switchSDTab(tab,el){
-  document.querySelectorAll('.stock-tab').forEach(t=>t.classList.remove('active'));
-  if(el)el.classList.add('active');
-  const c=document.getElementById('sTabContent');
-  switch(tab){
-    case 'quote':loadSDQuote(c);break;
-    case 'tech':c.innerHTML='<div class="card"><h3>📈 技术分析</h3><div class="empty">待实现 — 由 zsiga stock-technical-analysis propose 填充</div></div>';break;
-    case 'ai':c.innerHTML='<div class="card"><h3>🤖 AI 分析</h3><div class="empty">待实现 — 由 zsiga stock-ai-analysis propose 填充</div></div>';break;
-    case 'valuation':c.innerHTML='<div class="card"><h3>💰 估值分析</h3><div class="empty">待实现 — 由 zsiga stock-valuation propose 填充</div></div>';break;
-    case 'announcement':c.innerHTML='<div class="card"><h3>📋 公告</h3><div class="empty">待实现 — 由 zsiga stock-announcement-tab propose 填充</div></div>';break;
-    case 'supply':c.innerHTML='<div class="card"><h3>🔗 供应链</h3><div class="empty">待实现 — 由 zsiga stock-supply-chain-tab propose 填充</div></div>';break;
-  }
-}
-
-async function loadStockHeader(code){
-  try{
-    const d=await api('/api/stock/quote?symbol='+encodeURIComponent(code));
-    const el=document.getElementById('stockHeaderArea');
-    const bc=document.getElementById('bcStockName');
-    if(d.error){el.innerHTML='<div class="card"><div class="empty">❌ '+esc(d.error)+'</div></div>';return}
-    const name=d.name||d.stock_name||code;
-    const price=d.price||d.current||0;
-    const change=d.change||0;const pct=d.change_pct||d.pct_chg||0;
-    const cls=change>=0?'up':'dn';const sg=change>=0?'+':'';
-    if(bc)bc.textContent=name+' ('+code+')';
-    document.getElementById('pageTitle').innerHTML='<span style="cursor:pointer" onclick="goPage(\'stock\')">📈 个股</span> <span style="color:#ccc">/</span> <span style="color:#1890ff">'+esc(name)+'</span>';
-    el.innerHTML='<div class="stock-header"><div class="sh-back" onclick="goPage(\'stock\')">← 返回个股列表</div><div style="position:relative;z-index:1"><div class="sh-name">'+esc(name)+'</div><div class="sh-code">'+esc(code)+'</div><div class="sh-price">'+parseFloat(price).toFixed(2)+'<span class="sh-change '+cls+'">'+sg+parseFloat(change).toFixed(2)+' ('+sg+parseFloat(pct).toFixed(2)+'%)</span></div><div class="sh-metrics">'+(d.open?'<div class="sh-metric"><div class="label">开盘</div><div class="value">'+parseFloat(d.open).toFixed(2)+'</div></div>':'')+(d.high?'<div class="sh-metric"><div class="label">最高</div><div class="value">'+parseFloat(d.high).toFixed(2)+'</div></div>':'')+(d.low?'<div class="sh-metric"><div class="label">最低</div><div class="value">'+parseFloat(d.low).toFixed(2)+'</div></div>':'')+(d.volume?'<div class="sh-metric"><div class="label">成交量</div><div class="value">'+esc(String(d.volume))+'</div></div>':'')+'<div class="sh-metric"><div class="label">PE</div><div class="value">'+(d.pe?parseFloat(d.pe).toFixed(1):'-')+'</div></div><div class="sh-metric"><div class="label">PB</div><div class="value">'+(d.pb?parseFloat(d.pb).toFixed(1):'-')+'</div></div></div></div></div>';
-  }catch(e){document.getElementById('stockHeaderArea').innerHTML='<div class="card"><div class="empty">加载失败: '+esc(e.message)+'</div></div>'}
-}
-
-async function loadSDQuote(el){
-  el.innerHTML='<div class="card"><h3>K线走势</h3><div id="klineChart" style="height:350px;background:#fafafa;border-radius:8px"></div></div><div class="card"><h3>核心指标</h3><div id="sdIndicators" class="tech-indicators" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div></div>';
-  try{
-    const d=await api('/api/stock/quote?symbol='+encodeURIComponent(_stockDetailCode));
-    if(!d.error){
-      const ind=document.getElementById('sdIndicators');
-      const items=[['MA5',d.ma5],['MA20',d.ma20],['MACD',d.macd],['KDJ',d.kdj],['RSI',d.rsi],['换手率',d.turnover_rate],['量比',d.volume_ratio]];
-      ind.innerHTML=items.filter(i=>i[1]).map(i=>'<div style="background:#f8f9fa;border-radius:8px;padding:14px 16px;border:1px solid #f0f0f0"><div style="font-size:12px;color:#999;margin-bottom:6px">'+i[0]+'</div><div style="font-size:20px;font-weight:700">'+i[1]+'</div></div>').join('');
-    }
-  }catch(e){}
-  if(typeof echarts!=='undefined'&&document.getElementById('klineChart')){
-    try{
-      const kd=await api('/api/stock/kline?symbol='+encodeURIComponent(_stockDetailCode)+'&period=daily&count=60');
-      if(kd&&!kd.error&&kd.data){drawKline(kd.data)}else{drawMockKline()}
-    }catch(e){drawMockKline()}
-  }
-}
-
-function drawKline(data){
-  const el=document.getElementById('klineChart');if(!el)return;
-  const chart=echarts.init(el);
-  const dates=data.map(d=>d.date||d[0]);const ohlc=data.map(d=>[d.open||d[1],d.close||d[2],d.low||d[3],d.high||d[4]]);const vols=data.map(d=>d.volume||d[5]||0);
-  chart.setOption({animation:false,tooltip:{trigger:'axis',axisPointer:{type:'cross'}},legend:{data:['K线','MA5','MA20'],top:0},grid:[{left:'8%',right:'3%',top:'12%',height:'55%'},{left:'8%',right:'3%',top:'74%',height:'16%'}],xAxis:[{type:'category',data:dates,boundaryGap:true},{type:'category',gridIndex:1,data:dates,boundaryGap:true}],yAxis:[{scale:true},{scale:true,gridIndex:1,splitNumber:2}],series:[{name:'K线',type:'candlestick',data:ohlc,itemStyle:{color:'#ff4d4f',color0:'#52c41a',borderColor:'#ff4d4f',borderColor0:'#52c41a'}},{name:'MA5',type:'line',data:ohlc.map((_,i)=>{if(i<4)return null;let s=0;for(let j=i-4;j<=i;j++)s+=parseFloat(ohlc[j][1]);return(s/5).toFixed(2)}),smooth:true,lineStyle:{width:1},symbol:'none'},{name:'MA20',type:'line',data:ohlc.map((_,i)=>{if(i<19)return null;let s=0;for(let j=i-19;j<=i;j++)s+=parseFloat(ohlc[j][1]);return(s/20).toFixed(2)}),smooth:true,lineStyle:{width:1},symbol:'none'},{name:'成交量',type:'bar',xAxisIndex:1,yAxisIndex:1,data:vols}]});
-  window.addEventListener('resize',()=>chart.resize());
-}
-
-function drawMockKline(){
-  const el=document.getElementById('klineChart');if(!el)return;
-  const chart=echarts.init(el);var dates=[],data=[],vols=[],base=7.5;
-  for(var i=0;i<60;i++){var d=new Date(2026,2,1);d.setDate(d.getDate()+i);dates.push((d.getMonth()+1)+'/'+d.getDate());
-  var o=base+(Math.random()-0.45)*0.3,c=o+(Math.random()-0.4)*0.4,l=Math.min(o,c)-Math.random()*0.15,h=Math.max(o,c)+Math.random()*0.2;
-  data.push([o.toFixed(2),c.toFixed(2),l.toFixed(2),h.toFixed(2)]);vols.push((Math.random()*100+50).toFixed(0));base=c;}
-  chart.setOption({animation:false,tooltip:{trigger:'axis',axisPointer:{type:'cross'}},legend:{data:['K线','MA5'],top:0},grid:[{left:'8%',right:'3%',top:'12%',height:'55%'},{left:'8%',right:'3%',top:'74%',height:'16%'}],xAxis:[{type:'category',data:dates,boundaryGap:true},{type:'category',gridIndex:1,data:dates,boundaryGap:true}],yAxis:[{scale:true},{scale:true,gridIndex:1,splitNumber:2}],series:[{name:'K线',type:'candlestick',data:data,itemStyle:{color:'#ff4d4f',color0:'#52c41a',borderColor:'#ff4d4f',borderColor0:'#52c41a'}},{name:'MA5',type:'line',data:data.map(function(_,i){if(i<4)return null;var s=0;for(var j=i-4;j<=i;j++)s+=parseFloat(data[j][1]);return(s/5).toFixed(2)}),smooth:true,lineStyle:{width:1},symbol:'none'},{name:'成交量',type:'bar',xAxisIndex:1,yAxisIndex:1,data:vols}]});
-  window.addEventListener('resize',()=>chart.resize());
-}
-
-// === 推荐页 ===
-function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div class="empty">待实现 — 由 zsiga stock-recommendation-page propose 填充</div></div>';
-}
-
-
 init();
-
 </script>
