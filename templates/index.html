@@ -2157,20 +2157,22 @@ async function loadHotSectors(){
 
 
 async function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业精选</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnConcept" onclick="loadRecConcept()">💡 概念龙头</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnTheme" onclick="loadRecTheme()">🎯 主题投资</button></div><div id="recContent" style="min-height:300px"><div class="empty">选择维度加载推荐...</div></div></div>';
+  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业精选</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnConcept" onclick="loadRecConcept()">💡 概念龙头</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnTheme" onclick="loadRecTheme()">🎯 主题投资</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
   loadRecIndustry();
 }
 async function loadRecIndustry(){
   document.getElementById('recContent').innerHTML='<div class="empty">加载行业精选...</div>';
   try{
-    var d=await api('/api/search/sectors');
+    var d=await api('/api/search/sectors?limit=20');
     if(d&&d.data&&d.data.length){
       var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
-      d.data.slice(0,10).forEach(function(s){
-        var name=s.name||s.sector||s.industry||'--';
-        var change=s.change_pct||s.change||0;
+      d.data.forEach(function(s){
+        var name=s.name||'--';
+        var change=typeof s.change_pct==='number'?s.change_pct:0;
         var color=change>0?'#ff4d4f':change<0?'#52c41a':'#999';
-        html+='<div class="card" style="cursor:pointer;padding:16px" data-dim="industry" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)"><div style="font-size:15px;font-weight:600;margin-bottom:6px">'+name+'</div><div style="font-size:20px;font-weight:700;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
+        var arrow=change>0?'↑':change<0?'↓':'—';
+        var lead=s.leading_stock?s.leading_stock+' +'+s.leading_change+'%':'';
+        html+='<div class="card" style="cursor:pointer;padding:16px" data-dim="industry" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="font-size:22px;font-weight:700;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(2)+'%</div>'+(lead?'<div style="font-size:11px;color:#999;margin-top:4px">领涨 '+lead+'</div>':'')+'</div>';
       });
       html+='</div>';
       document.getElementById('recContent').innerHTML=html;
@@ -2184,12 +2186,16 @@ async function loadRecIndustry(){
 async function loadRecConcept(){
   document.getElementById('recContent').innerHTML='<div class="empty">加载概念板块...</div>';
   try{
-    var d=await api('/api/search/concepts');
+    var d=await api('/api/search/concepts/summary?limit=30');
     if(d&&d.data&&d.data.length){
-      var html='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-      d.data.slice(0,30).forEach(function(c){
-        var name=c.name||c.concept||c;
-        html+='<button class="btn" style="padding:6px 14px;font-size:13px" data-dim="concept" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)">'+name+'</button>';
+      var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+      d.data.forEach(function(c){
+        var name=c.name||'--';
+        var change=typeof c.change_pct==='number'?c.change_pct:0;
+        var color=change>0?'#ff4d4f':change<0?'#52c41a':'#999';
+        var bg=change>0?'#fff1f0':change<0?'#f6ffed':'#fafafa';
+        var arrow=change>0?'↑':change<0?'↓':'—';
+        html+='<div class="card" style="cursor:pointer;padding:12px;background:'+bg+'" data-dim="concept" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)"><div style="font-size:13px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="font-size:16px;font-weight:700;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(2)+'%</div>'+(c.leading_stock?'<div style="font-size:10px;color:#999;margin-top:3px">领涨 '+c.leading_stock+'</div>':'')+'</div>';
       });
       html+='</div>';
       document.getElementById('recContent').innerHTML=html;

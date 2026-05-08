@@ -181,7 +181,10 @@ def agent_request(method, path, data=None):
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}, e.code
+        try:
+            return json.loads(_raw), e.code
+        except (json.JSONDecodeError, ValueError):
+            return {"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}, e.code
     except Exception as e:
         return {"error": str(e)}, 502
 
@@ -502,7 +505,10 @@ def shark_request(method, path, data=None):
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}, e.code
+        try:
+            return json.loads(_raw), e.code
+        except (json.JSONDecodeError, ValueError):
+            return {"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}, e.code
     except Exception as e:
         return {"error": str(e)}, 502
 
@@ -662,9 +668,17 @@ def list_concepts():
     return jsonify(data), status
 
 
+@app.route("/api/search/concepts/summary", methods=["GET"])
+def list_concepts_summary():
+    limit = request.args.get("limit", "30")
+    data, status = shark_request("GET", f"/api/search/concepts/summary?limit={limit}")
+    return jsonify(data), status
+
+
 @app.route("/api/search/sectors", methods=["GET"])
 def list_sectors():
-    data, status = shark_request("GET", "/api/analysis/stock/sectors")
+    limit = request.args.get("limit", "20")
+    data, status = shark_request("GET", f"/api/search/industries/summary?limit={limit}")
     return jsonify(data), status
 
 
@@ -1365,7 +1379,10 @@ def classify_policy():
         return jsonify(result)
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1654,7 +1671,10 @@ def proxy_cookie_capture():
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1704,7 +1724,10 @@ def proxy_cookie_capture_switch_phone():
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1725,7 +1748,10 @@ def proxy_cookie_capture_submit_phone():
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1747,7 +1773,10 @@ def proxy_cookie_capture_submit_code():
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1770,6 +1799,9 @@ def proxy_cookie_import():
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
         _raw = e.read()
-        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
+        try:
+            return jsonify(json.loads(_raw)), e.code
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
