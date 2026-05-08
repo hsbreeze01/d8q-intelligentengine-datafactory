@@ -1792,6 +1792,28 @@ function calcMACD(closes, short, long, signal) {
   return { dif: dif, dea: dea, macd: macd };
 }
 
+function calcKDJ(highs, lows, closes, n, m1, m2) {
+  n = n || 9; m1 = m1 || 3; m2 = m2 || 3;
+  var len = closes.length;
+  var K = new Array(len), D = new Array(len), J = new Array(len);
+  var prevK = 50, prevD = 50;
+  for (var i = 0; i < len; i++) {
+    var start = Math.max(0, i - n + 1);
+    var hn = -Infinity, ln = Infinity;
+    for (var j = start; j <= i; j++) {
+      if (highs[j] > hn) hn = highs[j];
+      if (lows[j] < ln) ln = lows[j];
+    }
+    var rsv = (hn === ln) ? 50 : ((closes[i] - ln) / (hn - ln)) * 100;
+    var k = (2 / m1) * prevK + (1 / m1) * rsv;
+    var d = (2 / m2) * prevD + (1 / m2) * k;
+    var jv = 3 * k - 2 * d;
+    K[i] = k; D[i] = d; J[i] = jv;
+    prevK = k; prevD = d;
+  }
+  return { k: K, d: D, j: J };
+}
+
 // === 推荐页 ===
 function loadRecommend(el){
   el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div class="empty">待实现 — 由 zsiga stock-recommendation-page propose 填充</div></div>';

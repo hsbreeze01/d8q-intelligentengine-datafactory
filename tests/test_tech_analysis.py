@@ -51,5 +51,23 @@ class TestCalcMACD(unittest.TestCase):
         self.assertIn("calcEMA(dif,", self.html)
 
 
+# ── Task 1.3: calcKDJ ───────────────────────────────────────────────────────
+
+class TestCalcKDJ(unittest.TestCase):
+    """Task 1.3: calcKDJ(highs, lows, closes, n, m1, m2) must exist and return k/d/j."""
+
+    def setUp(self):
+        self.html = _read_html()
+
+    def test_calckdj_exists(self):
+        self.assertIn("function calcKDJ(", self.html)
+
+    def test_calckdj_accepts_highs_lows(self):
+        self.assertIn("highs, lows, closes", self.html)
+
+    def test_calckdj_returns_k_d_j(self):
+        self.assertIn("k: K, d: D, j: J", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()
