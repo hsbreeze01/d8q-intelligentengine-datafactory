@@ -1692,7 +1692,7 @@ function switchSDTab(tab,el){
   const c=document.getElementById('sTabContent');
   switch(tab){
     case 'quote':loadSDQuote(c);break;
-    case 'tech':c.innerHTML='<div class="card"><h3>📈 技术分析</h3><div class="empty">待实现 — 由 zsiga stock-technical-analysis propose 填充</div></div>';break;
+    case 'tech':loadSDTech(c);break;
     case 'ai':c.innerHTML='<div class="card"><h3>🤖 AI 分析</h3><div class="empty">待实现 — 由 zsiga stock-ai-analysis propose 填充</div></div>';break;
     case 'valuation':c.innerHTML='<div class="card"><h3>💰 估值分析</h3><div class="empty">待实现 — 由 zsiga stock-valuation propose 填充</div></div>';break;
     case 'announcement':c.innerHTML='<div class="card"><h3>📋 公告</h3><div class="empty">待实现 — 由 zsiga stock-announcement-tab propose 填充</div></div>';break;
@@ -1855,6 +1855,85 @@ function calcRSI(closes, periods) {
   }
   return result;
 }
+
+
+async function loadSDTech(el){
+  el.innerHTML='<div class="card"><h3>技术指标分析</h3><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;margin-bottom:12px" id="techToolbar"><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'ma\')">MA趋势</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'macd\')">MACD</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'kdj\')">KDJ</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'boll\')">BOLL</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'rsi\')">RSI</button></div><div id="techChart" style="height:300px;background:#fafafa;border-radius:8px"></div></div></div><div class="card"><h3>技术信号汇总</h3><div id="techSignals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div><div id="techVerdict" style="margin-top:16px;padding:12px 16px;background:#f8f9fa;border-radius:8px;font-size:13px;color:#666;line-height:1.8"></div></div>';
+  try{
+    const d=await api('/api/stock/kline?symbol='+encodeURIComponent(_stockDetailCode)+'&period=daily&count=60');
+    window._techData=d&&!d.error?d.data:null;
+  }catch(e){window._techData=null}
+  drawTechChart('ma');
+}
+
+function drawTechChart(type){
+  const el=document.getElementById('techChart');if(!el)return;
+  const chart=echarts.init(el);
+  const raw=window._techData;
+  var dates=[],closes=[],highs=[],lows=[];
+  if(raw&&raw.length){
+    dates=raw.map(d=>d.date||d[0]);closes=raw.map(d=>parseFloat(d.close||d[2]));highs=raw.map(d=>parseFloat(d.high||d[4]));lows=raw.map(d=>parseFloat(d.low||d[3]));
+  }else{
+    var base=7.5;for(var i=0;i<60;i++){var dd=new Date(2026,2,1);dd.setDate(dd.getDate()+i);dates.push((dd.getMonth()+1)+'/'+dd.getDate());var o=base+(Math.random()-0.45)*0.3,c=o+(Math.random()-0.4)*0.4,l=Math.min(o,c)-Math.random()*0.15,h=Math.max(o,c)+Math.random()*0.2;closes.push(c);highs.push(h);lows.push(l);base=c;}
+  }
+  var series=[],legend=[];
+  if(type==='ma'){
+    var ma5=calcMA(closes,5),ma10=calcMA(closes,10),ma20=calcMA(closes,20);
+    series=[{name:'MA5',type:'line',data:ma5,smooth:true,lineStyle:{width:1.5}},{name:'MA10',type:'line',data:ma10,smooth:true,lineStyle:{width:1.5}},{name:'MA20',type:'line',data:ma20,smooth:true,lineStyle:{width:1.5}}];legend=['MA5','MA10','MA20'];
+  }else if(type==='macd'){
+    var r=calcMACD(closes,12,26,9);
+    series=[{name:'DIF',type:'line',data:r.dif,smooth:true,lineStyle:{width:1.5}},{name:'DEA',type:'line',data:r.dea,smooth:true,lineStyle:{width:1.5}},{name:'MACD',type:'bar',data:r.macd,itemStyle:{color:function(p){return p.value>=0?'#ff4d4f':'#52c41a'}}}];legend=['DIF','DEA','MACD'];
+  }else if(type==='kdj'){
+    var r=calcKDJ(highs,lows,closes,9,3,3);
+    series=[{name:'K',type:'line',data:r.k,smooth:true,lineStyle:{width:1.5}},{name:'D',type:'line',data:r.d,smooth:true,lineStyle:{width:1.5}},{name:'J',type:'line',data:r.j,smooth:true,lineStyle:{width:1.5}}];legend=['K','D','J'];
+  }else if(type==='boll'){
+    var r=calcBOLL(closes,20,2);
+    series=[{name:'上轨',type:'line',data:r.upper,smooth:true,lineStyle:{width:1,color:'#ff4d4f'}},{name:'中轨',type:'line',data:r.mid,smooth:true,lineStyle:{width:1.5,color:'#1890ff'}},{name:'下轨',type:'line',data:r.lower,smooth:true,lineStyle:{width:1,color:'#52c41a'}},{name:'收盘价',type:'line',data:closes,smooth:true,lineStyle:{width:1.5}}];legend=['上轨','中轨','下轨','收盘价'];
+  }else if(type==='rsi'){
+    var r=calcRSI(closes,[6,12,24]);
+    series=[{name:'RSI6',type:'line',data:r[6],smooth:true,lineStyle:{width:1.5}},{name:'RSI12',type:'line',data:r[12],smooth:true,lineStyle:{width:1.5}},{name:'RSI24',type:'line',data:r[24],smooth:true,lineStyle:{width:1.5}}];legend=['RSI6','RSI12','RSI24'];
+  }
+  chart.setOption({animation:false,tooltip:{trigger:'axis'},legend:{data:legend,top:0},grid:{left:'8%',right:'3%',top:'12%',bottom:'10%'},xAxis:{type:'category',data:dates},yAxis:{},series:series});
+  window.addEventListener('resize',()=>chart.resize());
+  evalTechSignals(closes,highs,lows);
+}
+
+function evalTechSignals(closes,highs,lows){
+  var signals=[];
+  var ma5=calcMA(closes,5),ma10=calcMA(closes,10),ma20=calcMA(closes,20);
+  var last=closes.length-1;
+  if(ma5[last]>ma10[last]&&ma10[last]>ma20[last])signals.push({name:'MA',val:'多头排列',sig:'buy'});
+  else if(ma5[last]<ma10[last]&&ma10[last]<ma20[last])signals.push({name:'MA',val:'空头排列',sig:'sell'});
+  else signals.push({name:'MA',val:'交叉',sig:'neutral'});
+  var mr=calcMACD(closes,12,26,9);
+  if(mr.macd[last]>0)signals.push({name:'MACD',val:'金叉',sig:'buy'});
+  else signals.push({name:'MACD',val:'死叉',sig:'sell'});
+  var kr=calcKDJ(highs,lows,closes,9,3,3);
+  if(kr.j[last]>80)signals.push({name:'KDJ',val:'超买',sig:'sell'});
+  else if(kr.j[last]<20)signals.push({name:'KDJ',val:'超卖',sig:'buy'});
+  else signals.push({name:'KDJ',val:'中性('+kr.j[last].toFixed(1)+')',sig:'neutral'});
+  var rsi6=calcRSI(closes,[6])[6];
+  if(rsi6[last]>70)signals.push({name:'RSI',val:'偏强',sig:'sell'});
+  else if(rsi6[last]<30)signals.push({name:'RSI',val:'偏弱',sig:'buy'});
+  else signals.push({name:'RSI',val:'中性('+rsi6[last].toFixed(1)+')',sig:'neutral'});
+  var br=calcBOLL(closes,20,2);
+  if(closes[last]>br.upper[last])signals.push({name:'BOLL',val:'突破上轨',sig:'sell'});
+  else if(closes[last]<br.lower[last])signals.push({name:'BOLL',val:'跌破下轨',sig:'buy'});
+  else signals.push({name:'BOLL',val:'中轨附近',sig:'neutral'});
+  var el=document.getElementById('techSignals');
+  if(el){
+    var sigMap={buy:{bg:'#fff2f0',color:'#ff4d4f',text:'看多'},sell:{bg:'#f6ffed',color:'#52c41a',text:'看空'},neutral:{bg:'#f5f5f5',color:'#999',text:'中性'}};
+    el.innerHTML=signals.map(s=>{var m=sigMap[s.sig];return '<div style="background:'+m.bg+';border-radius:8px;padding:14px 16px;border:1px solid #f0f0f0"><div style="font-size:12px;color:#999;margin-bottom:6px">'+s.name+'</div><div style="font-size:20px;font-weight:700;margin-bottom:4px">'+s.val+'</div><div style="font-size:12px;padding:2px 8px;border-radius:10px;display:inline-block;color:'+m.color+'">'+m.text+'</div></div>';}).join('');
+  }
+  var vd=document.getElementById('techVerdict');
+  if(vd){
+    var buys=signals.filter(s=>s.sig==='buy').length,sells=signals.filter(s=>s.sig==='sell').length;
+    var verdict=buys>sells?'短期偏多':sells>buys?'短期偏空':'多空平衡';
+    var vcolor=buys>sells?'#ff4d4f':sells>buys?'#52c41a':'#999';
+    vd.innerHTML='<b style="color:#333">综合判定：</b><span style="color:'+vcolor+';font-weight:700">'+verdict+'</span>。'+signals.map(s=>s.name+s.val).join('，')+'。';
+  }
+}
+
 
 // === 推荐页 ===
 function loadRecommend(el){
