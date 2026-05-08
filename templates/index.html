@@ -1969,7 +1969,7 @@ async function loadSDAI(el){
 }
 
 async function loadSDValuation(el){
-  el.innerHTML='<div class="card"><h3>估值分析</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnAnnual" onclick="loadValData('annual')">年报</button><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnQuarter" onclick="loadValData('quarterly')">季报</button></div><div id="valContent" style="min-height:200px"><div class="empty">加载中...</div></div></div>';
+  el.innerHTML='<div class="card"><h3>估值分析</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnAnnual" data-type="annual" onclick="loadValData(this.dataset.type)">年报</button><button class="btn" style="padding:4px 12px;font-size:12px" id="valBtnQuarter" data-type="quarterly" onclick="loadValData(this.dataset.type)">季报</button></div><div id="valContent" style="min-height:200px"><div class="empty">加载中...</div></div></div>';
   loadValData('annual');
 }
 
