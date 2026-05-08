@@ -180,7 +180,8 @@ def agent_request(method, path, data=None):
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
-        return json.loads(e.read()), e.code
+        _raw = e.read()
+        return json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}, e.code
     except Exception as e:
         return {"error": str(e)}, 502
 
@@ -428,7 +429,11 @@ def _publisher_request(method, path, data=None, max_retries=1):
             with urllib.request.urlopen(req, timeout=120) as resp:
                 return json.loads(resp.read()), resp.status
         except urllib.error.HTTPError as e:
-            last_result = json.loads(e.read())
+            raw = e.read()
+            try:
+                last_result = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                last_result = {"error": f"publisher returned HTTP {e.code}: {raw[:200]}"}
             last_code = e.code
             # Only retry on server errors (500/502/503), not client errors
             if e.code < 500 or attempt >= max_retries:
@@ -489,7 +494,8 @@ def shark_request(method, path, data=None):
         with urllib.request.urlopen(req, timeout=300) as resp:
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
-        return json.loads(e.read()), e.code
+        _raw = e.read()
+        return json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}, e.code
     except Exception as e:
         return {"error": str(e)}, 502
 
@@ -1274,7 +1280,8 @@ def classify_policy():
             result = json.loads(resp.read())
         return jsonify(result)
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -1562,7 +1569,8 @@ def proxy_cookie_capture():
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1611,7 +1619,8 @@ def proxy_cookie_capture_switch_phone():
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1631,7 +1640,8 @@ def proxy_cookie_capture_submit_phone():
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1652,7 +1662,8 @@ def proxy_cookie_capture_submit_code():
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
 
@@ -1674,6 +1685,7 @@ def proxy_cookie_import():
             data = json.loads(resp.read())
             return jsonify(data), resp.status
     except urllib.error.HTTPError as e:
-        return jsonify(json.loads(e.read())), e.code
+        _raw = e.read()
+        return jsonify(json.loads(_raw) if _raw.strip() else {"error": f"HTTP {e.code}: non-JSON response"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
