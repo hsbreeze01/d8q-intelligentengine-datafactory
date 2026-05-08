@@ -1833,6 +1833,29 @@ function calcBOLL(closes, n, k) {
   return { upper: upper, mid: mid, lower: lower };
 }
 
+function calcRSI(closes, periods) {
+  periods = periods || [6, 12, 24];
+  var result = {};
+  for (var pi = 0; pi < periods.length; pi++) {
+    var p = periods[pi];
+    var arr = new Array(closes.length);
+    for (var i = 0; i < closes.length; i++) arr[i] = null;
+    for (var i = p; i < closes.length; i++) {
+      var gains = 0, losses = 0;
+      for (var j = i - p + 1; j <= i; j++) {
+        var diff = closes[j] - closes[j - 1];
+        if (diff > 0) gains += diff;
+        else losses -= diff;
+      }
+      var avgGain = gains / p;
+      var avgLoss = losses / p;
+      arr[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    }
+    result[p] = arr;
+  }
+  return result;
+}
+
 // === 推荐页 ===
 function loadRecommend(el){
   el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div class="empty">待实现 — 由 zsiga stock-recommendation-page propose 填充</div></div>';
