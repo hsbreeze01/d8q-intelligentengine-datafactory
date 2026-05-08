@@ -619,6 +619,55 @@ def stock_supply_chain():
     return jsonify(data), status
 
 
+
+
+@app.route("/api/search/by-keyword", methods=["GET"])
+def search_by_keyword():
+    keyword = request.args.get("keyword", "")
+    limit = request.args.get("limit", "20")
+    data, status = shark_request("GET", "/api/search/stock/by-keyword?keyword=" + keyword + "&limit=" + limit)
+    return jsonify(data), status
+
+
+@app.route("/api/search/by-industry", methods=["GET"])
+def search_by_industry():
+    qs = request.query_string.decode() if request.query_string else ""
+    data, status = shark_request("GET", "/api/search/stock/by-industry?" + qs)
+    return jsonify(data), status
+
+
+@app.route("/api/search/by-concept", methods=["GET"])
+def search_by_concept():
+    qs = request.query_string.decode() if request.query_string else ""
+    data, status = shark_request("GET", "/api/search/stock/by-concept?" + qs)
+    return jsonify(data), status
+
+
+@app.route("/api/search/by-theme", methods=["GET"])
+def search_by_theme():
+    qs = request.query_string.decode() if request.query_string else ""
+    data, status = shark_request("GET", "/api/search/stock/by-theme?" + qs)
+    return jsonify(data), status
+
+
+@app.route("/api/search/industries", methods=["GET"])
+def list_industries():
+    data, status = shark_request("GET", "/api/search/industries")
+    return jsonify(data), status
+
+
+@app.route("/api/search/concepts", methods=["GET"])
+def list_concepts():
+    data, status = shark_request("GET", "/api/search/concepts")
+    return jsonify(data), status
+
+
+@app.route("/api/search/sectors", methods=["GET"])
+def list_sectors():
+    data, status = shark_request("GET", "/api/analysis/stock/sectors")
+    return jsonify(data), status
+
+
 @app.route("/api/report/stock", methods=["POST"])
 def report_stock_query():
     """批量查询股票研报 - 缓存优先，减少远端调用"""
