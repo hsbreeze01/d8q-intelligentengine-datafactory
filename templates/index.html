@@ -2205,84 +2205,109 @@ async function loadHotSectors(){
 
 
 async function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业精选</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnConcept" onclick="loadRecConcept()">💡 概念龙头</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnTheme" onclick="loadRecTheme()">🎯 主题投资</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
-  loadRecIndustry();
+  el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecReports()">📑 热门研报</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecTracks()">🔥 赛道热度</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="loadRecTheme()">🎯 主题搜索</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
+  loadRecReports();
 }
-async function loadRecIndustry(){
-  document.getElementById('recContent').innerHTML='<div class="empty">加载行业精选...</div>';
+async function loadRecReports(){
+  var el=document.getElementById('recContent');
+  el.innerHTML='<div class="empty">加载研报...</div>';
   try{
-    var d=await api('/api/search/sectors?limit=20');
-    if(d&&d.data&&d.data.length){
-      var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
-      d.data.forEach(function(s){
-        var name=s.name||'--';
-        var change=typeof s.change_pct==='number'?s.change_pct:0;
-        var color=change>0?'#ff4d4f':change<0?'#52c41a':'#999';
-        var arrow=change>0?'↑':change<0?'↓':'—';
-        var lead=s.leading_stock?s.leading_stock+' +'+s.leading_change+'%':'';
-        html+='<div class="card" style="cursor:pointer;padding:16px" data-dim="industry" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="font-size:22px;font-weight:700;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(2)+'%</div>'+(lead?'<div style="font-size:11px;color:#999;margin-top:4px">领涨 '+lead+'</div>':'')+'</div>';
+    var d=await api('/api/stock/reports?keyword=&limit=12');
+    if(d&&d.reports&&d.reports.length){
+      var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+      d.reports.forEach(function(r){
+        var title=r.title||'--';
+        var org=r.org||r.institution||'';
+        var date=(r.date||'').slice(0,10);
+        var cat=r.category||'';
+        var url=r.detail_url||r.url||'#';
+        var summary=(r.summary||'').slice(0,80);
+        html+='<div class="card" style="padding:16px;cursor:pointer" onclick="window.open(\''+url+'\',\'_blank\')"><div style="font-size:14px;font-weight:600;margin-bottom:6px;line-height:1.4">'+title+'</div><div style="font-size:12px;color:#999;display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span>'+org+'</span><span>'+date+'</span>'+(cat?'<span style="background:#e6f7ff;color:#1890ff;padding:1px 6px;border-radius:10px;font-size:11px">'+cat+'</span>':'')+'</div>'+(summary?'<div style="font-size:12px;color:#666;line-height:1.5;margin-top:4px">'+summary+'...</div>':'')+'</div>';
       });
       html+='</div>';
-      document.getElementById('recContent').innerHTML=html;
+      el.innerHTML=html;
     }else{
-      document.getElementById('recContent').innerHTML='<div class="empty">暂无行业数据</div>';
+      el.innerHTML='<div class="empty">暂无研报数据</div>';
     }
   }catch(e){
-    document.getElementById('recContent').innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+    el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
 }
-async function loadRecConcept(){
-  document.getElementById('recContent').innerHTML='<div class="empty">加载概念板块...</div>';
+async function loadRecTracks(){
+  var el=document.getElementById('recContent');
+  el.innerHTML='<div class="empty">加载赛道热度...</div>';
   try{
-    var d=await api('/api/search/concepts/summary?limit=30');
-    if(d&&d.data&&d.data.length){
-      var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
-      d.data.forEach(function(c){
-        var name=c.name||'--';
-        var change=typeof c.change_pct==='number'?c.change_pct:0;
+    var d=await apiV('/api/proxy/tracks/heat/latest');
+    if(d&&d.length){
+      var html='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
+      d.slice(0,10).forEach(function(t){
+        var name=t.name||'--';
+        var score=t.score!=null?t.score:'-';
+        var change=t.change||0;
         var color=change>0?'#ff4d4f':change<0?'#52c41a':'#999';
-        var bg=change>0?'#fff1f0':change<0?'#f6ffed':'#fafafa';
         var arrow=change>0?'↑':change<0?'↓':'—';
-        html+='<div class="card" style="cursor:pointer;padding:12px;background:'+bg+'" data-dim="concept" data-name="'+name+'" onclick="searchByDimValue(this.dataset.dim,this.dataset.name)"><div style="font-size:13px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="font-size:16px;font-weight:700;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(2)+'%</div>'+(c.leading_stock?'<div style="font-size:10px;color:#999;margin-top:3px">领涨 '+c.leading_stock+'</div>':'')+'</div>';
+        var newsC=t.news_count||0;
+        var policyC=t.policy_count||0;
+        html+='<div class="card" style="cursor:pointer;padding:16px" onclick="goPage(\'track\')"><div style="font-size:15px;font-weight:600;margin-bottom:4px">'+name+'</div><div style="display:flex;align-items:baseline;gap:12px"><span style="font-size:28px;font-weight:700;color:#1890ff">'+score+'</span><span style="font-size:16px;font-weight:600;color:'+color+'">'+arrow+' '+Math.abs(change).toFixed(1)+'</span></div><div style="font-size:12px;color:#999;margin-top:6px">资讯 '+newsC+' · 政策 '+policyC+'</div></div>';
       });
       html+='</div>';
-      document.getElementById('recContent').innerHTML=html;
+      el.innerHTML=html;
     }else{
-      document.getElementById('recContent').innerHTML='<div class="empty">暂无概念数据</div>';
+      el.innerHTML='<div class="empty">暂无赛道数据</div>';
     }
   }catch(e){
-    document.getElementById('recContent').innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+    el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
 }
 async function loadRecTheme(){
-  openDrawer('🎯 主题投资','<div style="margin-bottom:16px"><input class="search" id="themeInput" placeholder="输入主题关键词，如 AI、新能源车、半导体" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d9d9d9;border-radius:8px;box-sizing:border-box"></div><div id="themeResults"><div class="empty" style="padding:40px 0">输入关键词后按回车搜索</div></div>');
-  document.getElementById('themeInput').addEventListener('keydown',function(e){if(e.key==='Enter'&&this.value.trim())execThemeSearch(this.value.trim())});
+  var el=document.getElementById('recContent');
+  el.innerHTML='<div style="margin-bottom:16px"><input class="search" id="themeInput" placeholder="输入关键词搜索研报和个股，如 AI、新能源、半导体" style="width:100%;padding:10px 14px;font-size:14px;border:1px solid #d9d9d9;border-radius:8px;box-sizing:border-box"></div><div id="themeReports"></div><div id="themeStocks" style="margin-top:16px"></div>';
+  var _themeTimer=null;
+  document.getElementById('themeInput').addEventListener('input',function(){
+    clearTimeout(_themeTimer);
+    var v=this.value.trim();
+    if(v.length<2)return;
+    _themeTimer=setTimeout(function(){execThemeSearch(v)},300);
+  });
   document.getElementById('themeInput').focus();
 }
 async function execThemeSearch(input){
-  var area=document.getElementById('themeResults');
-  area.innerHTML='<div class="empty">分析中...</div>';
+  var rEl=document.getElementById('themeReports');
+  var sEl=document.getElementById('themeStocks');
+  rEl.innerHTML='<div class="empty">搜索中...</div>';
+  sEl.innerHTML='';
   try{
-    var d=await api('/api/search/by-theme?theme='+encodeURIComponent(input)+'&limit=10');
-    if(d&&d.data&&d.data.length){
-      var html='<div style="font-size:13px;color:#999;margin-bottom:12px">「'+input+'」找到 '+d.data.length+' 只相关股票</div><div class="stock-grid">';
-      d.data.forEach(function(s){
-        var code=s.code||s.symbol||'';
-        var name=s.name||'--';
-        var change=s.change_pct||0;
-        var color=change>0?'#ff4d4f':change<0?'#52c41a':'#333';
-        html+='<div class="stock-card" data-code="'+code+'" onclick="drawerPush(this.querySelector(\'.sc-name\').textContent+\' (\'+this.dataset.code+\')\',\'<div class="empty">加载中...</div>\');showStockDetail(this.dataset.code)"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div><div style="font-size:14px;font-weight:600;color:'+color+'">'+(typeof change==='number'?(change>0?'+':'')+change.toFixed(2)+'%':change)+'</div></div>';
+    var d=await api('/api/stock/reports?keyword='+encodeURIComponent(input)+'&limit=6');
+    if(d&&d.reports&&d.reports.length){
+      var html='<div style="font-size:13px;color:#999;margin-bottom:8px">研报（「'+input+'」）</div>';
+      d.reports.forEach(function(r){
+        var title=r.title||'--';
+        var org=r.org||'';
+        var date=(r.date||'').slice(0,10);
+        var url=r.detail_url||'#';
+        html+='<div style="padding:10px 0;border-bottom:1px solid #f5f5f5"><a href="'+url+'" target="_blank" style="font-size:14px;color:#333;text-decoration:none">'+title+'</a><div style="font-size:12px;color:#999;margin-top:2px">'+org+' · '+date+'</div></div>';
       });
-      html+='</div>';
-      area.innerHTML=html;
+      rEl.innerHTML=html;
     }else{
-      area.innerHTML='<div class="empty">未找到相关股票</div>';
+      rEl.innerHTML='<div class="empty">未找到相关研报</div>';
     }
   }catch(e){
-    area.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
+    rEl.innerHTML='<div class="empty">研报搜索失败</div>';
   }
+  try{
+    var sd=await api('/api/search/by-keyword?keyword='+encodeURIComponent(input)+'&limit=8');
+    if(sd&&sd.data&&sd.data.length){
+      var html='<div style="font-size:13px;color:#999;margin-bottom:8px">相关个股</div><div class="stock-grid">';
+      sd.data.forEach(function(s){
+        var code=s.code||s.symbol||'';
+        var name=s.name||'--';
+        html+='<div class="stock-card" onclick="showStockDetail(\''+code+'\')"><div class="sc-name">'+name+'</div><div class="sc-code">'+code+'</div></div>';
+      });
+      html+='</div>';
+      sEl.innerHTML=html;
+    }
+  }catch(e){}
 }
-
 
 init();
 
