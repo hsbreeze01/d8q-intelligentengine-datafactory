@@ -731,6 +731,12 @@ def list_sectors():
     data, status = shark_request("GET", f"/api/search/industries/summary?limit={limit}")
     return jsonify(data), status
 
+@app.route("/api/search/industries/summary", methods=["GET"])
+def list_industries_summary():
+    limit = request.args.get("limit", "20")
+    data, status = shark_request("GET", f"/api/search/industries/summary?limit={limit}")
+    return jsonify(data), status
+
 
 @app.route("/api/report/stock", methods=["POST"])
 def report_stock_query():
