@@ -69,5 +69,23 @@ class TestCalcKDJ(unittest.TestCase):
         self.assertIn("k: K, d: D, j: J", self.html)
 
 
+# ── Task 1.4: calcBOLL ──────────────────────────────────────────────────────
+
+class TestCalcBOLL(unittest.TestCase):
+    """Task 1.4: calcBOLL(closes, n, k) must exist and return upper/mid/lower."""
+
+    def setUp(self):
+        self.html = _read_html()
+
+    def test_calcboll_exists(self):
+        self.assertIn("function calcBOLL(", self.html)
+
+    def test_calcboll_returns_upper_mid_lower(self):
+        self.assertIn("upper: upper, mid: mid, lower: lower", self.html)
+
+    def test_calcboll_uses_std(self):
+        self.assertIn("Math.sqrt(sqSum", self.html)
+
+
 if __name__ == "__main__":
     unittest.main()

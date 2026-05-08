@@ -1814,6 +1814,25 @@ function calcKDJ(highs, lows, closes, n, m1, m2) {
   return { k: K, d: D, j: J };
 }
 
+function calcBOLL(closes, n, k) {
+  n = n || 20; k = k || 2;
+  var len = closes.length;
+  var upper = new Array(len), mid = new Array(len), lower = new Array(len);
+  for (var i = 0; i < len; i++) {
+    if (i < n - 1) { mid[i] = null; upper[i] = null; lower[i] = null; continue; }
+    var sum = 0;
+    for (var j = i - n + 1; j <= i; j++) sum += closes[j];
+    var avg = sum / n;
+    var sqSum = 0;
+    for (var j = i - n + 1; j <= i; j++) sqSum += Math.pow(closes[j] - avg, 2);
+    var std = Math.sqrt(sqSum / n);
+    mid[i] = avg;
+    upper[i] = avg + k * std;
+    lower[i] = avg - k * std;
+  }
+  return { upper: upper, mid: mid, lower: lower };
+}
+
 // === 推荐页 ===
 function loadRecommend(el){
   el.innerHTML='<div class="card"><h3>💡 每日推荐</h3><div class="empty">待实现 — 由 zsiga stock-recommendation-page propose 填充</div></div>';
