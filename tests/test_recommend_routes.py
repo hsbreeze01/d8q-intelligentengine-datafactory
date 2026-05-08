@@ -353,5 +353,190 @@ class TestSearchByKeywordRoute(_RecommendRouteTestBase):
             self._restore(mod, orig)
 
 
+class TestCompassRecommendationDaily(_RecommendRouteTestBase):
+    """Verify GET /api/proxy/recommendation/daily proxies to Compass correctly."""
+
+    @patch("app.urllib.request.urlopen")
+    def test_daily_proxy_returns_data(self, mock_urlopen):
+        """Route should proxy to compass /api/recommendation/daily and return data."""
+        client, mod, orig = self._get_client()
+        try:
+            rec_data = {
+                "recommendations": [
+                    {
+                        "code": "002594",
+                        "name": "比亚迪",
+                        "score": 85,
+                        "dimensions": {"technical": 80, "trend": 90, "fundamental": 85, "volume": 82},
+                        "reason": "新能源龙头，技术面走强",
+                        "risk": "短期涨幅较大，注意回调风险",
+                    },
+                    {
+                        "code": "300750",
+                        "name": "宁德时代",
+                        "score": 78,
+                        "dimensions": {"technical": 75, "trend": 80, "fundamental": 78, "volume": 76},
+                        "reason": "电池业务稳健增长",
+                        "risk": "行业竞争加剧",
+                    },
+                ]
+            }
+            mock_urlopen.return_value = self._mock_response(rec_data)
+
+            resp = client.get("/api/proxy/recommendation/daily")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertIn("recommendations", data)
+            self.assertEqual(len(data["recommendations"]), 2)
+            self.assertEqual(data["recommendations"][0]["code"], "002594")
+            self.assertEqual(data["recommendations"][0]["score"], 85)
+        finally:
+            self._restore(mod, orig)
+
+    @patch("app.urllib.request.urlopen")
+    def test_daily_proxy_forwards_to_compass(self, mock_urlopen):
+        """Route should forward to compass :8087 /api/recommendation/daily."""
+        client, mod, orig = self._get_client()
+        try:
+            mock_urlopen.return_value = self._mock_response({"recommendations": []})
+
+            client.get("/api/proxy/recommendation/daily")
+
+            called_url = mock_urlopen.call_args[0][0]
+            if isinstance(called_url, str):
+                url_str = called_url
+            else:
+                url_str = getattr(called_url, "full_url", str(called_url))
+
+            self.assertIn("8087", url_str)
+            self.assertIn("/api/recommendation/daily", url_str)
+        finally:
+            self._restore(mod, orig)
+
+    @patch("app.urllib.request.urlopen")
+    def test_daily_empty_result(self, mock_urlopen):
+        """Route should handle empty recommendations gracefully."""
+        client, mod, orig = self._get_client()
+        try:
+            mock_urlopen.return_value = self._mock_response({"recommendations": []})
+
+            resp = client.get("/api/proxy/recommendation/daily")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertIn("recommendations", data)
+            self.assertEqual(len(data["recommendations"]), 0)
+        finally:
+            self._restore(mod, orig)
+
+    @patch("app.urllib.request.urlopen")
+    def test_daily_upstream_error_returns_502(self, mock_urlopen):
+        """Route should return 502 when Compass is unreachable."""
+        client, mod, orig = self._get_client()
+        try:
+            mock_urlopen.side_effect = Exception("Connection refused")
+
+            resp = client.get("/api/proxy/recommendation/daily")
+            self.assertEqual(resp.status_code, 502)
+            data = resp.get_json()
+            self.assertIn("error", data)
+        finally:
+            self._restore(mod, orig)
+
+
+class TestCompassRecommendationGenerate(_RecommendRouteTestBase):
+    """Verify POST /api/proxy/recommendation/generate proxies to Compass with admin check."""
+
+    @patch("app.urllib.request.urlopen")
+    def test_generate_admin_can_trigger(self, mock_urlopen):
+        """Admin user should be able to trigger recommendation generation."""
+        client, mod, orig = self._get_client()
+        try:
+            gen_result = {"status": "ok", "message": "推荐生成已触发"}
+            mock_urlopen.return_value = self._mock_response(gen_result)
+
+            resp = client.post("/api/proxy/recommendation/generate",
+                               json={"top_n": 10},
+                               content_type="application/json")
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertEqual(data["status"], "ok")
+        finally:
+            self._restore(mod, orig)
+
+    def test_generate_non_admin_forbidden(self):
+        """Non-admin user should be forbidden from triggering generation."""
+        import app as _app_module
+
+        conn_clean = sqlite3.connect(_TEST_DB)
+        conn_clean.execute("DELETE FROM user_events")
+        conn_clean.commit()
+        conn_clean.close()
+
+        _app_module._report_cache._store.clear()
+
+        _orig_get_db = _app_module.get_db
+
+        def _test_get_db():
+            conn = sqlite3.connect(_TEST_DB)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+        _app_module.get_db = _test_get_db
+        _app = _app_module.app
+        _app.config["TESTING"] = True
+        client = _app.test_client()
+        with client.session_transaction() as sess:
+            sess["role"] = "viewer"
+            sess["username"] = "viewer_user"
+
+        try:
+            resp = client.post("/api/proxy/recommendation/generate",
+                               json={"top_n": 10},
+                               content_type="application/json")
+            self.assertEqual(resp.status_code, 403)
+            data = resp.get_json()
+            self.assertIn("error", data)
+        finally:
+            _app_module.get_db = _orig_get_db
+
+    @patch("app.urllib.request.urlopen")
+    def test_generate_forwards_to_compass(self, mock_urlopen):
+        """Route should forward POST to compass :8087 /api/recommendation/generate."""
+        client, mod, orig = self._get_client()
+        try:
+            mock_urlopen.return_value = self._mock_response({"status": "ok"})
+
+            client.post("/api/proxy/recommendation/generate",
+                        json={"top_n": 10},
+                        content_type="application/json")
+
+            called_url = mock_urlopen.call_args[0][0]
+            if isinstance(called_url, str):
+                url_str = called_url
+            else:
+                url_str = getattr(called_url, "full_url", str(called_url))
+
+            self.assertIn("8087", url_str)
+            self.assertIn("/api/recommendation/generate", url_str)
+        finally:
+            self._restore(mod, orig)
+
+    @patch("app.urllib.request.urlopen")
+    def test_generate_upstream_error_returns_502(self, mock_urlopen):
+        """Route should return 502 when Compass is unreachable on generate."""
+        client, mod, orig = self._get_client()
+        try:
+            mock_urlopen.side_effect = Exception("Connection refused")
+
+            resp = client.post("/api/proxy/recommendation/generate",
+                               json={"top_n": 10},
+                               content_type="application/json")
+            self.assertEqual(resp.status_code, 502)
+            data = resp.get_json()
+            self.assertIn("error", data)
+        finally:
+            self._restore(mod, orig)
+
+
 if __name__ == "__main__":
     unittest.main()

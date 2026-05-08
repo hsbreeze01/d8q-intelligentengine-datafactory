@@ -50,6 +50,7 @@ app.register_blueprint(prompts_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
+COMPASS_API = "http://localhost:8087"
 PUBLISHER_API = "http://localhost:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
@@ -81,6 +82,7 @@ FUNCTION_MAP = {
     "/api/notify/": "通知",
     "/api/llm-config": "LLM配置",
     "/api/keyword-": "关键词",
+    "/api/proxy/recommendation": "股票推荐",
 }
 
 
@@ -514,6 +516,25 @@ def shark_request(method, path, data=None):
         return {"error": str(e)}, 502
 
 
+def compass_request(method, path, data=None):
+    """Proxy request to Compass API"""
+    url = COMPASS_API + urllib.parse.quote(path, safe='/:?=&')
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read()), resp.status
+    except urllib.error.HTTPError as e:
+        _raw = e.read()
+        try:
+            return json.loads(_raw), e.code
+        except (json.JSONDecodeError, ValueError):
+            return {"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}, e.code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
 # 股票名称/代码互转缓存
 _stock_cache = {}
 
@@ -634,6 +655,23 @@ def search_by_keyword():
     limit = request.args.get("limit", "20")
     data, status = shark_request("GET", "/api/search/stock/by-keyword?keyword=" + keyword + "&limit=" + limit)
     return jsonify(data), status
+
+
+# --- Compass Recommendation Proxy ---
+@app.route("/api/proxy/recommendation/daily", methods=["GET"])
+def recommendation_daily():
+    """Proxy daily stock recommendation from Compass."""
+    data, code = compass_request("GET", "/api/recommendation/daily")
+    return jsonify(data), code
+
+
+@app.route("/api/proxy/recommendation/generate", methods=["POST"])
+def recommendation_generate():
+    """Trigger recommendation generation via Compass (admin only)."""
+    if session.get("role") != "admin":
+        return jsonify({"error": "仅管理员可操作"}), 403
+    data, code = compass_request("POST", "/api/recommendation/generate", request.json)
+    return jsonify(data), code
 
 
 @app.route("/api/search/by-industry", methods=["GET"])
