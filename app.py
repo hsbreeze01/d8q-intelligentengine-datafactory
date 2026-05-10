@@ -1,6 +1,7 @@
 """D8Q 智能资讯工厂 - 前后端一体 Web 应用 v2 (含任务管理)"""
 import sqlite3
 import json
+import re
 import logging
 import os
 import secrets
@@ -334,6 +335,10 @@ def meta():
     try:
         subjects = [r[0] for r in conn.execute("SELECT DISTINCT subject FROM financial_news ORDER BY subject")]
         sources = [r[0] for r in conn.execute("SELECT DISTINCT source FROM financial_news ORDER BY source")]
+        # Subject 校验过滤：排除测试标记和非法 subject
+        _test_re = re.compile(r'^(压力测试|并发测试|存储测试|AI并发测试)', re.IGNORECASE)
+        _ctrl_re = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+        subjects = [s for s in subjects if isinstance(s, str) and 2 <= len(s) <= 50 and not _ctrl_re.search(s) and not _test_re.search(s)]
         return jsonify({"subjects": subjects, "sources": sources})
     finally:
         conn.close()
