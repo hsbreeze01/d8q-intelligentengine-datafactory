@@ -75,7 +75,33 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .empty{text-align:center;padding:40px;color:#999;font-size:14px}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:6px;font-size:14px;z-index:9999;opacity:0;transition:opacity .3s;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
 .toast.show{opacity:1}.toast.err{background:#fff2f0;color:#ff4d4f;border-color:#ffccc7}
-@media(max-width:768px){.sidebar{width:56px}.sidebar .logo span,.sidebar nav a span,.sidebar .user-box{display:none}.sidebar nav a{justify-content:center;padding:12px}}
+.menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;font-size:20px;cursor:pointer;border-radius:6px;border:1px solid #e8e8e8;margin-right:12px;flex-shrink:0;transition:all .15s}
+.menu-btn:hover{border-color:#1890ff;color:#1890ff;background:#f0f7ff}
+@media(max-width:768px){
+  body{flex-direction:column}
+  .sidebar{display:none;position:fixed;top:0;left:0;width:200px;height:100vh;z-index:200}
+  .sidebar.mobile-open{display:flex;flex-direction:column}
+  .main{width:100%;overflow-x:hidden}
+  .topbar{padding:0 12px}
+  .topbar .search{width:120px;font-size:12px}
+  .content{padding:12px}
+  .menu-btn{display:flex}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  .sh-metrics{grid-template-columns:repeat(3,1fr)}
+  .rcfg{grid-template-columns:1fr}
+  .mc .value{font-size:22px}
+  .card{padding:14px}
+  .card h3{font-size:14px}
+  .et{display:block;overflow-x:auto}
+  .feed-item{padding:12px 14px}
+  .feed-pager .fp{min-width:28px;height:28px;font-size:11px}
+  .drawer-panel{width:100% !important;min-width:0 !important;max-width:100vw}
+  #taskModal .card{width:100% !important;max-width:95vw !important}
+  .tech-indicators{grid-template-columns:repeat(2,1fr) !important}
+  .tech-signals{grid-template-columns:repeat(2,1fr) !important}
+  .val-metrics{grid-template-columns:repeat(2,1fr) !important}
+}
 
 /* === 资讯 Feed 样式 === */
 .feed-item{background:#fff;border-radius:10px;padding:18px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:all .2s;border-left:4px solid #d9d9d9}
@@ -174,7 +200,7 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 <div class="user-box"><div class="name" id="uName">-</div><div class="role" id="uRole">-</div><div class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">退出登录</div></div>
 </div>
 <div class="main">
-<div class="topbar"><div class="title" id="pageTitle">概览</div><div id="viewToggle" style="display:none" class="view-toggle"><span class="active" data-v="mine" onclick="switchView('mine')">我的视图</span><span data-v="all" onclick="switchView('all')">全局视图</span></div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
+<div class="topbar"><div class="menu-btn" onclick="toggleMobileMenu()">☰</div><div class="title" id="pageTitle">概览</div><div id="viewToggle" style="display:none" class="view-toggle"><span class="active" data-v="mine" onclick="switchView('mine')">我的视图</span><span data-v="all" onclick="switchView('all')">全局视图</span></div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
 <div class="content" id="contentArea"></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -263,6 +289,7 @@ window.addEventListener('popstate',e=>{if(e.state&&e.state.page)goPage(e.state.p
 
 
 function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2500)}
+function toggleMobileMenu(){var s=document.querySelector(".sidebar");s.classList.toggle("mobile-open")}
 function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
 function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
