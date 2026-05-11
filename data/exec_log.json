@@ -1,5 +1,135 @@
 [
   {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "success",
+    "duration": 52.0,
+    "time": "2026-05-11T08:51:18.056180"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "success",
+    "duration": 73.8,
+    "time": "2026-05-11T08:41:36.030169"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-11T08:30:25.435155"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥AI基建狂潮来袭，你准备好上车了吗？",
+    "duration": 4.9,
+    "time": "2026-05-11T08:30:25.318369"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "success",
+    "duration": 51.0,
+    "time": "2026-05-11T00:49:53.646232"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "publisher returned HTTP 500: b'<!doctype html>\\n<html lang=en>\\n<title>500 Internal Server Error</title>\\n<h1>Internal Server Error</h1>\\n<p>The server encountered an internal error and was unable to complete your request. Either the s'",
+    "duration": 3.1,
+    "time": "2026-05-10T08:50:43.933250"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "publisher returned HTTP 500: b'<!doctype html>\\n<html lang=en>\\n<title>500 Internal Server Error</title>\\n<h1>Internal Server Error</h1>\\n<p>The server encountered an internal error and was unable to complete your request. Either the s'",
+    "duration": 3.5,
+    "time": "2026-05-10T08:40:40.988331"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-10T08:30:40.787258"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤫AI要上“紧箍咒”？背后竟藏千亿大棋",
+    "duration": 4.5,
+    "time": "2026-05-10T08:30:40.678195"
+  },
+  {
+    "task_id": "fbcfb5f5",
+    "type": "publish",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "publisher returned HTTP 500: b'<!doctype html>\\n<html lang=en>\\n<title>500 Internal Server Error</title>\\n<h1>Internal Server Error</h1>\\n<p>The server encountered an internal error and was unable to complete your request. Either the s'",
+    "duration": 3.0,
+    "time": "2026-05-09T08:50:08.192423"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "publisher returned HTTP 500: b'<!doctype html>\\n<html lang=en>\\n<title>500 Internal Server Error</title>\\n<h1>Internal Server Error</h1>\\n<p>The server encountered an internal error and was unable to complete your request. Either the s'",
+    "duration": 4.3,
+    "time": "2026-05-09T08:40:05.148351"
+  },
+  {
+    "task_id": "6aee9247",
+    "type": "creation",
+    "subject": "核电",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.0,
+    "time": "2026-05-09T08:31:00.529424"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥AI算力大爆发！国家放大招了？",
+    "duration": 4.2,
+    "time": "2026-05-09T08:31:00.347984"
+  },
+  {
     "task_id": "5d3cba25",
     "type": "publish",
     "subject": "人工智能",

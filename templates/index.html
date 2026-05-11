@@ -81,6 +81,8 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
   body{flex-direction:column}
   .sidebar{display:none;position:fixed;top:0;left:0;width:200px;height:100vh;z-index:200}
   .sidebar.mobile-open{display:flex;flex-direction:column}
+  .sidebar-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:199}
+  .sidebar.mobile-open~.sidebar-overlay{display:block}
   .main{width:100%;overflow-x:hidden}
   .topbar{padding:0 12px}
   .topbar .search{width:120px;font-size:12px}
@@ -191,14 +193,17 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .drawer-header .close-drawer{width:28px;height:28px;border-radius:6px;border:1px solid #e8e8e8;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#999;transition:all .15s}
 .drawer-header .close-drawer:hover{border-color:#ff4d4f;color:#ff4d4f;background:#fff1f0}
 .drawer-body{flex:1;overflow-y:auto;padding:20px}
+.tech-indicators{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.tech-signals{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.val-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 </style>
-</head>
 <body>
 <div class="sidebar">
 <div class="logo">🏭 D8Q<span>Pro</span></div>
 <nav id="nav"></nav>
 <div class="user-box"><div class="name" id="uName">-</div><div class="role" id="uRole">-</div><div class="logout" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login')">退出登录</div></div>
 </div>
+<div class="sidebar-overlay" onclick="toggleMobileMenu()"></div>
 <div class="main">
 <div class="topbar"><div class="menu-btn" onclick="toggleMobileMenu()">☰</div><div class="title" id="pageTitle">概览</div><div id="viewToggle" style="display:none" class="view-toggle"><span class="active" data-v="mine" onclick="switchView('mine')">我的视图</span><span data-v="all" onclick="switchView('all')">全局视图</span></div><input class="search" placeholder="搜索资讯、赛道..." id="globalSearch"></div>
 <div class="content" id="contentArea"></div>
@@ -274,7 +279,7 @@ if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
 return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
 }).join('');
-nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();goPage(a.dataset.p)});
+nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();var sb=document.querySelector('.sidebar');if(sb)sb.classList.remove('mobile-open');goPage(a.dataset.p)});
 }
 
 function goPage(id,push=true){
@@ -289,7 +294,10 @@ window.addEventListener('popstate',e=>{if(e.state&&e.state.page)goPage(e.state.p
 
 
 function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2500)}
-function toggleMobileMenu(){var s=document.querySelector(".sidebar");s.classList.toggle("mobile-open")}
+function toggleMobileMenu(){var s=document.querySelector(".sidebar");s.classList.toggle("mobile-open");setTimeout(function(){window._echartsInstances.forEach(function(c){try{c.resize()}catch(e){}})},350)}
+var _echartsInstances=[];
+function _registerChart(c){if(c)_echartsInstances.push(c)}
+function _echInit(el){var c=echarts.init(el);_registerChart(c);return c}
 function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
 function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
@@ -346,7 +354,7 @@ const dateLabels=allDates.map(d=>d.slice(5));
 const tracks={};
 data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,map:{}};tracks[d.name].map[d.date]=d.score});
 const series=Object.entries(tracks).map(([name,v])=>({name,type:'line',smooth:true,data:allDates.map(dt=>v.map[dt]??null),itemStyle:{color:v.color},lineStyle:{color:v.color}}));
-const chart=echarts.init(document.getElementById('dashChart'));
+const chart=_echInit(document.getElementById('dashChart'));
 chart.setOption({tooltip:{trigger:'axis'},legend:{top:0,right:0,textStyle:{fontSize:11}},grid:{top:30,bottom:20,left:40,right:20},xAxis:{type:'category',data:dateLabels},yAxis:{type:'value',max:100},series});
 }
 
@@ -380,7 +388,7 @@ const dateLabels=allDates.map(d=>d.slice(5));
 const tracks={};
 data.forEach(d=>{if(!tracks[d.name])tracks[d.name]={color:d.color,map:{}};tracks[d.name].map[d.date]=d.score});
 const series=Object.entries(tracks).map(([name,v])=>({name,type:'line',smooth:true,data:allDates.map(dt=>v.map[dt]??null),itemStyle:{color:v.color},lineStyle:{color:v.color},areaStyle:{color:v.color,opacity:0.05}}));
-const chart=echarts.init(document.getElementById('trackChart'));
+const chart=_echInit(document.getElementById('trackChart'));
 chart.setOption({tooltip:{trigger:'axis'},legend:{top:0,right:0},grid:{top:30,bottom:20,left:40,right:20},xAxis:{type:'category',data:dateLabels},yAxis:{type:'value',max:100},series});
 }
 
@@ -754,7 +762,7 @@ if(pages>1){pager.innerHTML='<div class="feed-pager">'+Array.from({length:Math.m
 
 function showCollectForm(){
 document.getElementById('taskModal').style.display='flex';
-document.getElementById('taskModal').innerHTML=`<div class="card" style="width:520px;max-width:90vw;max-height:85vh;overflow-y:auto">
+document.getElementById('taskModal').innerHTML=`<div class="card" style="max-width:95vw;width:100%;max-height:85vh;overflow-y:auto">
 <h3 style="margin-bottom:20px">📥 新建采集任务</h3>
 <div style="display:flex;border:1px solid #d9d9d9;border-radius:6px;overflow:hidden;margin-bottom:16px"><button type="button" id="modeTrack" style="flex:1;padding:8px;border:none;background:#fafafa;cursor:pointer;font-size:14px" onclick="switchCollectMode('track')">🏁 按赛道</button><button type="button" id="modeCustom" style="flex:1;padding:8px;border:none;background:#1890ff;color:#fff;cursor:pointer;font-size:14px" onclick="switchCollectMode('custom')">✏️ 自定义</button></div>
 <div id="trackSection" style="display:none;margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">选择赛道</label><select style="width:100%;margin-top:6px;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px" id="mTrack" onchange="onTrackSelect()"><option value="">-- 请选择赛道 --</option></select>
@@ -857,7 +865,7 @@ document.getElementById('mSubject').value=task.subject||'';
 async function showKeywordManager(trackId,trackName){
 window._kwTrackId=trackId;
 document.getElementById('taskModal').style.display='flex';
-document.getElementById('taskModal').innerHTML='<div class="card" style="width:520px;max-width:90vw;max-height:85vh;overflow-y:auto"><h3 style="margin-bottom:20px">🔑 关键词管理 — '+esc(trackName)+'</h3><div id="kwList" style="margin-bottom:16px;min-height:60px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start">加载中...</div><div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #f0f0f0"><input class="search" style="flex:1;padding:8px 12px;font-size:14px" id="kwInput" placeholder="输入新关键词" onkeydown="if(event.key===\'Enter\')addKeyword()"><button class="btn" style="padding:8px 16px;font-size:13px" onclick="addKeyword()">添加</button></div><div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">关闭</button></div></div>';
+document.getElementById('taskModal').innerHTML='<div class="card" style="max-width:95vw;width:100%;max-height:85vh;overflow-y:auto"><h3 style="margin-bottom:20px">🔑 关键词管理 — '+esc(trackName)+'</h3><div id="kwList" style="margin-bottom:16px;min-height:60px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start">加载中...</div><div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #f0f0f0"><input class="search" style="flex:1;padding:8px 12px;font-size:14px" id="kwInput" placeholder="输入新关键词" onkeydown="if(event.key===\'Enter\')addKeyword()"><button class="btn" style="padding:8px 16px;font-size:13px" onclick="addKeyword()">添加</button></div><div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">关闭</button></div></div>';
 loadKeywordList(trackId);
 }
 async function loadKeywordList(trackId){
@@ -889,7 +897,7 @@ async function toggleCollect(id){var r=await api('/api/tasks/'+id+'/toggle',{met
 function showContentForm(type){
 var isPublish=type==='publish';
 document.getElementById('taskModal').style.display='flex';
-document.getElementById('taskModal').innerHTML=`<div class="card" style="width:500px;max-width:90vw">
+document.getElementById('taskModal').innerHTML=`<div class="card" style="max-width:95vw;width:100%">
 <h3 style="margin-bottom:20px">${isPublish?'📤 新建发布任务':'✍️ 新建创作任务'}</h3>
 <div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">主题 *</label><input class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mCSubject" placeholder="输入已有采集主题，如：人工智能、具身智能"></div>
 ${isPublish?`<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">发布渠道</label><select class="search" style="width:100%;margin-top:6px;padding:10px 12px" id="mChannel"><option value="xiaohongshu">🔴 小红书</option></select></div>`
@@ -1071,7 +1079,7 @@ toast(frozen?'已解冻':'已冻结');loadUserMgmt();
 async function delUser(name){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+modal.innerHTML=`<div class="card" style="max-width:95vw;width:100%">
 <h3 style="margin-bottom:20px;color:#ff4d4f">⚠️ 删除用户</h3>
 <div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#fff2f0;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div></div>
 <div style="background:#fff2f0;border:1px solid #ffccc7;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#ff4d4f;line-height:1.6">此操作将永久删除该用户及其所有个人数据（订阅、自选股、偏好设置等），且<strong>不可恢复</strong>。</div>
@@ -1088,7 +1096,7 @@ if(r.error){toast(r.error,true)}else{toast('用户 '+name+' 已删除');closeMod
 async function resetPw(name){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+modal.innerHTML=`<div class="card" style="max-width:95vw;width:100%">
 <h3 style="margin-bottom:20px">🔑 重置密码</h3>
 <div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#e6f7ff;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div><div style="font-size:12px;color:#999">设置新密码</div></div>
 <div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新密码</label><input id="rp_pass" type="password" class="search" style="width:100%;margin-top:6px;padding:10px 12px" placeholder="至少 8 位字符" onkeydown="if(event.key==='Enter')submitResetPw('${name}')"></div>
@@ -1107,7 +1115,7 @@ if(r&&r.error){toast(r.error,true)}else{toast('密码重置成功');closeModal()
 async function changeRole(name,currentRole){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML=`<div class="card" style="width:400px;max-width:90vw">
+modal.innerHTML=`<div class="card" style="max-width:95vw;width:100%">
 <h3 style="margin-bottom:20px">🔄 修改角色</h3>
 <div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#e6f7ff;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div><div style="font-size:12px;color:#999">当前角色：<span class="badge badge-info">${currentRole}</span></div></div>
 <div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新角色</label><select id="cr_role" class="search" style="width:100%;margin-top:6px;padding:10px 12px"><option value="viewer" ${currentRole==='viewer'?'selected':''}>viewer - 只读</option><option value="editor" ${currentRole==='editor'?'selected':''}>editor - 可编辑</option><option value="admin" ${currentRole==='admin'?'selected':''}>admin - 管理员</option></select></div>
@@ -1177,12 +1185,12 @@ async function updateCookie(mode){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
 if(!mode){
-modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 更新 Cookie</h3><p style="color:#666;font-size:13px;margin:12px 0 20px">选择 Cookie 更新方式</p><div style="display:flex;gap:12px;flex-direction:column"><div onclick="updateCookie(\'remote\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#1890ff\';this.style.background=\'#f0f7ff\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">🖥️ 扫码登录（推荐）</div><div style="color:#999;font-size:12px;margin-top:4px">用手机小红书扫码即可，最简单可靠</div></div><div onclick="updateCookie(\'local\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#faad14\';this.style.background=\'#fffbe6\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">📥 本地浏览器导入</div><div style="color:#999;font-size:12px;margin-top:4px">在你的浏览器上登录小红书后导出登录信息</div></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
+modal.innerHTML='<div class="card" style="max-width:95vw;width:100%"><h3>🍪 更新 Cookie</h3><p style="color:#666;font-size:13px;margin:12px 0 20px">选择 Cookie 更新方式</p><div style="display:flex;gap:12px;flex-direction:column"><div onclick="updateCookie(\'remote\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#1890ff\';this.style.background=\'#f0f7ff\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">🖥️ 扫码登录（推荐）</div><div style="color:#999;font-size:12px;margin-top:4px">用手机小红书扫码即可，最简单可靠</div></div><div onclick="updateCookie(\'local\')" style="border:1px solid #e8e8e8;border-radius:8px;padding:16px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\'#faad14\';this.style.background=\'#fffbe6\'" onmouseout="this.style.borderColor=\'#e8e8e8\';this.style.background=\'transparent\'"><div style="font-weight:500;font-size:14px">📥 本地浏览器导入</div><div style="color:#999;font-size:12px;margin-top:4px">在你的浏览器上登录小红书后导出登录信息</div></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
 return;
 }
 if(mode==='local'){importCookieUI();return;}
 // Remote scan mode (original flow)
-modal.innerHTML='<div class="card" style="width:520px;max-width:90vw"><h3>🍪 远端扫码更新</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">扫码登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">完成</span></div></div><div id="qrArea" style="text-align:center;margin:12px 0;min-height:60px"></div><div id="phoneFallback" style="text-align:center;margin:4px 0"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
+modal.innerHTML='<div class="card" style="max-width:95vw;width:100%"><h3>🍪 远端扫码更新</h3><div id="cookieSteps" style="margin:20px 0"><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs1" style="width:24px;height:24px;border-radius:50%;background:#1890ff;color:#fff;text-align:center;line-height:24px;font-size:12px">1</span><span id="cs1t" style="font-size:14px">打开登录页...</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f5f5f5"><span id="cs2" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">2</span><span id="cs2t" style="font-size:14px;color:#999">扫码登录</span></div><div style="display:flex;align-items:center;gap:10px;padding:12px 0"><span id="cs3" style="width:24px;height:24px;border-radius:50%;background:#f0f0f0;color:#999;text-align:center;line-height:24px;font-size:12px">3</span><span id="cs3t" style="font-size:14px;color:#999">完成</span></div></div><div id="qrArea" style="text-align:center;margin:12px 0;min-height:60px"></div><div id="phoneFallback" style="text-align:center;margin:4px 0"></div><div id="cookieFooter" style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button></div></div>';
 try{
 const r=await api('/api/cookie/capture',{method:'POST',body:JSON.stringify({platform:'xiaohongshu'})});
 if(r.error){document.getElementById('cs1').style.background='#ff4d4f';document.getElementById('cs1t').textContent=r.error;return}
@@ -1235,7 +1243,7 @@ document.getElementById('cs1').style.background='#ff4d4f';document.getElementByI
 function detectCookieFormat(text){var trimmed=(text||'').trim();if(!trimmed)return{type:'invalid',cookies:[],error:'输入为空'};if(trimmed.charAt(0)==='['){try{var arr=JSON.parse(trimmed);if(!Array.isArray(arr)||arr.length===0)return{type:'invalid',cookies:[],error:'JSON 数组为空或格式不正确'};var cookies=[];for(var i=0;i<arr.length;i++){var c=arr[i];if(c&&typeof c.name==='string'&&typeof c.value==='string')cookies.push({name:c.name,value:c.value,domain:c.domain||'',path:c.path||'/'})}if(cookies.length===0)return{type:'invalid',cookies:[],error:'JSON 中未找到有效的 Cookie 项（需要 name 和 value 字段）'};return{type:'json',cookies:cookies,error:null}}catch(e){return{type:'invalid',cookies:[],error:'JSON 解析失败：'+e.message}}}if(/[^=;\s]/.test(trimmed)&&trimmed.indexOf('=')!==-1){var segments=trimmed.split(';');var cookies=[];for(var i=0;i<segments.length;i++){var seg=segments[i];var idx=seg.indexOf('=');if(idx<1)continue;var name=seg.substring(0,idx).trim();var value=seg.substring(idx+1).trim();if(name)cookies.push({name:name,value:value,domain:'.xiaohongshu.com',path:'/'})}if(cookies.length===0)return{type:'invalid',cookies:[],error:'未检测到有效的 name=value 对'};return{type:'raw',cookies:cookies,error:null}}return{type:'invalid',cookies:[],error:'无法识别格式。请使用 Cookie-Editor 扩展导出 JSON 格式'}}
 function ciEscapeHtml(str){var div=document.createElement('div');div.appendChild(document.createTextNode(str));return div.innerHTML}
 function ciOnInput(){var textarea=document.getElementById('ciTextarea');var badgeEl=document.getElementById('ciFormatBadge');var previewEl=document.getElementById('ciPreview');var errorEl=document.getElementById('ciError');var importBtn=document.getElementById('ciImportBtn');if(!textarea)return;var text=textarea.value;var result=detectCookieFormat(text);errorEl.style.display='none';errorEl.textContent='';if(!text.trim()){badgeEl.style.display='none';previewEl.style.display='none';importBtn.style.opacity='0.5';importBtn.style.pointerEvents='none';return}var REQUIRED=['web_session','a1','webId'];badgeEl.style.display='flex';badgeEl.style.alignItems='center';badgeEl.style.gap='8px';if(result.type==='json'){badgeEl.innerHTML='<span style="display:inline-block;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f;padding:3px 12px;border-radius:4px;font-size:12px;font-weight:500">Cookie-Editor JSON</span><span style="font-size:12px;color:#666">检测到 '+result.cookies.length+' 个 Cookie</span>'}else if(result.type==='raw'){badgeEl.innerHTML='<span style="display:inline-block;background:#e6f7ff;color:#1890ff;border:1px solid #91d5ff;padding:3px 12px;border-radius:4px;font-size:12px;font-weight:500">原始 Cookie 字符串</span><span style="font-size:12px;color:#666">检测到 '+result.cookies.length+' 个 Cookie（可能缺少 httpOnly 字段）</span>'}else{badgeEl.innerHTML='<span style="display:inline-block;background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7;padding:3px 12px;border-radius:4px;font-size:12px;font-weight:500">格式无效</span>';previewEl.style.display='none';importBtn.style.opacity='0.5';importBtn.style.pointerEvents='none';errorEl.style.display='block';errorEl.textContent=result.error;return}var cookies=result.cookies;var requiredSet={};for(var r=0;r<REQUIRED.length;r++)requiredSet[REQUIRED[r]]=false;for(var c=0;c<cookies.length;c++){if(requiredSet.hasOwnProperty(cookies[c].name))requiredSet[cookies[c].name]=true}var hasAllRequired=true;for(var k in requiredSet){if(!requiredSet[k])hasAllRequired=false}var th='';th+='<div style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden">';th+='<table style="width:100%;border-collapse:collapse;font-size:13px">';th+='<thead><tr style="background:#fafafa">';th+='<th style="text-align:left;padding:10px 12px;border-bottom:1px solid #f0f0f0;color:#666;font-weight:500">名称</th>';th+='<th style="text-align:left;padding:10px 12px;border-bottom:1px solid #f0f0f0;color:#666;font-weight:500">值</th>';th+='<th style="text-align:left;padding:10px 12px;border-bottom:1px solid #f0f0f0;color:#666;font-weight:500">域名</th>';th+='</tr></thead><tbody>';for(var i=0;i<cookies.length;i++){var ck=cookies[i];var isReq=REQUIRED.indexOf(ck.name)!==-1;var bgColor=isReq?'#f6ffed':'#fff';var truncated=ck.value.length>40?ck.value.substring(0,40)+'...':ck.value;var nameDisplay=isReq?'<span style="color:#52c41a;font-weight:600">✓ '+ciEscapeHtml(ck.name)+'</span>':ciEscapeHtml(ck.name);th+='<tr style="background:'+bgColor+'">';th+='<td style="padding:8px 12px;border-bottom:1px solid #f0f0f0">'+nameDisplay+'</td>';th+='<td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;color:#666;font-family:monospace;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+ciEscapeHtml(ck.value)+'">'+ciEscapeHtml(truncated)+'</td>';th+='<td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;color:#999;font-size:12px">'+ciEscapeHtml(ck.domain)+'</td>';th+='</tr>'}th+='</tbody></table></div>';th+='<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">';th+='<span style="font-size:12px;color:#666">必需 Cookie：</span>';for(var j=0;j<REQUIRED.length;j++){var rn=REQUIRED[j];if(requiredSet[rn])th+='<span style="display:inline-flex;align-items:center;gap:4px;background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f;padding:2px 10px;border-radius:4px;font-size:12px">✓ '+rn+'</span>';else th+='<span style="display:inline-flex;align-items:center;gap:4px;background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7;padding:2px 10px;border-radius:4px;font-size:12px">✗ '+rn+'</span>'}th+='</div>';if(!hasAllRequired)th+='<div style="margin-top:8px;padding:8px 12px;background:#fff7e6;border:1px solid #ffe58f;border-radius:6px;font-size:12px;color:#d48806">⚠️ 缺少必需的 Cookie，导入后可能无法正常使用。请确保使用 Cookie-Editor 扩展在 xiaohongshu.com 页面导出完整数据。</div>';previewEl.innerHTML=th;previewEl.style.display='block';importBtn.style.opacity=hasAllRequired?'1':'0.85';importBtn.style.pointerEvents='auto'}
-function importCookieUI(){var html='<div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center">';html+='<div style="background:#fff;border-radius:8px;padding:28px 32px;width:640px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.25)">';html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">';html+='<h3 style="margin:0;font-size:20px;font-weight:600;color:#1a1a1a">导入小红书 Cookie</h3>';html+='<button onclick="closeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999;padding:0;line-height:1">&times;</button>';html+='</div>';html+='<div style="background:#e6f7ff;border:1px solid #91d5ff;border-radius:8px;padding:16px 18px;margin-bottom:20px">';html+='<div style="font-weight:600;font-size:13px;color:#1890ff;margin-bottom:10px">操作步骤</div>';html+='<ol style="margin:0;padding-left:20px;font-size:13px;color:#333;line-height:2.2">';html+='<li>安装浏览器扩展 <strong>Cookie-Editor</strong><div style="margin-top:2px"><a href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm" target="_blank" style="display:inline-block;padding:3px 10px;background:#f0f0f0;border-radius:4px;font-size:12px;color:#333;text-decoration:none;margin-right:6px">Chrome 版</a><a href="https://microsoftedge.microsoft.com/addons/detail/cookieeditor/ajfboaconbpkglpfanbmlfgojgndmhmc" target="_blank" style="display:inline-block;padding:3px 10px;background:#f0f0f0;border-radius:4px;font-size:12px;color:#333;text-decoration:none">Edge 版</a></div></li>';html+='<li>在浏览器打开 <a href="https://www.xiaohongshu.com" target="_blank" style="color:#1890ff">xiaohongshu.com</a> 并登录你的账号</li>';html+='<li>点击浏览器右上角的 <strong>Cookie-Editor 扩展图标</strong>（🍪饼干形状）</li>';html+='<li>点击扩展面板底部的 <strong>"Export" → "Export as JSON"</strong>，内容会自动复制到剪贴板</li>';html+='<li>回到本页面，在下方输入框 <strong>Ctrl+V 粘贴</strong>，确认预览无误后点击"导入"</li>';html+='</ol>';html+='</div>';html+='<div style="margin-bottom:16px">';html+='<label style="display:block;font-size:14px;font-weight:500;color:#333;margin-bottom:8px">👇 粘贴从 Cookie-Editor 导出的内容：</label>';html+='<textarea id="ciTextarea" oninput="ciOnInput()" onpaste="setTimeout(ciOnInput,50)" placeholder="点击 Cookie-Editor 的 Export as JSON 后，在此处 Ctrl+V 粘贴" style="width:100%;height:120px;border:1px solid #d9d9d9;border-radius:6px;padding:10px 12px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.2s" onfocus="this.style.borderColor=\'#1890ff\'" onblur="this.style.borderColor=\'#d9d9d9\'"></textarea>';html+='</div>';html+='<div id="ciFormatBadge" style="margin-bottom:16px;display:none"></div>';html+='<div id="ciPreview" style="display:none;margin-bottom:20px"></div>';html+='<div id="ciError" style="display:none;margin-bottom:16px;padding:12px 16px;background:#fff2f0;border:1px solid #ffccc7;border-radius:6px;color:#ff4d4f;font-size:13px"></div>';html+='<div style="display:flex;gap:12px;justify-content:flex-end;padding-top:8px;border-top:1px solid #f0f0f0">';html+='<button onclick="updateCookie()" style="background:transparent;color:#1890ff;border:1px solid #1890ff;border-radius:6px;padding:8px 20px;font-size:14px;cursor:pointer">返回</button>';html+='<button id="ciImportBtn" onclick="importCookiePaste()" style="background:#1890ff;color:#fff;border:none;border-radius:6px;padding:8px 28px;font-size:14px;font-weight:500;cursor:pointer;opacity:0.5;pointer-events:none;transition:opacity 0.2s">导入 Cookie</button>';html+='</div>';html+='</div></div>';modal.style.display='flex';modal.innerHTML=html}
+function importCookieUI(){var html='<div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:center;justify-content:center">';html+='<div style="background:#fff;border-radius:8px;padding:28px 32px;max-width:95vw;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.25)">';html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">';html+='<h3 style="margin:0;font-size:20px;font-weight:600;color:#1a1a1a">导入小红书 Cookie</h3>';html+='<button onclick="closeModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999;padding:0;line-height:1">&times;</button>';html+='</div>';html+='<div style="background:#e6f7ff;border:1px solid #91d5ff;border-radius:8px;padding:16px 18px;margin-bottom:20px">';html+='<div style="font-weight:600;font-size:13px;color:#1890ff;margin-bottom:10px">操作步骤</div>';html+='<ol style="margin:0;padding-left:20px;font-size:13px;color:#333;line-height:2.2">';html+='<li>安装浏览器扩展 <strong>Cookie-Editor</strong><div style="margin-top:2px"><a href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm" target="_blank" style="display:inline-block;padding:3px 10px;background:#f0f0f0;border-radius:4px;font-size:12px;color:#333;text-decoration:none;margin-right:6px">Chrome 版</a><a href="https://microsoftedge.microsoft.com/addons/detail/cookieeditor/ajfboaconbpkglpfanbmlfgojgndmhmc" target="_blank" style="display:inline-block;padding:3px 10px;background:#f0f0f0;border-radius:4px;font-size:12px;color:#333;text-decoration:none">Edge 版</a></div></li>';html+='<li>在浏览器打开 <a href="https://www.xiaohongshu.com" target="_blank" style="color:#1890ff">xiaohongshu.com</a> 并登录你的账号</li>';html+='<li>点击浏览器右上角的 <strong>Cookie-Editor 扩展图标</strong>（🍪饼干形状）</li>';html+='<li>点击扩展面板底部的 <strong>"Export" → "Export as JSON"</strong>，内容会自动复制到剪贴板</li>';html+='<li>回到本页面，在下方输入框 <strong>Ctrl+V 粘贴</strong>，确认预览无误后点击"导入"</li>';html+='</ol>';html+='</div>';html+='<div style="margin-bottom:16px">';html+='<label style="display:block;font-size:14px;font-weight:500;color:#333;margin-bottom:8px">👇 粘贴从 Cookie-Editor 导出的内容：</label>';html+='<textarea id="ciTextarea" oninput="ciOnInput()" onpaste="setTimeout(ciOnInput,50)" placeholder="点击 Cookie-Editor 的 Export as JSON 后，在此处 Ctrl+V 粘贴" style="width:100%;height:120px;border:1px solid #d9d9d9;border-radius:6px;padding:10px 12px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.2s" onfocus="this.style.borderColor=\'#1890ff\'" onblur="this.style.borderColor=\'#d9d9d9\'"></textarea>';html+='</div>';html+='<div id="ciFormatBadge" style="margin-bottom:16px;display:none"></div>';html+='<div id="ciPreview" style="display:none;margin-bottom:20px"></div>';html+='<div id="ciError" style="display:none;margin-bottom:16px;padding:12px 16px;background:#fff2f0;border:1px solid #ffccc7;border-radius:6px;color:#ff4d4f;font-size:13px"></div>';html+='<div style="display:flex;gap:12px;justify-content:flex-end;padding-top:8px;border-top:1px solid #f0f0f0">';html+='<button onclick="updateCookie()" style="background:transparent;color:#1890ff;border:1px solid #1890ff;border-radius:6px;padding:8px 20px;font-size:14px;cursor:pointer">返回</button>';html+='<button id="ciImportBtn" onclick="importCookiePaste()" style="background:#1890ff;color:#fff;border:none;border-radius:6px;padding:8px 28px;font-size:14px;font-weight:500;cursor:pointer;opacity:0.5;pointer-events:none;transition:opacity 0.2s">导入 Cookie</button>';html+='</div>';html+='</div></div>';modal.style.display='flex';modal.innerHTML=html}
 function importCookiePaste(){var textarea=document.getElementById('ciTextarea');var errorEl=document.getElementById('ciError');var importBtn=document.getElementById('ciImportBtn');if(!textarea)return;var text=textarea.value.trim();if(!text){errorEl.style.display='block';errorEl.textContent='请先粘贴 Cookie 内容';return}var result=detectCookieFormat(text);if(result.type==='invalid'){errorEl.style.display='block';errorEl.textContent=result.error||'无法识别 Cookie 格式，请检查粘贴内容';return}importBtn.disabled=true;importBtn.style.opacity='0.7';importBtn.style.pointerEvents='none';var origText=importBtn.textContent;importBtn.textContent='导入中...';errorEl.style.display='none';api('/api/cookie/import',{method:'POST',body:JSON.stringify({platform:'xiaohongshu',cookies:text})}).then(function(data){if(data.status==='ok'){toast(data.message||'导入成功',false);closeModal();var mainEl=document.getElementById('contentArea')||document.querySelector('.content');if(mainEl&&typeof loadMonitor==='function')loadMonitor(mainEl)}else{var errMsg=data.error||data.message||'导入失败';errorEl.style.display='block';errorEl.textContent='❌ '+errMsg;if(errMsg.indexOf('web_session')!==-1||errMsg.indexOf('a1')!==-1||errMsg.indexOf('webId')!==-1){var REQUIRED=['web_session','a1','webId'];var cookies=result.cookies;var found={};for(var i=0;i<cookies.length;i++)found[cookies[i].name]=true;var missing=[];for(var j=0;j<REQUIRED.length;j++){if(!found[REQUIRED[j]])missing.push(REQUIRED[j])}if(missing.length>0)errorEl.innerHTML='❌ '+errMsg+'<br><span style="font-size:12px;color:#999">缺少：'+missing.join('、')+'</span>'}}}).catch(function(err){errorEl.style.display='block';errorEl.textContent='网络错误：'+(err.message||err)}).finally(function(){importBtn.disabled=false;importBtn.textContent=origText;importBtn.style.opacity='1';importBtn.style.pointerEvents='auto'})}
 async function switchToPhoneMode(){
 var r;
@@ -1299,7 +1307,7 @@ toast('登录失败: '+e.message,true);btn.disabled=false;btn.textContent='登�
 async function addMonitorRule(){
 const modal=document.getElementById('taskModal');
 modal.style.display='flex';
-modal.innerHTML='<div class="card" style="width:500px;max-width:90vw"><h3 style="margin-bottom:16px">\u65b0\u589e\u76d1\u63a7\u89c4\u5219</h3><div style="display:grid;gap:12px"><div><label style="font-size:12px;color:#666">\u89c4\u5219\u540d\u79f0</label><input id="mr_name" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="\u4f8b: StockShark \u5ef6\u8fdf\u76d1\u63a7"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u7c7b\u578b</label><select id="mr_type" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="http">HTTP</option><option value="system">System</option><option value="custom">Custom</option></select></div><div><label style="font-size:12px;color:#666">\u544a\u8b66\u7ea7\u522b</label><select id="mr_sev" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="warning">Warning</option><option value="critical">Critical</option></select></div></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5 URL / \u914d\u7f6e</label><input id="mr_url" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="http://localhost:8088/"></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u95f4\u9694\uff08\u79d2\uff09</label><input id="mr_interval" type="number" class="search" style="width:100%;padding:8px 12px;margin-top:4px" value="60"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">\u53d6\u6d88</button><button class="btn" onclick="submitAddMonitorRule()">\u786e\u8ba4\u521b\u5efa</button></div></div>';
+modal.innerHTML='<div class="card" style="max-width:95vw;width:100%"><h3 style="margin-bottom:16px">\u65b0\u589e\u76d1\u63a7\u89c4\u5219</h3><div style="display:grid;gap:12px"><div><label style="font-size:12px;color:#666">\u89c4\u5219\u540d\u79f0</label><input id="mr_name" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="\u4f8b: StockShark \u5ef6\u8fdf\u76d1\u63a7"></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u7c7b\u578b</label><select id="mr_type" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="http">HTTP</option><option value="system">System</option><option value="custom">Custom</option></select></div><div><label style="font-size:12px;color:#666">\u544a\u8b66\u7ea7\u522b</label><select id="mr_sev" class="search" style="width:100%;padding:8px 12px;margin-top:4px"><option value="warning">Warning</option><option value="critical">Critical</option></select></div></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5 URL / \u914d\u7f6e</label><input id="mr_url" class="search" style="width:100%;padding:8px 12px;margin-top:4px" placeholder="http://localhost:8088/"></div><div><label style="font-size:12px;color:#666">\u68c0\u67e5\u95f4\u9694\uff08\u79d2\uff09</label><input id="mr_interval" type="number" class="search" style="width:100%;padding:8px 12px;margin-top:4px" value="60"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px"><button class="btn-ghost" onclick="closeModal()">\u53d6\u6d88</button><button class="btn" onclick="submitAddMonitorRule()">\u786e\u8ba4\u521b\u5efa</button></div></div>';
 }
 
 async function submitAddMonitorRule(){
@@ -1421,6 +1429,9 @@ if(!subs.subscriptions||!subs.subscriptions.length){window._showGuide=true;}
 initNav();
 loadPage(curPage);
 if(curPage==='monitor'){setInterval(()=>{if(curPage==='monitor')loadMonitor(document.getElementById('contentArea'))},30000)}
+var _mq=window.matchMedia('(max-width:768px)');
+function _mqResize(e){_echartsInstances.forEach(function(c){try{c.resize()}catch(ex){}})}
+if(_mq.addEventListener){_mq.addEventListener('change',_mqResize)}else if(_mq.addListener){_mq.addListener(_mqResize)}
 }
 
 // === 政策分析 ===
@@ -1643,7 +1654,7 @@ async function loadFuncChart() {
     const data = await api('/api/analytics/functions?days=' + analyticsDays);
     const funcs = data.functions || [];
     if (!funcs.length) return;
-    const chart = echarts.init(document.getElementById('funcChart'));
+    const chart = _echInit(document.getElementById('funcChart'));
     chart.setOption({
         tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}},
         grid: {top: 10, bottom: 30, left: 80, right: 30},
@@ -1658,7 +1669,7 @@ async function loadTrendChart() {
     const data = await api('/api/analytics/trends?days=' + analyticsDays);
     const trends = data.trends || [];
     if (!trends.length) return;
-    const chart = echarts.init(document.getElementById('trendChart'));
+    const chart = _echInit(document.getElementById('trendChart'));
     chart.setOption({
         tooltip: {trigger: 'axis'},
         legend: {top: 0, right: 0, textStyle: {fontSize: 11}},
@@ -1753,7 +1764,7 @@ async function loadStockHeader(code){
 }
 
 async function loadSDQuote(el){
-  el.innerHTML='<div class="card"><h3>K线走势</h3><div id="klineChart" style="height:350px;background:#fafafa;border-radius:8px"></div></div><div class="card"><h3>核心指标</h3><div id="sdIndicators" class="tech-indicators" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div></div>';
+  el.innerHTML='<div class="card"><h3>K线走势</h3><div id="klineChart" style="height:350px;background:#fafafa;border-radius:8px"></div></div><div class="card"><h3>核心指标</h3><div id="sdIndicators" class="tech-indicators" style="display:grid;gap:12px"></div></div>';
   try{
     const d=await api('/api/stock/quote?symbol='+encodeURIComponent(_stockDetailCode));
     if(!d.error){
@@ -1772,7 +1783,7 @@ async function loadSDQuote(el){
 
 function drawKline(data){
   const el=document.getElementById('klineChart');if(!el)return;
-  const chart=echarts.init(el);
+  const chart=_echInit(el);
   const dates=data.map(d=>d.date||d[0]);const ohlc=data.map(d=>[d.open||d[1],d.close||d[2],d.low||d[3],d.high||d[4]]);const vols=data.map(d=>d.volume||d[5]||0);
   chart.setOption({animation:false,tooltip:{trigger:'axis',axisPointer:{type:'cross'}},legend:{data:['K线','MA5','MA20'],top:0},grid:[{left:'8%',right:'3%',top:'12%',height:'55%'},{left:'8%',right:'3%',top:'74%',height:'16%'}],xAxis:[{type:'category',data:dates,boundaryGap:true},{type:'category',gridIndex:1,data:dates,boundaryGap:true}],yAxis:[{scale:true},{scale:true,gridIndex:1,splitNumber:2}],series:[{name:'K线',type:'candlestick',data:ohlc,itemStyle:{color:'#ff4d4f',color0:'#52c41a',borderColor:'#ff4d4f',borderColor0:'#52c41a'}},{name:'MA5',type:'line',data:ohlc.map((_,i)=>{if(i<4)return null;let s=0;for(let j=i-4;j<=i;j++)s+=parseFloat(ohlc[j][1]);return(s/5).toFixed(2)}),smooth:true,lineStyle:{width:1},symbol:'none'},{name:'MA20',type:'line',data:ohlc.map((_,i)=>{if(i<19)return null;let s=0;for(let j=i-19;j<=i;j++)s+=parseFloat(ohlc[j][1]);return(s/20).toFixed(2)}),smooth:true,lineStyle:{width:1},symbol:'none'},{name:'成交量',type:'bar',xAxisIndex:1,yAxisIndex:1,data:vols}]});
   window.addEventListener('resize',()=>chart.resize());
@@ -1780,7 +1791,7 @@ function drawKline(data){
 
 function drawMockKline(){
   const el=document.getElementById('klineChart');if(!el)return;
-  const chart=echarts.init(el);var dates=[],data=[],vols=[],base=7.5;
+  const chart=_echInit(el);var dates=[],data=[],vols=[],base=7.5;
   for(var i=0;i<60;i++){var d=new Date(2026,2,1);d.setDate(d.getDate()+i);dates.push((d.getMonth()+1)+'/'+d.getDate());
   var o=base+(Math.random()-0.45)*0.3,c=o+(Math.random()-0.4)*0.4,l=Math.min(o,c)-Math.random()*0.15,h=Math.max(o,c)+Math.random()*0.2;
   data.push([o.toFixed(2),c.toFixed(2),l.toFixed(2),h.toFixed(2)]);vols.push((Math.random()*100+50).toFixed(0));base=c;}
@@ -1894,7 +1905,7 @@ function calcRSI(closes, periods) {
 
 
 async function loadSDTech(el){
-  el.innerHTML='<div class="card"><h3>技术指标分析</h3><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;margin-bottom:12px" id="techToolbar"><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'ma\')">MA趋势</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'macd\')">MACD</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'kdj\')">KDJ</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'boll\')">BOLL</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'rsi\')">RSI</button></div><div id="techChart" style="height:300px;background:#fafafa;border-radius:8px"></div></div></div><div class="card"><h3>技术信号汇总</h3><div id="techSignals" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px"></div><div id="techVerdict" style="margin-top:16px;padding:12px 16px;background:#f8f9fa;border-radius:8px;font-size:13px;color:#666;line-height:1.8"></div></div>';
+  el.innerHTML='<div class="card"><h3>技术指标分析</h3><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:8px;margin-bottom:12px" id="techToolbar"><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'ma\')">MA趋势</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'macd\')">MACD</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'kdj\')">KDJ</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'boll\')">BOLL</button><button class="btn" style="padding:4px 12px;font-size:12px" onclick="drawTechChart(\'rsi\')">RSI</button></div><div id="techChart" style="height:300px;background:#fafafa;border-radius:8px"></div></div></div><div class="card"><h3>技术信号汇总</h3><div id="techSignals" class="tech-signals" style="display:grid;gap:12px"></div><div id="techVerdict" style="margin-top:16px;padding:12px 16px;background:#f8f9fa;border-radius:8px;font-size:13px;color:#666;line-height:1.8"></div></div>';
   try{
     const d=await api('/api/stock/kline?symbol='+encodeURIComponent(_stockDetailCode)+'&period=daily&count=60');
     window._techData=d&&!d.error?d.data:null;
@@ -1904,7 +1915,7 @@ async function loadSDTech(el){
 
 function drawTechChart(type){
   const el=document.getElementById('techChart');if(!el)return;
-  const chart=echarts.init(el);
+  const chart=_echInit(el);
   const raw=window._techData;
   var dates=[],closes=[],highs=[],lows=[];
   if(raw&&raw.length){
@@ -2007,7 +2018,7 @@ async function loadValData(reportType){
   try{
     var vd=await api('/api/stock/valuation?symbol='+encodeURIComponent(_stockDetailCode));
     var fd=await api('/api/stock/financial?symbol='+encodeURIComponent(_stockDetailCode)+'&report_type='+reportType);
-    var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">';
+    var html='<div class="val-metrics" style="display:grid;gap:12px;margin-bottom:16px">';
     if(vd&&vd.data){
       var v=Array.isArray(vd.data)?vd.data[0]||{}:vd.data;
       var metrics=[
