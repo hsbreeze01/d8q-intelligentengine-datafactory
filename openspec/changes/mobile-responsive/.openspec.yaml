@@ -1,0 +1,6 @@
+name: mobile-responsive
+description: 使 factory 前端在移动端浏览器(390-768px)下可用
+files:
+  - templates/index.html
+scope: frontend-only
+risk: low
