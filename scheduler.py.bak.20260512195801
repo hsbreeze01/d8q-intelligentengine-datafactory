@@ -16,7 +16,6 @@ logger.addHandler(_fh)
 logger.setLevel(logging.INFO)
 
 TASKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "content_tasks.json")
-EXEC_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "exec_log.json")
 LOCK_PATH = "/tmp/d8q_scheduler.lock"
 
 # 热度聚合脚本路径
@@ -74,122 +73,17 @@ def _run_task(task):
     """执行单个任务"""
     import urllib.request
     task_id = task.get("id", "")
-    task_type = task.get("type", "")
-    task_subject = task.get("subject", "")
-
-    # publish 任务：检查今日 creation 是否成功，失败则跳过
-    if task_type == "publish":
-        today = datetime.now().strftime("%Y-%m-%d")
-        try:
-            with open(EXEC_LOG_PATH, encoding="utf-8") as f:
-                import json as _j
-                logs = _j.load(f)
-            # 查找今日同 subject 的 creation 记录
-            today_creation = [l for l in logs if l.get("type") == "creation"
-                              and l.get("subject") == task_subject
-                              and l.get("time", "").startswith(today)]
-            if today_creation and not today_creation[0].get("success", False):
-                logger.info("跳过 publish %s: 今日 creation 失败 (%s)", task_subject, today_creation[0].get("result_summary", ""))
-                return {"error": "skipped_creation_failed", "subject": task_subject, "reason": "今日创作任务失败，跳过发布"}
-        except Exception:
-            pass  # 无 exec_log 则不阻断
-
-        # publish 前检查 infopublisher 健康状态
-        try:
-            health_req = urllib.request.Request("http://127.0.0.1:8089/api/health")
-            with urllib.request.urlopen(health_req, timeout=5) as h_resp:
-                h_data = json.loads(h_resp.read())
-                if h_data.get("status") != "ok":
-                    logger.warning("infopublisher 健康检查异常: %s，跳过发布", h_data)
-                    return {"error": "publisher_unhealthy", "subject": task_subject}
-        except Exception as he:
-            logger.error("infopublisher 不可达: %s，跳过发布", he)
-            return {"error": "publisher_unreachable", "subject": task_subject, "reason": str(he)[:200]}
-
-    # 按 task 类型设置超时：creation 300s (LLM 生成), publish 15s (队列投递，不再等待完成)
-    timeout = 15 if task_type == "publish" else 300
-
     try:
         url = f"http://127.0.0.1:8088/api/content/tasks/{task_id}/run?trigger=scheduler"
         req = urllib.request.Request(url, method="POST", data=b"{}")
         req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             result = json.loads(resp.read())
-        logger.info("任务 %s(%s/%s) 执行完成: %s", task_id, task_type, task_subject, result)
-        # publish 任务：解析队列返回，保存 queue_task_id 和 queue_status
-        if task_type == "publish" and result.get("task_id") and result.get("status") in ("queued", "running"):
-            task["queue_task_id"] = result["task_id"]
-            task["queue_status"] = result["status"]
-            logger.info("publish %s 已投递队列 queue_task_id=%s", task_subject, result["task_id"])
+        logger.info("任务 %s(%s/%s) 执行完成: %s", task_id, task.get("type"), task.get("subject"), result)
         return result
-    except urllib.error.HTTPError as e:
-        err_body = e.read()
-        try:
-            err_result = json.loads(err_body)
-        except Exception:
-            err_result = {"error": f"HTTP {e.code}: {err_body[:200]}"}
-        logger.error("任务 %s 执行失败 (HTTP %d): %s", task_id, e.code, err_result)
-        return err_result
     except Exception as e:
         logger.error("任务 %s 执行失败: %s", task_id, e)
         return {"error": str(e)}
-
-
-def _poll_pending():
-    """轮询已投递的 publish 队列任务，检查完成状态"""
-    import urllib.request
-    tasks = _load_tasks()
-    changed = False
-    for task in tasks:
-        if task.get("queue_status") not in ("queued", "running"):
-            continue
-        queue_task_id = task.get("queue_task_id", "")
-        if not queue_task_id:
-            continue
-        try:
-            url = f"http://127.0.0.1:8089/api/publish/queue/{queue_task_id}"
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                result = json.loads(resp.read())
-            status = result.get("status", "")
-            if status in ("completed", "failed"):
-                task["queue_status"] = status
-                changed = True
-                success = status == "completed"
-                _append_scheduler_exec_log(task, result, success)
-                logger.info("publish %s 队列完成: status=%s", task.get("subject", ""), status)
-            # queued/running → 等待下次轮询
-        except Exception as e:
-            logger.warning("poll publish queue %s 失败: %s", queue_task_id, e)
-    if changed:
-        _save_tasks(tasks)
-
-
-def _append_scheduler_exec_log(task, result, success):
-    """scheduler 轮询完成后写入 exec_log，格式与手动触发一致"""
-    import fcntl
-    entry = {
-        "task_id": task.get("id", ""),
-        "type": task.get("type", ""),
-        "subject": task.get("subject", ""),
-        "trigger": "scheduler",
-        "success": success,
-        "result_summary": result.get("error") or result.get("title") or result.get("status") or str(result)[:100],
-        "duration": 0,
-        "time": datetime.now().isoformat(),
-    }
-    try:
-        with open(EXEC_LOG_PATH, "r+", encoding="utf-8") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
-            logs = json.load(f)
-            logs.insert(0, entry)
-            logs = logs[:200]
-            f.seek(0)
-            f.truncate()
-            json.dump(logs, f, ensure_ascii=False, indent=2)
-    except (FileNotFoundError, json.JSONDecodeError):
-        with open(EXEC_LOG_PATH, "w", encoding="utf-8") as f:
-            json.dump([entry], f, ensure_ascii=False, indent=2)
 
 
 # --- 每日附加任务的执行状态 ---
@@ -243,9 +137,6 @@ def _tick():
 
         # 每日附加任务
         _run_daily_extras()
-
-        # 先轮询已投递的 publish 队列任务
-        _poll_pending()
 
         # 先执行creation，再执行publish
         for task_type in ("creation", "publish"):

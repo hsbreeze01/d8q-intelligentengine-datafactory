@@ -995,7 +995,7 @@ def run_content_task(task_id):
                     body = "\n".join(l for l in lines[1:] if not l.startswith(">") and l.strip())[:1000]
                     # 调用 infopublisher API
                     pub_data = {"platform": task.get("channel", "xiaohongshu"), "title": title, "content": body}
-                    pub_result, pub_code = _publisher_request("POST", "/api/publish/queue", pub_data, max_retries=0)
+                    pub_result, pub_code = _publisher_request("POST", "/api/publish", pub_data)
                     pub_result["file"] = files[-1]
                     pub_result["subject"] = subject
                     _append_exec_log(task, pub_result, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
