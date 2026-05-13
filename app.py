@@ -998,7 +998,16 @@ def run_content_task(task_id):
                     pub_result, pub_code = _publisher_request("POST", "/api/publish/queue", pub_data, max_retries=0)
                     pub_result["file"] = files[-1]
                     pub_result["subject"] = subject
-                    _append_exec_log(task, pub_result, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
+                    # queued/running 状态不写 exec-log，由 scheduler _poll_pending 统一写入最终结果
+                    if pub_result.get("status") not in ("queued", "running"):
+                        _append_exec_log(task, pub_result, __import__("time").time() - _t0, request.args.get("trigger", "manual"))
+                    else:
+                        # 保存 queue_task_id 和 trigger 供 scheduler 轮询后写入 exec-log
+                        trigger = request.args.get("trigger", "manual")
+                        task["queue_task_id"] = pub_result.get("task_id", "")
+                        task["queue_status"] = pub_result["status"]
+                        task["queue_trigger"] = trigger
+                        _save_content_tasks(tasks)
                     return jsonify(pub_result), 200
         _no_art = {"error": "无文章可发布"}
         _append_exec_log(task, _no_art, __import__("time").time() - _t0, request.args.get("trigger", "manual"))

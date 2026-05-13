@@ -156,23 +156,31 @@ def _poll_pending():
                 task["queue_status"] = status
                 changed = True
                 success = status == "completed"
-                _append_scheduler_exec_log(task, result, success)
+                _append_scheduler_exec_log(task, result, success, trigger=task.get("queue_trigger", "scheduler"))
                 logger.info("publish %s 队列完成: status=%s", task.get("subject", ""), status)
             # queued/running → 等待下次轮询
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                # queue_task_id 在 publisher 侧丢失（重启后队列清空），标记为 lost
+                task["queue_status"] = "lost"
+                changed = True
+                logger.warning("publish %s 队列任务丢失(queue_task_id=%s)，标记为 lost", task.get("subject", ""), queue_task_id)
+            else:
+                logger.warning("poll publish queue %s HTTP错误: %s", queue_task_id, e)
         except Exception as e:
             logger.warning("poll publish queue %s 失败: %s", queue_task_id, e)
     if changed:
         _save_tasks(tasks)
 
 
-def _append_scheduler_exec_log(task, result, success):
+def _append_scheduler_exec_log(task, result, success, trigger="scheduler"):
     """scheduler 轮询完成后写入 exec_log，格式与手动触发一致"""
     import fcntl
     entry = {
         "task_id": task.get("id", ""),
         "type": task.get("type", ""),
         "subject": task.get("subject", ""),
-        "trigger": "scheduler",
+        "trigger": trigger,
         "success": success,
         "result_summary": result.get("error") or result.get("title") or result.get("status") or str(result)[:100],
         "duration": 0,
