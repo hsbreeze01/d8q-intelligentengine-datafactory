@@ -1886,7 +1886,7 @@ def proxy_cookie_import():
 # Strategy Group API Proxy — route browser requests to Compass
 # ============================================================
 
-def _strategy_proxy(method, path, data=None):
+def _strategy_proxy(method, path, data=None, timeout=30):
     """Proxy strategy API calls to Compass with user context"""
     url = COMPASS_API + path
     body = json.dumps(data).encode() if data else None
@@ -1896,7 +1896,7 @@ def _strategy_proxy(method, path, data=None):
     if uname:
         req.add_header("X-Forwarded-User", uname)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
         raw = e.read()
@@ -2017,7 +2017,7 @@ def proxy_event_info(event_id):
 
 @app.route("/api/strategy/<int:group_id>/scan", methods=["POST"])
 def proxy_strategy_scan(group_id):
-    data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json)
+    data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json, timeout=10)
     return jsonify(data), code
 
 
