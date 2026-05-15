@@ -312,7 +312,7 @@ function toggleMobileMenu(){var s=document.querySelector(".sidebar");s.classList
 var _echartsInstances=[];
 function _registerChart(c){if(c)_echartsInstances.push(c)}
 function _echInit(el){var c=echarts.init(el);_registerChart(c);return c}
-function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>{if(!r.ok)return r.json().then(d=>{throw new Error(d.error||'请求失败 ('+r.status+')')});return r.json()})}
+function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())}
 function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',market:'市场',report:'研报'};return`<span class="tag tag-${type||'tech'}">${m[type]||type||''}</span>`}
@@ -466,16 +466,12 @@ ${groupList.length === 0 ? '<div class="empty">暂无可订阅策略</div>' : gr
 }
 
 async function subscribeStrategy(gid){
-try{
 await api('/api/strategy/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy_group_id:gid})});
 toast('已订阅');loadStrategyDiscover(document.getElementById('contentArea'));
-}catch(e){toast(e.message,true)}
 }
 async function unsubscribeStrategy(gid){
-try{
 await api('/api/strategy/subscription/'+gid,{method:'DELETE'});
 toast('已取消订阅');loadStrategyDiscover(document.getElementById('contentArea'));
-}catch(e){toast(e.message,true)}
 }
 
 async function loadMyStrategy(el){
@@ -555,7 +551,7 @@ ${groups.length === 0 ? '<div class="empty">暂无策略组，点击上方按钮
 <table class="et"><thead><tr><th>名称</th><th>状态</th><th>聚合维度</th><th>总信号</th><th>总事件</th><th>最近扫描</th><th>操作</th></tr></thead>
 <tbody>${groups.map(g=>'<tr><td><b>'+esc(g.name)+'</b><div style="font-size:11px;color:#999;margin-top:2px">'+esc(g.description||'').slice(0,40)+'</div></td>'+
 '<td><span class="badge '+(g.status==='active'?'badge-ok':'badge-err')+'">'+({active:'运行中',paused:'已暂停',archived:'已归档'}[g.status]||g.status)+'</span></td>'+
-'<td>'+(g.aggregation?g.aggregation.dimension:'-')+'</td>'+
+'<td>'+(g.aggregation?JSON.parse(g.aggregation).dimension:'-')+'</td>'+
 '<td>'+(g.total_signals||0)+'</td><td>'+(g.total_events||0)+'</td>'+
 '<td style="font-size:12px">'+(g.last_scan_at?(g.last_scan_at+'').slice(0,16):'-')+'</td>'+
 '<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editStrategyGroup('+g.id+')">编辑</button>'+
@@ -631,17 +627,31 @@ function applyTemplate(key){
 
 function serializeConditions(){
   var rows=document.querySelectorAll('#condRows .cond-row');
-  var indicators=[];
-  var conditions=[];
+  var groups={};
   rows.forEach(function(row){
     var ind=row.querySelector('select').value;
     var op=row.querySelectorAll('select')[1].value;
     var val=row.querySelector('input[type=number]').value;
-    if(!ind||val==='')return;
-    if(indicators.indexOf(ind)===-1)indicators.push(ind);
-    conditions.push({indicator:ind,operator:op,value:parseFloat(val)});
+    if(!ind||!val)return;
+    var shortName=ind.replace(/^(kdj_|rsi_|volume_|boll_|ma_)/,'').replace(/^/,'');
+    if(ind.startsWith('kdj_'))shortName=ind.replace('kdj_','');
+    else if(ind.startsWith('rsi_'))shortName=ind;
+    else if(ind.startsWith('volume_'))shortName='volume_ratio';
+    else if(ind.startsWith('boll_'))shortName=ind.replace('boll_','');
+    else if(ind.startsWith('ma_'))shortName=ind.replace('ma_','');
+    else shortName=ind;
+    var condStr=shortName+op+val;
+    var groupKey;
+    if(ind.startsWith('kdj_'))groupKey='kdj';
+    else if(ind.startsWith('rsi_'))groupKey='rsi';
+    else if(ind.startsWith('volume_'))groupKey='volume';
+    else if(ind.startsWith('boll_'))groupKey='boll';
+    else if(ind.startsWith('ma_'))groupKey='ma';
+    else groupKey=ind;
+    if(!groups[groupKey])groups[groupKey]={conditions:[]};
+    groups[groupKey].conditions.push(condStr);
   });
-  return {indicators:indicators,conditions:conditions};
+  return groups;
 }
 function parseConditions(indicators){
   var conds=[];
@@ -689,13 +699,13 @@ function _toggleMinSignals(){
 
 function serializeSignalLogic(){
   var r=document.querySelector('input[name="sgLogic"]:checked');
-  return r?r.value:'AND';
-}
-function getScoringThreshold(){
-  var r=document.querySelector('input[name="sgLogic"]:checked');
-  if(!r||r.value!=='SCORING')return null;
-  var ms=document.getElementById('sgMinSignals');
-  return ms&&ms.value?parseInt(ms.value):null;
+  var type=r?r.value:'AND';
+  var logic={type:type};
+  if(type==='SCORING'){
+    var ms=document.getElementById('sgMinSignals');
+    if(ms&&ms.value)logic.min_signals=parseInt(ms.value);
+  }
+  return logic;
 }
 function parseSignalLogic(sl){
   try{var obj=(typeof sl==='string')?JSON.parse(sl):sl;return obj||{type:'AND'}}catch(e){return{type:'AND'}}
@@ -706,12 +716,13 @@ function serializeAggregation(){
   var stocks=document.getElementById('sgAggStocks');
   var time=document.getElementById('sgAggTime');
   var unit=document.getElementById('sgAggTimeUnit');
+  var agg={dimension:dim?dim.value:'industry',min_stocks:stocks?parseInt(stocks.value)||3:3};
   var tv=time?parseInt(time.value)||3:3;
   var u=unit?unit.value:'days';
-  var minutes=tv;
-  if(u==='hours')minutes=tv*60;
-  else if(u==='days')minutes=tv*1440;
-  return {dimension:dim?dim.value:'industry',min_stocks:stocks?parseInt(stocks.value)||3:3,time_window_minutes:minutes};
+  if(u==='hours')agg.time_window_hours=tv;
+  else if(u==='minutes')agg.time_window_minutes=tv;
+  else agg.time_window_days=tv;
+  return agg;
 }
 function parseAggregation(agg){
   try{var obj=(typeof agg==='string')?JSON.parse(agg):agg;return obj||{}}catch(e){return{}}
@@ -772,19 +783,14 @@ freqSel.onchange=function(){cronInput.style.display=freqSel.value==='custom'?'':
 async function saveStrategyGroup(gid){
 var name=document.getElementById('sgName').value;
 if(!name){toast('请输入策略组名称');return}
-var parsed=serializeConditions();
-if(parsed.conditions.length===0){toast('请至少添加一个条件');return}
 var freq=document.getElementById('sgFreq').value;
-var cronMap={hourly:'0 * * * *',daily:'0 16 * * *',weekly:'0 16 * * 5'};
-var scan_cron=freq==='custom'?document.getElementById('sgCron').value:(cronMap[freq]||'0 16 * * *');
-if(freq==='custom'&&!scan_cron){toast('请输入 cron 表达式');return}
+var scan_frequency=freq==='custom'?document.getElementById('sgCron').value:freq;
+if(freq==='custom'&&!scan_frequency){toast('请输入 cron 表达式');return}
 var body={name:name,description:document.getElementById('sgDesc').value,
-  indicators:parsed.indicators,
-  conditions:parsed.conditions,
+  scan_frequency:scan_frequency,
+  indicators:serializeConditions(),
   signal_logic:serializeSignalLogic(),
-  scoring_threshold:getScoringThreshold(),
-  aggregation:serializeAggregation(),
-  scan_cron:scan_cron};
+  aggregation:serializeAggregation()};
 try{
   if(gid){await api('/api/strategy/groups/'+gid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
   else{await api('/api/strategy/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}

@@ -4,11 +4,11 @@
 <style>
     .form-container { max-width: 720px; }
     .form-group { margin-bottom: 20px; }
-    .form-group label {
+    .form-group > label {
         display: block; font-size: 14px; font-weight: 600;
         color: #333; margin-bottom: 6px;
     }
-    .form-group label .hint {
+    .form-group > label .hint {
         font-weight: 400; color: #999; font-size: 12px; margin-left: 6px;
     }
     .form-control {
@@ -21,11 +21,80 @@
         outline: none; border-color: #1890FF;
         box-shadow: 0 0 0 2px rgba(24,144,255,0.1);
     }
-    textarea.form-control { min-height: 100px; resize: vertical; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; }
     select.form-control { appearance: auto; }
     .form-actions { display: flex; gap: 12px; margin-top: 28px; }
-    .threshold-group { display: none; }
-    .threshold-group.visible { display: block; }
+
+    /* Template buttons */
+    .tpl-opts { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tpl-opt {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 6px 14px; border-radius: 6px; cursor: pointer;
+        font-size: 13px; font-weight: 500;
+        background: #F0F5FF; color: #1890FF; border: 1px solid #D6E4FF;
+        transition: all 0.2s;
+    }
+    .tpl-opt:hover { background: #D6E4FF; border-color: #ADC6FF; }
+
+    /* Condition builder rows */
+    .cond-rows { margin-bottom: 10px; }
+    .cond-row {
+        display: flex; gap: 8px; align-items: center;
+        margin-bottom: 8px;
+    }
+    .cond-row select,
+    .cond-row input[type="number"] {
+        padding: 8px 10px; border: 1px solid #D9D9D9;
+        border-radius: 6px; font-size: 13px; color: #333;
+        background: #FFF; transition: border-color 0.2s;
+    }
+    .cond-row select:focus,
+    .cond-row input[type="number"]:focus {
+        outline: none; border-color: #1890FF;
+        box-shadow: 0 0 0 2px rgba(24,144,255,0.1);
+    }
+    .cond-row .cond-indicator { width: 160px; appearance: auto; }
+    .cond-row .cond-operator { width: 130px; appearance: auto; }
+    .cond-row .cond-value { width: 100px; }
+    .btn-remove {
+        width: 30px; height: 30px; border: none; border-radius: 6px;
+        background: #FFF1F0; color: #FF4D4F; font-size: 16px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: background 0.2s; flex-shrink: 0;
+    }
+    .btn-remove:hover { background: #FFCCC7; }
+    .btn-add-cond {
+        padding: 6px 14px; border-radius: 6px; border: 1px dashed #D9D9D9;
+        background: transparent; color: #1890FF; font-size: 13px;
+        cursor: pointer; transition: all 0.2s;
+    }
+    .btn-add-cond:hover { border-color: #1890FF; background: #F0F5FF; }
+
+    /* Radio group */
+    .radio-group { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    .radio-group label {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 14px; color: #333; cursor: pointer; font-weight: 400;
+    }
+    .radio-group input[type="radio"] { margin: 0; }
+    .scoring-fields { margin-top: 10px; padding: 10px 14px; background: #FAFAFA; border-radius: 6px; }
+    .scoring-fields label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
+    .scoring-fields input { width: 120px; }
+
+    /* Aggregation fields */
+    .agg-fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .agg-field label { display: block; font-size: 12px; color: #999; margin-bottom: 4px; }
+    .agg-field select,
+    .agg-field input { width: 100%; }
+    .agg-dimension { width: 120px; }
+    .agg-min-stocks { width: 100px; }
+    .agg-time-value { width: 80px; }
+    .agg-time-unit { width: auto; }
+
+    /* Scan frequency */
+    .freq-group { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .freq-group select { width: 160px; }
+    .freq-cron { margin-top: 8px; }
+    .freq-cron input { width: 200px; }
 </style>
 {% endblock %}
 
@@ -41,46 +110,76 @@
                    placeholder="输入策略组名称">
         </div>
 
+        <!-- 指标条件构建器 -->
         <div class="form-group">
-            <label>指标 <span class="hint">JSON 数组格式</span></label>
-            <textarea name="indicators" class="form-control" required
-                      placeholder='["RSI", "MACD", "BOLL"]'>{{ group.indicators|tojson if group and group.indicators else '' }}</textarea>
+            <label>指标条件</label>
+            <div class="tpl-opts">
+                <div class="tpl-opt" onclick="applyTemplate('bottom_resonance')">底部共振</div>
+                <div class="tpl-opt" onclick="applyTemplate('volume_breakout')">放量突破</div>
+                <div class="tpl-opt" onclick="applyTemplate('oversold_bounce')">超跌反弹</div>
+            </div>
+            <div class="cond-rows" id="condRows"></div>
+            <button type="button" class="btn-add-cond" onclick="addConditionRow()">+ 添加条件</button>
         </div>
 
+        <!-- 信号逻辑 -->
         <div class="form-group">
             <label>信号逻辑</label>
-            <select name="signal_logic" class="form-control" onchange="toggleThreshold(this.value)">
-                <option value="AND" {% if group and group.signal_logic == 'AND' %}selected{% endif %}>AND — 全部满足</option>
-                <option value="OR" {% if group and group.signal_logic == 'OR' %}selected{% endif %}>OR — 任一满足</option>
-                <option value="SCORING" {% if group and group.signal_logic == 'SCORING' %}selected{% endif %}>SCORING — 评分模式</option>
-            </select>
+            <div class="radio-group" id="logicRadios">
+                <label><input type="radio" name="logicType" value="AND" checked> AND（全部满足）</label>
+                <label><input type="radio" name="logicType" value="OR"> OR（任一满足）</label>
+                <label><input type="radio" name="logicType" value="SCORING"> SCORING（评分模式）</label>
+            </div>
+            <div class="scoring-fields" id="scoringFields" style="display:none;">
+                <label>最低满足条件数</label>
+                <input type="number" id="minSignals" class="form-control" min="1" value="2">
+            </div>
         </div>
 
-        <div class="form-group threshold-group {% if group and group.signal_logic == 'SCORING' %}visible{% endif %}" id="thresholdGroup">
-            <label>评分阈值 <span class="hint">仅 SCORING 模式</span></label>
-            <input type="number" name="scoring_threshold" class="form-control"
-                   step="0.1" min="0" max="100"
-                   value="{{ group.scoring_threshold if group and group.scoring_threshold else '' }}"
-                   placeholder="例如: 0.7">
-        </div>
-
+        <!-- 聚合规则 -->
         <div class="form-group">
-            <label>条件 <span class="hint">JSON 格式</span></label>
-            <textarea name="conditions" class="form-control"
-                      placeholder='{"RSI": {"op": "<", "value": 30}}'>{{ group.conditions|tojson if group and group.conditions else '' }}</textarea>
+            <label>聚合规则</label>
+            <div class="agg-fields">
+                <div class="agg-field agg-dimension">
+                    <label>维度</label>
+                    <select id="aggDimension" class="form-control">
+                        <option value="industry">行业</option>
+                        <option value="concept">概念</option>
+                        <option value="theme">主题</option>
+                    </select>
+                </div>
+                <div class="agg-field agg-min-stocks">
+                    <label>最少股票数</label>
+                    <input type="number" id="aggMinStocks" class="form-control" min="1" value="3">
+                </div>
+                <div class="agg-field">
+                    <label>时间窗口</label>
+                    <div style="display:flex; gap:4px;">
+                        <input type="number" id="aggTimeValue" class="form-control agg-time-value" min="1" value="3">
+                        <select id="aggTimeUnit" class="form-control agg-time-unit">
+                            <option value="minutes">分钟</option>
+                            <option value="hours">小时</option>
+                            <option value="days" selected>天</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <!-- 扫描频率 -->
         <div class="form-group">
-            <label>聚合配置 <span class="hint">JSON 格式</span></label>
-            <textarea name="aggregation" class="form-control"
-                      placeholder='{"dimension": "sector", "top_n": 10}'>{{ group.aggregation|tojson if group and group.aggregation else '' }}</textarea>
-        </div>
-
-        <div class="form-group">
-            <label>扫描 Cron <span class="hint">Cron 表达式</span></label>
-            <input type="text" name="scan_cron" class="form-control"
-                   value="{{ group.scan_cron if group and group.scan_cron else '' }}"
-                   placeholder="0 9 * * 1-5">
+            <label>扫描频率</label>
+            <div class="freq-group">
+                <select id="scanFrequency" class="form-control" onchange="toggleCronInput(this.value)">
+                    <option value="hourly">每小时</option>
+                    <option value="daily" selected>每天</option>
+                    <option value="weekly">每周</option>
+                    <option value="custom">自定义 cron</option>
+                </select>
+            </div>
+            <div class="freq-cron" id="cronFields" style="display:none;">
+                <input type="text" id="cronExpr" class="form-control" placeholder="0 9 * * 1-5">
+            </div>
         </div>
 
         <div class="form-actions">
@@ -92,29 +191,375 @@
 
 <script>
 {% if group and group.id %}
-const GROUP_ID = {{ group.id }};
-const IS_EDIT = true;
+var GROUP_ID = {{ group.id }};
+var IS_EDIT = true;
 {% else %}
-const GROUP_ID = null;
-const IS_EDIT = false;
+var GROUP_ID = null;
+var IS_EDIT = false;
 {% endif %}
 
-function toggleThreshold(val) {
-    const el = document.getElementById('thresholdGroup');
-    el.classList.toggle('visible', val === 'SCORING');
+/* ============================================================
+ * Constants
+ * ============================================================ */
+var INDICATOR_OPTIONS = [
+    {value: 'kdj_k', label: 'KDJ-K', key: 'k', group: 'kdj'},
+    {value: 'kdj_d', label: 'KDJ-D', key: 'd', group: 'kdj'},
+    {value: 'kdj_j', label: 'KDJ-J', key: 'j', group: 'kdj'},
+    {value: 'rsi_6', label: 'RSI(6)', key: 'rsi_6', group: 'rsi'},
+    {value: 'rsi_12', label: 'RSI(12)', key: 'rsi_12', group: 'rsi'},
+    {value: 'rsi_24', label: 'RSI(24)', key: 'rsi_24', group: 'rsi'},
+    {value: 'volume_ratio', label: '量比', key: 'volume_ratio', group: 'volume'},
+    {value: 'turnover_rate', label: '换手率', key: 'turnover_rate', group: 'turnover'},
+    {value: 'macd_dif', label: 'MACD-DIF', key: 'macd_dif', group: 'macd'},
+    {value: 'macd_dea', label: 'MACD-DEA', key: 'macd_dea', group: 'macd'},
+    {value: 'macd_macd', label: 'MACD柱', key: 'macd_macd', group: 'macd'},
+    {value: 'ma5', label: 'MA5', key: 'ma5', group: 'ma'},
+    {value: 'ma10', label: 'MA10', key: 'ma10', group: 'ma'},
+    {value: 'ma20', label: 'MA20', key: 'ma20', group: 'ma'},
+    {value: 'boll_up', label: 'BOLL上轨', key: 'boll_up', group: 'boll'},
+    {value: 'boll_mid', label: 'BOLL中轨', key: 'boll_mid', group: 'boll'},
+    {value: 'boll_low', label: 'BOLL下轨', key: 'boll_low', group: 'boll'},
+    {value: 'close', label: '收盘价', key: 'close', group: 'price'},
+    {value: 'open', label: '开盘价', key: 'open', group: 'price'},
+    {value: 'high', label: '最高价', key: 'high', group: 'price'},
+    {value: 'low', label: '最低价', key: 'low', group: 'price'},
+    {value: 'pe_ttm', label: 'PE(TTM)', key: 'pe_ttm', group: 'valuation'},
+    {value: 'pb', label: 'PB', key: 'pb', group: 'valuation'},
+    {value: 'ps', label: 'PS', key: 'ps', group: 'valuation'}
+];
+
+var OPERATOR_OPTIONS = [
+    {value: '>', label: '>'},
+    {value: '<', label: '<'},
+    {value: '>=', label: '>='},
+    {value: '<=', label: '<='},
+    {value: '==', label: '=='},
+    {value: 'cross_above', label: '上穿'},
+    {value: 'cross_below', label: '下穿'}
+];
+
+var STRATEGY_TEMPLATES = {
+    bottom_resonance: {
+        name: '底部共振策略',
+        conditions: [
+            {indicator: 'kdj_k', operator: '<', value: 30},
+            {indicator: 'rsi_6', operator: '<', value: 30},
+            {indicator: 'volume_ratio', operator: '>', value: 1.5}
+        ],
+        logic: {type: 'SCORING', min_signals: 2},
+        aggregation: {dimension: 'industry', min_stocks: 3, time_window_days: 3}
+    },
+    volume_breakout: {
+        name: '放量突破策略',
+        conditions: [
+            {indicator: 'volume_ratio', operator: '>', value: 2.0},
+            {indicator: 'close', operator: '>', value: 0},
+            {indicator: 'macd', operator: '>', value: 0}
+        ],
+        logic: {type: 'AND'},
+        aggregation: {dimension: 'concept', min_stocks: 3, time_window_days: 5}
+    },
+    oversold_bounce: {
+        name: '超跌反弹策略',
+        conditions: [
+            {indicator: 'kdj_j', operator: '<', value: 0},
+            {indicator: 'rsi_6', operator: '<', value: 20},
+            {indicator: 'close', operator: '<', value: 0}
+        ],
+        logic: {type: 'OR'},
+        aggregation: {dimension: 'industry', min_stocks: 5, time_window_days: 7}
+    }
+};
+
+/* ============================================================
+ * Serialization: form → JSON
+ * ============================================================ */
+
+function serializeConditions() {
+    var rows = document.querySelectorAll('#condRows .cond-row');
+    var grouped = {};
+    rows.forEach(function(row) {
+        var indicator = row.querySelector('.cond-indicator').value;
+        var operator = row.querySelector('.cond-operator').value;
+        var value = parseFloat(row.querySelector('.cond-value').value);
+        if (!indicator || isNaN(value)) return;
+        var opt = INDICATOR_OPTIONS.find(function(o) { return o.value === indicator; });
+        if (!opt) return;
+        var condStr;
+        if (operator === 'cross_above' || operator === 'cross_below') {
+            condStr = opt.key + ' ' + operator + ' ' + value;
+        } else {
+            condStr = opt.key + operator + value;
+        }
+        var grp = opt.group;
+        if (!grouped[grp]) grouped[grp] = {conditions: []};
+        grouped[grp].conditions.push(condStr);
+    });
+    return grouped;
 }
+
+function serializeSignalLogic() {
+    var radios = document.querySelectorAll('input[name="logicType"]');
+    var type = 'AND';
+    radios.forEach(function(r) { if (r.checked) type = r.value; });
+    var result = {type: type};
+    if (type === 'SCORING') {
+        result.min_signals = parseInt(document.getElementById('minSignals').value) || 2;
+    }
+    return result;
+}
+
+function serializeAggregation() {
+    var dimension = document.getElementById('aggDimension').value;
+    var minStocks = parseInt(document.getElementById('aggMinStocks').value) || 3;
+    var timeValue = parseInt(document.getElementById('aggTimeValue').value) || 3;
+    var timeUnit = document.getElementById('aggTimeUnit').value;
+    var result = {dimension: dimension, min_stocks: minStocks};
+    if (timeUnit === 'days') result.time_window_days = timeValue;
+    else if (timeUnit === 'hours') result.time_window_hours = timeValue;
+    else if (timeUnit === 'minutes') result.time_window_minutes = timeValue;
+    return result;
+}
+
+function serializeScanFrequency() {
+    var freq = document.getElementById('scanFrequency').value;
+    if (freq === 'custom') {
+        return document.getElementById('cronExpr').value.trim() || '0 9 * * 1-5';
+    }
+    return freq;
+}
+
+/* ============================================================
+ * Parsing: JSON → form (for edit mode)
+ * ============================================================ */
+
+function findIndicatorOptByKey(key) {
+    return INDICATOR_OPTIONS.find(function(o) { return o.key === key; }) ||
+           INDICATOR_OPTIONS.find(function(o) { return o.value === key; });
+}
+
+function parseConditionString(str) {
+    str = (str || '').trim();
+    if (!str) return null;
+    /* cross_above / cross_below: "key cross_above value" */
+    var crossMatch = str.match(/^(\S+)\s+(cross_above|cross_below)\s+(.+)$/);
+    if (crossMatch) {
+        return {key: crossMatch[1], operator: crossMatch[2], value: parseFloat(crossMatch[3])};
+    }
+    /* simple comparison: "key<30", "rsi_6>=20" */
+    var m = str.match(/^([a-zA-Z_][a-zA-Z0-9_]*)(<=|>=|==|>|<)(.+)$/);
+    if (m) {
+        return {key: m[1], operator: m[2], value: parseFloat(m[3])};
+    }
+    return null;
+}
+
+function parseConditions(indicators) {
+    if (!indicators || typeof indicators !== 'object') return;
+    var condRows = document.getElementById('condRows');
+    condRows.innerHTML = '';
+    var hasRows = false;
+    Object.keys(indicators).forEach(function(grp) {
+        var entry = indicators[grp];
+        var conditions = entry && (entry.conditions || entry.condition);
+        if (!Array.isArray(conditions)) {
+            /* Try simple format: indicators might be array of names */
+            return;
+        }
+        conditions.forEach(function(condStr) {
+            var parsed = parseConditionString(String(condStr));
+            if (!parsed) return;
+            var opt = findIndicatorOptByKey(parsed.key);
+            if (!opt) return;
+            addConditionRow(opt.value, parsed.operator, parsed.value);
+            hasRows = true;
+        });
+    });
+    if (!hasRows) addConditionRow();
+}
+
+function parseSignalLogic(logic) {
+    if (!logic) return;
+    var type = (typeof logic === 'string') ? logic : (logic.type || 'AND');
+    var radios = document.querySelectorAll('input[name="logicType"]');
+    radios.forEach(function(r) { r.checked = (r.value === type); });
+    var scoringFields = document.getElementById('scoringFields');
+    scoringFields.style.display = (type === 'SCORING') ? 'block' : 'none';
+    if (type === 'SCORING' && logic.min_signals) {
+        document.getElementById('minSignals').value = logic.min_signals;
+    }
+    if (type === 'SCORING' && logic.scoring_threshold != null) {
+        document.getElementById('minSignals').value = logic.scoring_threshold;
+    }
+}
+
+function parseAggregation(agg) {
+    if (!agg || typeof agg !== 'object') return;
+    if (agg.dimension) document.getElementById('aggDimension').value = agg.dimension;
+    if (agg.min_stocks) document.getElementById('aggMinStocks').value = agg.min_stocks;
+    if (agg.time_window_days) {
+        document.getElementById('aggTimeValue').value = agg.time_window_days;
+        document.getElementById('aggTimeUnit').value = 'days';
+    } else if (agg.time_window_hours) {
+        document.getElementById('aggTimeValue').value = agg.time_window_hours;
+        document.getElementById('aggTimeUnit').value = 'hours';
+    } else if (agg.time_window_minutes) {
+        document.getElementById('aggTimeValue').value = agg.time_window_minutes;
+        document.getElementById('aggTimeUnit').value = 'minutes';
+    }
+}
+
+/* ============================================================
+ * UI helpers
+ * ============================================================ */
+
+function addConditionRow(indicator, operator, value) {
+    var container = document.getElementById('condRows');
+    var row = document.createElement('div');
+    row.className = 'cond-row';
+
+    /* Indicator select */
+    var selInd = document.createElement('select');
+    selInd.className = 'cond-indicator';
+    selInd.innerHTML = '<option value="">选择指标</option>';
+    INDICATOR_OPTIONS.forEach(function(opt) {
+        var op = document.createElement('option');
+        op.value = opt.value;
+        op.textContent = opt.label;
+        if (opt.value === indicator) op.selected = true;
+        selInd.appendChild(op);
+    });
+
+    /* Operator select */
+    var selOp = document.createElement('select');
+    selOp.className = 'cond-operator';
+    OPERATOR_OPTIONS.forEach(function(opt) {
+        var op = document.createElement('option');
+        op.value = opt.value;
+        op.textContent = opt.label;
+        if (opt.value === (operator || '<')) op.selected = true;
+        selOp.appendChild(op);
+    });
+
+    /* Value input */
+    var inpVal = document.createElement('input');
+    inpVal.type = 'number';
+    inpVal.className = 'cond-value';
+    inpVal.step = 'any';
+    inpVal.placeholder = '数值';
+    if (value != null) inpVal.value = value;
+
+    /* Remove button */
+    var btnRemove = document.createElement('button');
+    btnRemove.type = 'button';
+    btnRemove.className = 'btn-remove';
+    btnRemove.textContent = '×';
+    btnRemove.onclick = function() { removeConditionRow(btnRemove); };
+
+    row.appendChild(selInd);
+    row.appendChild(selOp);
+    row.appendChild(inpVal);
+    row.appendChild(btnRemove);
+    container.appendChild(row);
+}
+
+function removeConditionRow(btn) {
+    var row = btn.closest('.cond-row');
+    if (row) row.remove();
+    /* Ensure at least one row remains */
+    var container = document.getElementById('condRows');
+    if (!container.children.length) addConditionRow();
+}
+
+function applyTemplate(key) {
+    var tpl = STRATEGY_TEMPLATES[key];
+    if (!tpl) return;
+    /* Fill name only if empty */
+    var nameInput = document.querySelector('input[name="name"]');
+    if (nameInput && !nameInput.value.trim()) nameInput.value = tpl.name;
+    /* Fill conditions */
+    var condRows = document.getElementById('condRows');
+    condRows.innerHTML = '';
+    tpl.conditions.forEach(function(c) {
+        addConditionRow(c.indicator, c.operator, c.value);
+    });
+    /* Fill signal logic */
+    if (tpl.logic) {
+        var radios = document.querySelectorAll('input[name="logicType"]');
+        radios.forEach(function(r) { r.checked = (r.value === tpl.logic.type); });
+        var scoringFields = document.getElementById('scoringFields');
+        scoringFields.style.display = (tpl.logic.type === 'SCORING') ? 'block' : 'none';
+        if (tpl.logic.min_signals) {
+            document.getElementById('minSignals').value = tpl.logic.min_signals;
+        }
+    }
+    /* Fill aggregation */
+    if (tpl.aggregation) {
+        parseAggregation(tpl.aggregation);
+    }
+    showToast('已填充「' + tpl.name + '」模板', 'success');
+}
+
+function toggleCronInput(val) {
+    var cronFields = document.getElementById('cronFields');
+    cronFields.style.display = (val === 'custom') ? 'block' : 'none';
+}
+
+/* Logic radio change handler */
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'logicType') {
+        var scoringFields = document.getElementById('scoringFields');
+        scoringFields.style.display = (e.target.value === 'SCORING') ? 'block' : 'none';
+    }
+});
+
+/* ============================================================
+ * Init & Submit
+ * ============================================================ */
+
+(function init() {
+    /* Inject group data for edit mode */
+    var GROUP_DATA = {{ group|tojson if group else 'null' }};
+
+    if (GROUP_DATA) {
+        /* Parse indicators (new structured format or legacy array) */
+        var indicators = GROUP_DATA.indicators;
+        if (indicators && typeof indicators === 'object' && !Array.isArray(indicators)) {
+            parseConditions(indicators);
+        } else {
+            addConditionRow();
+        }
+        /* Parse signal_logic */
+        parseSignalLogic(GROUP_DATA.signal_logic);
+        /* Parse aggregation */
+        parseAggregation(GROUP_DATA.aggregation);
+        /* Parse scan frequency / cron */
+        var scanCron = GROUP_DATA.scan_cron || GROUP_DATA.scan_frequency || '';
+        var freqSel = document.getElementById('scanFrequency');
+        var cronExpr = document.getElementById('cronExpr');
+        if (['hourly', 'daily', 'weekly'].indexOf(scanCron) >= 0) {
+            freqSel.value = scanCron;
+            cronFields.style.display = 'none';
+        } else if (scanCron) {
+            freqSel.value = 'custom';
+            cronExpr.value = scanCron;
+            cronFields.style.display = 'block';
+        }
+    } else {
+        /* New mode: add one empty condition row */
+        addConditionRow();
+    }
+})();
 
 async function handleSubmit(e) {
     e.preventDefault();
-    const form = e.target;
-    const body = {
+    var form = e.target;
+    var body = {
         name: form.name.value.trim(),
-        indicators: JSON.parse(form.indicators.value || '[]'),
-        signal_logic: form.signal_logic.value,
-        scoring_threshold: form.scoring_threshold.value ? parseFloat(form.scoring_threshold.value) : null,
-        conditions: form.conditions.value ? JSON.parse(form.conditions.value) : null,
-        aggregation: form.aggregation.value ? JSON.parse(form.aggregation.value) : null,
-        scan_cron: form.scan_cron.value.trim() || null,
+        indicators: serializeConditions(),
+        signal_logic: serializeSignalLogic(),
+        aggregation: serializeAggregation(),
+        scan_frequency: serializeScanFrequency()
     };
 
     try {
@@ -131,7 +576,7 @@ async function handleSubmit(e) {
             });
             showToast('创建成功', 'success');
         }
-        setTimeout(() => location.href = '/strategy/admin/groups/', 800);
+        setTimeout(function() { location.href = '/strategy/admin/groups/'; }, 800);
     } catch (e) {
         showToast('保存失败: ' + e.message, 'error');
     }

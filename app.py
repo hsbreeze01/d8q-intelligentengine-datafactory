@@ -2016,3 +2016,12 @@ def proxy_event_info(event_id):
 def proxy_strategy_scan(group_id):
     data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json)
     return jsonify(data), code
+
+
+@app.route("/<path:path>")
+def spa_fallback(path):
+    """SPA 路由 fallback — 所有非 API/static 路由返回 index.html"""
+    if path.startswith(("api/", "static/")):
+        return jsonify({"error": "Not found"}), 404
+    with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
+        return f.read()
