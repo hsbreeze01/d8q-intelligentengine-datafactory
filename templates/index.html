@@ -505,7 +505,7 @@ subList.forEach(async sub => {
     const events = Array.isArray(edata) ? edata : (edata.items || edata.events || []);
     if(!events.length){area.innerHTML='<div style="color:#bbb">暂无活跃事件</div>';return}
     area.innerHTML = events.map(e => `<div style="border:1px solid #f0f0f0;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="showEventDetail(${e.id})">
-      <div style="display:flex;justify-content:space-between"><b>${esc(e.target_name||'')}</b> <span class="badge badge-ok">${e.lifecycle==='tracking'?'跟踪中':e.lifecycle==='suggest_close'?'建议关闭':'已关闭'}</span></div>
+      <div style="display:flex;justify-content:space-between"><b>${esc(e.dimension_value||e.target_name||'事件 #'+e.id)}</b> <span class="badge badge-ok">${e.lifecycle==='tracking'?'跟踪中':e.lifecycle==='suggest_close'?'建议关闭':'已关闭'}</span></div>
       <div style="font-size:12px;color:#999;margin-top:4px">${e.stock_count||0}只股票 · 确认度 ${'✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3)))} · ${e.created_at?(e.created_at+'').slice(0,10):''}</div>
     </div>`).join('');
   }catch(ex){area.innerHTML='<div style="color:#ff4d4f">加载失败</div>'}
@@ -533,7 +533,7 @@ openDrawer(e.target_name||'事件详情',`
   </div>
   <h4 style="margin:16px 0 8px">📊 触发个股</h4>
   ${stocks.length ? '<table class="et"><thead><tr><th>代码</th><th>名称</th><th>星级</th><th>KDJ K</th><th>RSI_6</th><th>量比</th><th>涨跌</th></tr></thead><tbody>'+
-    stocks.map(s=>'<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(s.kdj_k||'-').toFixed(1)+'</td><td>'+(s.rsi_6||'-').toFixed(1)+'</td><td>'+(s.volume_ratio||'-')+'</td><td style="color:'+(s.change_pct>0?'#f5222d':'#52c41a')+'">'+(s.change_pct!=null?(s.change_pct>0?'+':'')+s.change_pct.toFixed(2)+'%':'-')+'</td></tr>').join('')
+    stocks.map(s=>{var snap=s.indicator_snapshot||{};return '<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(snap.kdj_k!=null?snap.kdj_k.toFixed(1):'-')+'</td><td>'+(snap.rsi_6!=null?snap.rsi_6.toFixed(1):'-')+'</td><td>'+(snap.volume_ratio!=null?snap.volume_ratio.toFixed(2):'-')+'</td><td style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+snap.change_pct.toFixed(2)+'%':'-')+'</td></tr>'}).join('')
     +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无个股数据</div>'}
   ${e.llm_summary ? '<h4 style="margin:16px 0 8px">🤖 AI 分析</h4><div style="background:#fafafa;border-radius:8px;padding:16px;font-size:13px;line-height:1.8">'+esc(e.llm_summary)+'</div>' : ''}
   ${(e.llm_keywords&&e.llm_keywords.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>' : ''}
