@@ -4,6 +4,46 @@
     "type": "publish",
     "subject": "人工智能",
     "trigger": "scheduler",
+    "success": false,
+    "result_summary": "🤫微软暗渡陈仓，后OpenAI时代留一手",
+    "duration": 0,
+    "time": "2026-05-15T08:41:42.718481"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤫微软暗渡陈仓，后OpenAI时代留一手",
+    "duration": 4.2,
+    "time": "2026-05-15T08:30:45.352408"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖马化腾喊话AI：船已上，但不够快！",
+    "duration": 0,
+    "time": "2026-05-14T08:41:23.843752"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖马化腾喊话AI：船已上，但不够快！",
+    "duration": 4.5,
+    "time": "2026-05-14T08:30:28.024561"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
     "success": true,
     "result_summary": "queued",
     "duration": 0.1,

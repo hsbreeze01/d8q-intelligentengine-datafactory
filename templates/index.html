@@ -263,6 +263,10 @@ const PAGES=[
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
+{id:'_div2'},
+{id:'strategy-discover',icon:'🔍',label:'策略发现',title:'策略发现'},
+{id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
+{id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
@@ -274,9 +278,10 @@ let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
 function initNav(){
 const nav=document.getElementById('nav');
 nav.innerHTML=PAGES.map(p=>{
-if(p.id==='_div')return'<div class="divider"></div>';
+if(p.id==='_div'||p.id==='_div2')return'<div class="divider"></div>';
 if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
+if(p.href)return`<a href="${p.href}">${p.icon} <span>${p.label}</span></a>`;
 return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
 }).join('');
 nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();var sb=document.querySelector('.sidebar');if(sb)sb.classList.remove('mobile-open');goPage(a.dataset.p)});
@@ -308,7 +313,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,'strategy-discover':loadStrategyDiscover,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -421,6 +426,175 @@ ${n.ai_summary?`<div class="feed-summary">💡 ${esc(n.ai_summary)}</div>`:(n.co
 </div>`;}).join(''):'<div class="empty">暂无数据</div>';
 const pages=Math.ceil((data.total||0)/10);
 document.getElementById('feedPager').innerHTML=pages>1?'<div class="feed-pager">'+Array.from({length:Math.min(pages,10)},(_,i)=>`<div class="fp${feedPage===i+1?' active':''}" onclick="feedPage=${i+1};renderFeed()">${i+1}</div>`).join('')+'</div>':'';
+}
+
+// === 策略组页面 SPA Loaders ===
+
+async function loadStrategyDiscover(el){
+const [groups,subs] = await Promise.all([api('/api/strategy/groups?status=active'),api('/api/strategy/subscriptions/')]);
+const groupList = Array.isArray(groups) ? groups : (groups.groups || groups.items || []);
+const subList = Array.isArray(subs) ? subs : (subs.subscriptions || subs.items || []);
+const subIds = new Set(subList.map(s => s.strategy_group_id));
+const subscribed = groupList.filter(g => subIds.has(g.id)).length;
+el.innerHTML = `
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#1890ff">${groupList.length}</div><div style="font-size:13px;color:#888;margin-top:4px">可订阅策略</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#52c41a">${subscribed}</div><div style="font-size:13px;color:#888;margin-top:4px">已订阅</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#faad14">0</div><div style="font-size:13px;color:#888;margin-top:4px">活跃事件</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#722ed1">-</div><div style="font-size:13px;color:#888;margin-top:4px">平均命中率</div></div>
+</div>
+<div class="card"><h3>🔍 策略发现</h3>
+${groupList.length === 0 ? '<div class="empty">暂无可订阅策略</div>' : groupList.map(g => `
+<div style="border:1px solid ${subIds.has(g.id)?'#1890ff':'#f0f0f0'};border-radius:12px;padding:20px;margin-bottom:12px;${subIds.has(g.id)?'background:#f0f7ff':''}">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:16px">${esc(g.name)}</b> ${g.status==='active'?'<span class="badge badge-ok">运行中</span>':'<span class="badge" style="background:#d9d9d6;color:#666">已暂停</span>'} ${subIds.has(g.id)?'<span class="badge badge-info">已订阅</span>':''}</div>
+    <div>${subIds.has(g.id) ? '<button class="btn-ghost" style="font-size:12px;padding:4px 12px" onclick="unsubscribeStrategy('+g.id+')">取消订阅</button>' : '<button class="btn" style="font-size:12px;padding:4px 12px" onclick="subscribeStrategy('+g.id+')">+ 订阅</button>'}</div>
+  </div>
+  <div style="color:#666;font-size:13px;margin-top:8px">${esc(g.description||'')}</div>
+  <div style="margin-top:10px;font-size:12px;color:#999">📊 总信号: ${g.total_signals||0} &nbsp;|&nbsp; 🎯 事件: ${g.total_events||0} &nbsp;|&nbsp; 🕐 最近扫描: ${g.last_scan_at?(g.last_scan_at+'').slice(0,16):'-'}</div>
+</div>`).join('')}
+</div>`;
+}
+
+async function subscribeStrategy(gid){
+await api('/api/strategy/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy_group_id:gid})});
+toast('已订阅');loadStrategyDiscover(document.getElementById('contentArea'));
+}
+async function unsubscribeStrategy(gid){
+await api('/api/strategy/subscription/'+gid,{method:'DELETE'});
+toast('已取消订阅');loadStrategyDiscover(document.getElementById('contentArea'));
+}
+
+async function loadMyStrategy(el){
+const subs = await api('/api/strategy/subscriptions/');
+const subList = Array.isArray(subs) ? subs : (subs.subscriptions || subs.items || []);
+el.innerHTML = `
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#1890ff">${subList.length}</div><div style="font-size:13px;color:#888;margin-top:4px">已订阅策略</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#52c41a">0</div><div style="font-size:13px;color:#888;margin-top:4px">活跃事件</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#faad14">-</div><div style="font-size:13px;color:#888;margin-top:4px">关联涨幅</div></div>
+  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#722ed1">0</div><div style="font-size:13px;color:#888;margin-top:4px">今日信号</div></div>
+</div>
+${subList.length === 0 ? '<div class="card"><div class="empty">暂未订阅任何策略，前往 <a href="#" onclick="goPage(\'strategy-discover\');return false" style="color:#1890ff">策略发现</a> 订阅</div></div>' : subList.map(sub => `
+<div class="card" style="margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h3 style="margin:0">📌 ${esc(sub.strategy_name||('策略组 #'+sub.strategy_group_id))}</h3>
+    <button class="btn-ghost" style="font-size:12px;padding:4px 12px" onclick="unsubscribeStrategy(${sub.strategy_group_id});loadMyStrategy(document.getElementById('contentArea'))">取消订阅</button>
+  </div>
+  <div id="my-events-${sub.strategy_group_id}" style="color:#999;font-size:13px">加载事件中...</div>
+</div>`).join('')}`;
+// load events for each subscription
+subList.forEach(async sub => {
+  const area = document.getElementById('my-events-'+sub.strategy_group_id);
+  if(!area) return;
+  try{
+    const edata = await api('/api/events?strategy_group_id='+sub.strategy_group_id+'&status=open');
+    const events = Array.isArray(edata) ? edata : (edata.items || edata.events || []);
+    if(!events.length){area.innerHTML='<div style="color:#bbb">暂无活跃事件</div>';return}
+    area.innerHTML = events.map(e => `<div style="border:1px solid #f0f0f0;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="showEventDetail(${e.id})">
+      <div style="display:flex;justify-content:space-between"><b>${esc(e.target_name||'')}</b> <span class="badge badge-ok">${e.lifecycle==='tracking'?'跟踪中':e.lifecycle==='suggest_close'?'建议关闭':'已关闭'}</span></div>
+      <div style="font-size:12px;color:#999;margin-top:4px">${e.stock_count||0}只股票 · 确认度 ${'✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3)))} · ${e.created_at?(e.created_at+'').slice(0,10):''}</div>
+    </div>`).join('');
+  }catch(ex){area.innerHTML='<div style="color:#ff4d4f">加载失败</div>'}
+});
+}
+
+async function showEventDetail(eid){
+const data = await api('/api/events/'+eid);
+const e = data.event || data;
+const [micro,macro,info] = await Promise.all([
+  api('/api/events/'+eid+'/micro').catch(()=>({})),
+  api('/api/events/'+eid+'/macro').catch(()=>({})),
+  api('/api/events/'+eid+'/info').catch(()=>({}))
+]);
+const stocks = micro.stocks || micro.items || [];
+const trendData = macro.trend || macro.items || [];
+const infoData = info.info || info;
+openDrawer(e.target_name||'事件详情',`
+<div style="margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.stock_count||0}</div><div style="font-size:11px;color:#888">触发股票</div></div>
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${'✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3)))||'-'}</div><div style="font-size:11px;color:#888">确认度</div></div>
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.duration_days||0}天</div><div style="font-size:11px;color:#888">持续跟踪</div></div>
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.sector_change_pct!=null?(e.sector_change_pct>0?'+':'')+e.sector_change_pct.toFixed(2)+'%':'-'}</div><div style="font-size:11px;color:#888">板块涨跌</div></div>
+  </div>
+  <h4 style="margin:16px 0 8px">📊 触发个股</h4>
+  ${stocks.length ? '<table class="et"><thead><tr><th>代码</th><th>名称</th><th>星级</th><th>KDJ K</th><th>RSI_6</th><th>量比</th><th>涨跌</th></tr></thead><tbody>'+
+    stocks.map(s=>'<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(s.kdj_k||'-').toFixed(1)+'</td><td>'+(s.rsi_6||'-').toFixed(1)+'</td><td>'+(s.volume_ratio||'-')+'</td><td style="color:'+(s.change_pct>0?'#f5222d':'#52c41a')+'">'+(s.change_pct!=null?(s.change_pct>0?'+':'')+s.change_pct.toFixed(2)+'%':'-')+'</td></tr>').join('')
+    +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无个股数据</div>'}
+  ${e.llm_summary ? '<h4 style="margin:16px 0 8px">🤖 AI 分析</h4><div style="background:#fafafa;border-radius:8px;padding:16px;font-size:13px;line-height:1.8">'+esc(e.llm_summary)+'</div>' : ''}
+  ${(e.llm_keywords&&e.llm_keywords.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>' : ''}
+  ${userRole==='admin'&&e.lifecycle==='suggest_close' ? '<div style="margin-top:16px"><button class="btn" onclick="closeEvent('+eid+')">确认关闭事件</button></div>' : ''}
+</div>`);
+}
+
+async function closeEvent(eid){
+await api('/api/events/'+eid+'/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+toast('事件已关闭');closeDrawer();loadMyStrategy(document.getElementById('contentArea'));
+}
+
+async function loadStrategyAdmin(el){
+const data = await api('/api/strategy/groups');
+const groups = Array.isArray(data) ? data : (data.groups || data.items || []);
+el.innerHTML = `
+<div class="card"><h3>📋 策略组管理 <button class="btn" style="padding:5px 12px;font-size:12px" onclick="showStrategyForm()">+ 新建策略组</button></h3>
+${groups.length === 0 ? '<div class="empty">暂无策略组，点击上方按钮创建</div>' : `
+<table class="et"><thead><tr><th>名称</th><th>状态</th><th>聚合维度</th><th>总信号</th><th>总事件</th><th>最近扫描</th><th>操作</th></tr></thead>
+<tbody>${groups.map(g=>'<tr><td><b>'+esc(g.name)+'</b><div style="font-size:11px;color:#999;margin-top:2px">'+esc(g.description||'').slice(0,40)+'</div></td>'+
+'<td><span class="badge '+(g.status==='active'?'badge-ok':'badge-err')+'">'+({active:'运行中',paused:'已暂停',archived:'已归档'}[g.status]||g.status)+'</span></td>'+
+'<td>'+(g.aggregation?JSON.parse(g.aggregation).dimension:'-')+'</td>'+
+'<td>'+(g.total_signals||0)+'</td><td>'+(g.total_events||0)+'</td>'+
+'<td style="font-size:12px">'+(g.last_scan_at?(g.last_scan_at+'').slice(0,16):'-')+'</td>'+
+'<td style="white-space:nowrap"><button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="editStrategyGroup('+g.id+')">编辑</button>'+
+'<button class="btn-ghost" style="padding:3px 8px;font-size:11px;margin-right:4px" onclick="toggleStrategyGroup('+g.id+',\''+g.status+'\')">'+(g.status==='active'?'暂停':'启用')+'</button>'+
+'<button class="btn-ghost" style="padding:3px 8px;font-size:11px;color:#ff4d4f;border-color:#ff4d4f" onclick="deleteStrategyGroup('+g.id+')">删除</button></td></tr>').join('')}</tbody></table>`}
+</div>
+<div id="strategyFormArea"></div>`;
+}
+
+async function showStrategyForm(gid){
+const g = gid ? await api('/api/strategy/groups/'+gid).then(d=>d.group||d) : null;
+document.getElementById('strategyFormArea').innerHTML = `
+<div class="card" style="margin-top:16px">
+<h3>${g?'编辑':'新建'}策略组</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+  <div><label style="font-size:13px;color:#555;font-weight:500">策略组名称 *</label><input class="search" id="sgName" style="width:100%;margin-top:6px;padding:10px 12px" value="${g?esc(g.name):''}" placeholder="如：底部共振策略 v1"></div>
+  <div><label style="font-size:13px;color:#555;font-weight:500">扫描频率</label><select class="search" id="sgFreq" style="width:100%;margin-top:6px;padding:10px 12px"><option value="daily" ${g&&g.scan_frequency==='daily'?'selected':''}>日级别</option></select></div>
+</div>
+<div style="margin-top:12px"><label style="font-size:13px;color:#555;font-weight:500">描述</label><textarea id="sgDesc" class="search" style="width:100%;margin-top:6px;padding:10px 12px;height:60px;resize:vertical" placeholder="策略组描述...">${g?esc(g.description||''):''}</textarea></div>
+<div style="margin-top:12px"><label style="font-size:13px;color:#555;font-weight:500">指标配置 (JSON)</label><textarea id="sgIndicators" class="search" style="width:100%;margin-top:6px;padding:10px 12px;height:120px;resize:vertical;font-family:monospace;font-size:12px">${g?esc(JSON.stringify(JSON.parse(g.indicators),null,2)):esc(JSON.stringify({kdj:{conditions:["k<30"]},rsi:{conditions:["rsi_6<30"]},volume:{conditions:["volume_ratio>1.5"]}},null,2))}</textarea></div>
+<div style="margin-top:12px"><label style="font-size:13px;color:#555;font-weight:500">信号逻辑 (JSON)</label><textarea id="sgLogic" class="search" style="width:100%;margin-top:6px;padding:10px 12px;height:80px;resize:vertical;font-family:monospace;font-size:12px">${g?esc(JSON.stringify(JSON.parse(g.signal_logic),null,2)):esc(JSON.stringify({type:"SCORING",min_signals:2},null,2))}</textarea></div>
+<div style="margin-top:12px"><label style="font-size:13px;color:#555;font-weight:500">聚合规则 (JSON)</label><textarea id="sgAggregation" class="search" style="width:100%;margin-top:6px;padding:10px 12px;height:80px;resize:vertical;font-family:monospace;font-size:12px">${g?esc(JSON.stringify(JSON.parse(g.aggregation),null,2)):esc(JSON.stringify({dimension:"industry",min_stocks:3,time_window_days:3},null,2))}</textarea></div>
+<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
+  <button class="btn-ghost" onclick="document.getElementById('strategyFormArea').innerHTML=''">取消</button>
+  <button class="btn" onclick="saveStrategyGroup(${g?g.id:'null'})">保存</button>
+</div>
+</div>`;
+}
+
+async function saveStrategyGroup(gid){
+const body = {name:document.getElementById('sgName').value,description:document.getElementById('sgDesc').value,
+  scan_frequency:document.getElementById('sgFreq').value,
+  indicators:JSON.parse(document.getElementById('sgIndicators').value),
+  signal_logic:JSON.parse(document.getElementById('sgLogic').value),
+  aggregation:JSON.parse(document.getElementById('sgAggregation').value)};
+if(!body.name){toast('请输入策略组名称');return}
+try{
+  if(gid){await api('/api/strategy/groups/'+gid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+  else{await api('/api/strategy/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})}
+  toast(gid?'已更新':'已创建');loadStrategyAdmin(document.getElementById('contentArea'));
+}catch(ex){toast('保存失败: '+ex.message)}
+}
+
+async function editStrategyGroup(gid){showStrategyForm(gid)}
+async function toggleStrategyGroup(gid,status){
+const newStatus = status==='active'?'paused':'active';
+await api('/api/strategy/groups/'+gid+'/status',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:newStatus})});
+toast(newStatus==='active'?'已启用':'已暂停');loadStrategyAdmin(document.getElementById('contentArea'));
+}
+async function deleteStrategyGroup(gid){
+if(!confirm('确认删除此策略组？'))return;
+await api('/api/strategy/groups/'+gid,{method:'DELETE'});toast('已删除');loadStrategyAdmin(document.getElementById('contentArea'));
 }
 </script>
 <script>
@@ -2290,6 +2464,7 @@ async function loadRecTracks(){
     el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';
   }
 }
+
 
 init();
 

@@ -55,6 +55,8 @@ def _track_event(response):
 
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
+from compass_pages import compass_bp
+app.register_blueprint(compass_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
@@ -1875,3 +1877,142 @@ def proxy_cookie_import():
             return jsonify({"error": f"HTTP {e.code}: {_raw[:200].decode('utf-8','replace') if isinstance(_raw,bytes) else _raw[:200]}"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)[:200]}), 500
+
+
+# ============================================================
+# Strategy Group API Proxy — route browser requests to Compass
+# ============================================================
+
+def _strategy_proxy(method, path, data=None):
+    """Proxy strategy API calls to Compass with user context"""
+    url = COMPASS_API + path
+    body = json.dumps(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("Content-Type", "application/json")
+    uname = session.get("username", "")
+    if uname:
+        req.add_header("X-Forwarded-User", uname)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read()), resp.status
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        try:
+            return json.loads(raw), e.code
+        except:
+            return {"error": raw[:200].decode("utf-8","replace") if isinstance(raw, bytes) else raw[:200]}, e.code
+    except Exception as e:
+        return {"error": str(e)}, 502
+
+
+@app.route("/api/strategy/groups", methods=["GET", "POST"])
+def proxy_strategy_groups():
+    if request.method == "GET":
+        qs = request.query_string.decode() or ""
+        data, code = _strategy_proxy("GET", "/api/strategy/groups?" + qs)
+    else:
+        data, code = _strategy_proxy("POST", "/api/strategy/groups", request.json)
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>", methods=["GET", "PUT", "DELETE"])
+def proxy_strategy_group(group_id):
+    if request.method == "GET":
+        data, code = _strategy_proxy("GET", f"/api/strategy/groups/{group_id}")
+    elif request.method == "PUT":
+        data, code = _strategy_proxy("PUT", f"/api/strategy/groups/{group_id}", request.json)
+    else:
+        data, code = _strategy_proxy("DELETE", f"/api/strategy/groups/{group_id}")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>/status", methods=["PATCH"])
+def proxy_strategy_group_status(group_id):
+    data, code = _strategy_proxy("PATCH", f"/api/strategy/groups/{group_id}/status", request.json)
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/subscribe", methods=["POST"])
+def proxy_strategy_subscribe():
+    body = request.json or {}
+    body["user_id"] = session.get("username", "")
+    data, code = _strategy_proxy("POST", "/api/strategy/subscription", body)
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/subscription", methods=["POST"])
+def proxy_strategy_subscription():
+    body = request.json or {}
+    body["user_id"] = session.get("username", "")
+    data, code = _strategy_proxy("POST", "/api/strategy/subscription", body)
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/subscription/<int:group_id>", methods=["DELETE"])
+def proxy_strategy_unsubscribe(group_id):
+    uname = session.get("username", "")
+    data, code = _strategy_proxy("DELETE", f"/api/strategy/subscription/{group_id}?user_id={uname}")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/subscription/mine", methods=["GET"])
+def proxy_strategy_my_subscriptions():
+    uname = session.get("username", "")
+    data, code = _strategy_proxy("GET", f"/api/strategy/subscription/mine?user_id={uname}")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/subscriptions/", methods=["GET"])
+def proxy_strategy_subscriptions():
+    uname = session.get("username", "")
+    data, code = _strategy_proxy("GET", f"/api/strategy/subscription/mine?user_id={uname}")
+    return jsonify(data), code
+
+
+@app.route("/api/events", methods=["GET"])
+def proxy_events():
+    qs = request.query_string.decode() or ""
+    data, code = _strategy_proxy("GET", "/api/events?" + qs)
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>", methods=["GET"])
+def proxy_event(event_id):
+    data, code = _strategy_proxy("GET", f"/api/events/{event_id}")
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>/close", methods=["POST"])
+def proxy_event_close(event_id):
+    data, code = _strategy_proxy("POST", f"/api/events/{event_id}/close", request.json)
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>/trend", methods=["GET"])
+def proxy_event_trend(event_id):
+    data, code = _strategy_proxy("GET", f"/api/events/{event_id}/trend")
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>/micro", methods=["GET"])
+def proxy_event_micro(event_id):
+    data, code = _strategy_proxy("GET", f"/api/events/{event_id}/micro")
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>/macro", methods=["GET"])
+def proxy_event_macro(event_id):
+    data, code = _strategy_proxy("GET", f"/api/events/{event_id}/macro")
+    return jsonify(data), code
+
+
+@app.route("/api/events/<int:event_id>/info", methods=["GET"])
+def proxy_event_info(event_id):
+    data, code = _strategy_proxy("GET", f"/api/events/{event_id}/info")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/<int:group_id>/scan", methods=["POST"])
+def proxy_strategy_scan(group_id):
+    data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json)
+    return jsonify(data), code
