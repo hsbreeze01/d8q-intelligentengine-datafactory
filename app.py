@@ -9,14 +9,18 @@ import sys
 import urllib.request
 import urllib.parse
 from datetime import timedelta
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Flask, request, jsonify, session
 import time as _time
-
-logger = logging.getLogger(__name__)
 
 from auth import auth_bp, check_auth
 from export_weekly import export_bp
 from prompts_api import bp as prompts_bp
+from compass_pages import compass_bp
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -55,7 +59,6 @@ def _track_event(response):
 
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
-from compass_pages import compass_bp
 app.register_blueprint(compass_bp)
 DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
@@ -994,7 +997,7 @@ def run_content_task(task_id):
                     # 从markdown提取标题和正文
                     lines = md_content.strip().split("\n")
                     title = lines[0].lstrip("# ").strip()[:20] if lines else subject
-                    body = "\n".join(l for l in lines[1:] if not l.startswith(">") and l.strip())[:1000]
+                    body = "\n".join(ln for ln in lines[1:] if not ln.startswith(">") and ln.strip())[:1000]
                     # 调用 infopublisher API
                     pub_data = {"platform": task.get("channel", "xiaohongshu"), "title": title, "content": body}
                     pub_result, pub_code = _publisher_request("POST", "/api/publish/queue", pub_data, max_retries=0)
@@ -1116,7 +1119,7 @@ def service_status():
         try:
             url = f"http://localhost:{cfg['port']}{cfg['path']}"
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5):
                 services[name] = {"status": "ok", "type": "http", "port": cfg["port"]}
         except urllib.error.HTTPError as e:
             # 405 = route exists (e.g. POST-only), service is alive
@@ -1137,7 +1140,7 @@ def service_status():
             if svc == "ghost_browser" and active:
                 try:
                     req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
-                    with urllib.request.urlopen(req, timeout=3) as resp:
+                    with urllib.request.urlopen(req, timeout=3):
                         entry["cdp"] = "ok"
                 except Exception:
                     entry["cdp"] = "down"
@@ -1372,7 +1375,7 @@ def analytics_cold_hot():
 
 
 # 启动调度器（gunicorn preload模式下只启动一次）
-from scheduler import start_scheduler
+from scheduler import start_scheduler  # noqa: E402
 start_scheduler()
 
 if __name__ == "__main__":
