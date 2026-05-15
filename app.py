@@ -2018,6 +2018,8 @@ def proxy_event_info(event_id):
 @app.route("/api/strategy/<int:group_id>/scan", methods=["POST"])
 def proxy_strategy_scan(group_id):
     data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json, timeout=10)
+    if code == 502 and "timed out" in str(data.get("error", "")).lower():
+        return jsonify({"error": "Compass scan request timeout"}), 502
     return jsonify(data), code
 
 
