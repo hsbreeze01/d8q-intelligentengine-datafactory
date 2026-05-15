@@ -1383,9 +1383,6 @@ if __name__ == "__main__":
 
 
 # --- 邮件推送 API ---
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 SMTP_CFG = {
     "server": os.getenv("SMTP_SERVER", "smtp.qq.com"),
@@ -1557,9 +1554,12 @@ def _execute_custom_check(config):
 def _execute_rule_check(rule):
     cfg = json.loads(rule["config_json"]) if isinstance(rule["config_json"], str) else rule["config_json"]
     rt = rule["type"]
-    if rt == "http": return _execute_http_check(cfg)
-    if rt == "system": return _execute_system_check(cfg)
-    if rt == "custom": return _execute_custom_check(cfg)
+    if rt == "http":
+        return _execute_http_check(cfg)
+    if rt == "system":
+        return _execute_system_check(cfg)
+    if rt == "custom":
+        return _execute_custom_check(cfg)
     return "unknown", f"未知类型: {rt}", {}
 
 @app.route("/api/monitor/rules", methods=["GET"])
@@ -1664,12 +1664,14 @@ def monitor_status():
                     raw = {}
                     try:
                         dj = cached.get("detail_json") or ""
-                        if dj: raw = json.loads(dj)
+                        if dj:
+                            raw = json.loads(dj)
                     except Exception:
                         pass
                     rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
                         "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"], "raw_data": raw})
-                    if st != "ok": alert_count += 1
+                    if st != "ok":
+                        alert_count += 1
                     should_check = False
             except Exception:
                 pass
@@ -1682,7 +1684,8 @@ def monitor_status():
             conn.execute("INSERT INTO monitor_results (rule_id,status,message,detail_json,checked_at) VALUES (?,?,?,?,?)",
                 (rule["id"], status, message, json.dumps(detail) if detail else "", checked_at))
             conn.commit()
-            if status != "ok": alert_count += 1
+            if status != "ok":
+                alert_count += 1
             rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
                 "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
     conn.close()
@@ -1695,7 +1698,7 @@ def monitor_status():
         start = _time.time()
         try:
             req = urllib.request.Request(f"http://localhost:{cfg['port']}{cfg['path']}", method="GET")
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5):
                 services[name] = {"status": "ok", "port": cfg["port"], "elapsed_ms": int((_time.time()-start)*1000)}
         except urllib.error.HTTPError as e:
             elapsed = int((_time.time()-start)*1000)
@@ -1703,7 +1706,8 @@ def monitor_status():
                 services[name] = {"status": "ok", "port": cfg["port"], "elapsed_ms": elapsed}
             else:
                 services[name] = {"status": "ok" if e.code < 500 else "error", "port": cfg["port"], "elapsed_ms": elapsed}
-                if e.code >= 500: alert_count += 1
+                if e.code >= 500:
+                    alert_count += 1
         except Exception:
             services[name] = {"status": "down", "port": cfg["port"]}
             alert_count += 1
@@ -1712,12 +1716,13 @@ def monitor_status():
             r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace('_','-')}"], capture_output=True, text=True, timeout=3)
             active = r.stdout.strip() == "active"
             entry = {"status": "active" if active else "inactive", "type": "systemd"}
-            if not active: alert_count += 1
+            if not active:
+                alert_count += 1
             if svc == "ghost_browser" and active:
                 try:
                     start = _time.time()
                     req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
-                    with urllib.request.urlopen(req, timeout=3) as resp:
+                    with urllib.request.urlopen(req, timeout=3):
                         entry["cdp"] = "ok"
                         entry["elapsed_ms"] = int((_time.time()-start)*1000)
                 except Exception:
@@ -1902,7 +1907,7 @@ def _strategy_proxy(method, path, data=None, timeout=30):
         raw = e.read()
         try:
             return json.loads(raw), e.code
-        except:
+        except Exception:
             return {"error": raw[:200].decode("utf-8","replace") if isinstance(raw, bytes) else raw[:200]}, e.code
     except Exception as e:
         return {"error": str(e)}, 502

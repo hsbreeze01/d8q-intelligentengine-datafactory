@@ -221,7 +221,7 @@ class TestStrategyScanProxy(_ScanProxyTestBase):
 
             client.post("/api/strategy/1/scan", json={})
 
-            called_req = mock_urlopen.call_args[0][0]
+            _called_req = mock_urlopen.call_args[0][0]
             # Check that timeout parameter was passed
             call_kwargs = mock_urlopen.call_args[1]
             if "timeout" in call_kwargs:
