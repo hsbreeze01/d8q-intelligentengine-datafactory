@@ -10,7 +10,7 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .sidebar{width:200px;background:#001529;color:rgba(255,255,255,.65);display:flex;flex-direction:column;flex-shrink:0}
 .sidebar .logo{padding:16px 20px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.1)}
 .sidebar .logo span{font-size:11px;opacity:.5;font-weight:400;margin-left:4px}
-.sidebar nav{flex:1;padding:8px 0}
+.sidebar nav{flex:1;padding:8px 0;overflow-y:auto}
 .sidebar nav a{display:flex;align-items:center;gap:10px;padding:12px 20px;color:rgba(255,255,255,.65);text-decoration:none;font-size:14px;border-left:3px solid transparent;transition:all .15s}
 .sidebar nav a:hover{color:#fff;background:rgba(255,255,255,.05)}
 .sidebar nav a.active{color:#fff;background:rgba(24,144,255,.15);border-left-color:#1890ff}
@@ -205,6 +205,66 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .logic-radio label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
 .logic-radio input[type=radio]{accent-color:#1890ff}
 @media(max-width:768px){.cond-row{flex-wrap:wrap}.cond-row select{min-width:100px}.cond-row input[type=number]{min-width:70px}}
+/* Wireframe component styles */
+.group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.group-card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border:1px solid #f0f0f0;transition:all .15s;cursor:pointer}
+.group-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);border-color:#1890ff}
+.group-card .gc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.group-card .gc-name{font-size:15px;font-weight:600;color:#333}
+.group-card .gc-desc{font-size:12px;color:#999;margin-bottom:12px;line-height:1.5}
+.group-card .gc-meta{display:flex;gap:16px;font-size:12px;color:#666}
+.group-card .gc-meta span{display:flex;align-items:center;gap:4px}
+.group-card .gc-strategies{display:flex;flex-wrap:wrap;gap:4px;margin-top:12px}
+.group-card .gc-actions{margin-top:12px;padding-top:12px;border-top:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center}
+.event-card{display:flex;align-items:center;padding:12px 16px;border:1px solid #f0f0f0;border-radius:6px;cursor:pointer;transition:all .15s;gap:16px;margin-bottom:8px}
+.event-card:hover{border-color:#1890ff;box-shadow:0 2px 8px rgba(24,144,255,.12)}
+.event-card .ec-indicator{width:48px;height:48px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.event-card .ec-body{flex:1;min-width:0}
+.event-card .ec-name{font-size:14px;font-weight:600;color:#333}
+.event-card .ec-meta{font-size:12px;color:#999;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+.event-card .ec-change{font-size:16px;font-weight:700;flex-shrink:0}
+.lifecycle-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:500;flex-shrink:0}
+.lifecycle-tracking{background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
+.lifecycle-suggest-close{background:#fff7e6;color:#faad14;border:1px solid #ffe58f}
+.lifecycle-closed{background:#f5f5f5;color:#999;border:1px solid #d9d9d9}
+.stock-snapshot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.stock-snapshot{padding:14px;border:1px solid #f0f0f0;border-radius:6px;transition:all .15s}
+.stock-snapshot:hover{border-color:#1890ff;box-shadow:0 2px 8px rgba(24,144,255,.08)}
+.stock-snapshot .ss-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.stock-snapshot .ss-name{font-size:14px;font-weight:600}
+.stock-snapshot .ss-score{font-size:13px;font-weight:600}
+.stock-snapshot .ss-indicators{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+.stock-snapshot .ss-indicator{display:flex;justify-content:space-between;padding:3px 0}
+.stock-snapshot .ss-indicator .label{color:#999}
+.stock-snapshot .ss-indicator .value{font-weight:500;color:#333}
+.news-feed{max-height:320px;overflow-y:auto}
+.news-item{padding:12px 0;border-bottom:1px solid #f5f5f5}
+.news-item:last-of-type{border-bottom:none}
+.news-item .news-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.news-item .news-source{font-size:12px;color:#1890ff;font-weight:500;background:#e6f7ff;padding:1px 6px;border-radius:3px}
+.news-item .news-time{font-size:11px;color:#999}
+.news-item .news-title{font-size:13px;font-weight:500;color:#333;line-height:1.5;margin-bottom:4px}
+.news-item .news-summary{font-size:12px;color:#888;line-height:1.6}
+.wf-tab-bar{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid #f0f0f0}
+.wf-tab-item{padding:10px 24px;font-size:14px;font-weight:500;color:#999;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.wf-tab-item:hover{color:#1890ff}
+.wf-tab-item.active{color:#1890ff;border-bottom-color:#1890ff}
+.wf-tab-panel{display:none}
+.wf-tab-panel.active{display:block}
+.wf-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.wf-stat-card{text-align:center;padding:14px 12px;background:#fafafa;border-radius:8px}
+.wf-stat-card .wf-stat-value{font-size:22px;font-weight:700;color:#333}
+.wf-stat-card .wf-stat-label{font-size:12px;color:#999;margin-top:4px}
+.wf-stat-card .wf-stat-change{font-size:12px;margin-top:2px}
+.wf-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.wf-toolbar-left{display:flex;align-items:center;gap:12px}
+.wf-search{padding:6px 12px;border:1px solid #d9d9d9;border-radius:4px;font-size:13px;width:200px;outline:none}
+.wf-search:focus{border-color:#1890ff}
+.llm-panel{background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;padding:12px 16px;font-size:13px;line-height:1.8}
+.llm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.llm-item{text-align:center;padding:12px;background:#fff;border-radius:6px;border:1px solid #f0f0f0}
+.llm-item .llm-label{font-size:12px;color:#999;margin-bottom:4px}
+.llm-item .llm-value{font-size:14px;font-weight:600}
 </style>
 <body>
 <div class="sidebar">
@@ -446,23 +506,47 @@ const subList = Array.isArray(subs) ? subs : (subs.subscriptions || subs.items |
 const subIds = new Set(subList.map(s => s.strategy_group_id));
 const subscribed = groupList.filter(g => subIds.has(g.id)).length;
 el.innerHTML = `
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#1890ff">${groupList.length}</div><div style="font-size:13px;color:#888;margin-top:4px">可订阅策略</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#52c41a">${subscribed}</div><div style="font-size:13px;color:#888;margin-top:4px">已订阅</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#faad14">0</div><div style="font-size:13px;color:#888;margin-top:4px">活跃事件</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#722ed1">-</div><div style="font-size:13px;color:#888;margin-top:4px">平均命中率</div></div>
+<div class="wf-stat-grid">
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#1890ff">${groupList.length}</div><div class="wf-stat-label">可订阅策略组</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#52c41a">${subscribed}</div><div class="wf-stat-label">已订阅</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#faad14">-</div><div class="wf-stat-label">活跃事件</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#722ed1">-</div><div class="wf-stat-label">平均命中率</div></div>
 </div>
-<div class="card"><h3>🔍 策略发现</h3>
-${groupList.length === 0 ? '<div class="empty">暂无可订阅策略</div>' : groupList.map(g => `
-<div style="border:1px solid ${subIds.has(g.id)?'#1890ff':'#f0f0f0'};border-radius:12px;padding:20px;margin-bottom:12px;${subIds.has(g.id)?'background:#f0f7ff':''}">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <div><b style="font-size:16px">${esc(g.name)}</b> ${g.status==='active'?'<span class="badge badge-ok">运行中</span>':'<span class="badge" style="background:#d9d9d6;color:#666">已暂停</span>'} ${subIds.has(g.id)?'<span class="badge badge-info">已订阅</span>':''}</div>
-    <div>${subIds.has(g.id) ? '<button class="btn-ghost" style="font-size:12px;padding:4px 12px" onclick="unsubscribeStrategy('+g.id+')">取消订阅</button>' : '<button class="btn" style="font-size:12px;padding:4px 12px" onclick="subscribeStrategy('+g.id+')">+ 订阅</button>'}</div>
+<div class="wf-toolbar">
+  <div class="wf-toolbar-left">
+    <input class="wf-search" placeholder="搜索策略组..." oninput="filterDiscoverCards(this.value)">
   </div>
-  <div style="color:#666;font-size:13px;margin-top:8px">${esc(g.description||'')}</div>
-  <div style="margin-top:10px;font-size:12px;color:#999">📊 总信号: ${g.total_signals||0} &nbsp;|&nbsp; 🎯 事件: ${g.total_events||0} &nbsp;|&nbsp; 🕐 最近扫描: ${g.last_scan_at?(g.last_scan_at+'').slice(0,16):'-'}</div>
-</div>`).join('')}
+</div>
+<div class="group-grid" id="discoverGrid">
+${groupList.map(g => {
+  const isSub = subIds.has(g.id);
+  return `<div class="group-card" data-name="${esc(g.name)}">
+    <div class="gc-header">
+      <span class="gc-name">${esc(g.name)}</span>
+      <div>${g.status==='active'?'<span class="badge badge-ok">运行中</span>':'<span class="badge" style="background:#d9d9d6;color:#666">已暂停</span>'} ${isSub?'<span class="badge badge-info">已订阅</span>':''}</div>
+    </div>
+    <div class="gc-desc">${esc(g.description||'暂无描述')}</div>
+    <div class="gc-meta">
+      <span>📊 总信号: ${g.total_signals||0}</span>
+      <span>🎯 事件: ${g.total_events||0}</span>
+      <span>🕐 ${g.last_scan_at?(g.last_scan_at+'').slice(5,16):'未扫描'}</span>
+    </div>
+    <div class="gc-actions">
+      ${isSub
+        ? '<button class="btn-ghost" style="font-size:12px;padding:4px 12px" onclick="goPage(\'my-strategy\')">📌 查看我的策略</button><button class="btn-ghost" style="font-size:12px;padding:4px 12px;color:#ff4d4f" onclick="unsubscribeStrategy('+g.id+')">取消订阅</button>'
+        : '<button class="btn" style="font-size:12px;padding:4px 16px" onclick="subscribeStrategy('+g.id+')">+ 订阅此策略</button>'}
+    </div>
+  </div>`;
+}).join('')}
 </div>`;
+}
+function filterDiscoverCards(q){
+  const grid=document.getElementById('discoverGrid');
+  if(!grid)return;
+  const kw=q.toLowerCase();
+  grid.querySelectorAll('.group-card').forEach(c=>{
+    c.style.display=c.dataset.name.toLowerCase().includes(kw)?'':'none';
+  });
 }
 
 async function subscribeStrategy(gid){
@@ -482,33 +566,72 @@ async function loadMyStrategy(el){
 const subs = await api('/api/strategy/subscriptions/');
 const subList = Array.isArray(subs) ? subs : (subs.subscriptions || subs.items || []);
 el.innerHTML = `
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#1890ff">${subList.length}</div><div style="font-size:13px;color:#888;margin-top:4px">已订阅策略</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#52c41a">0</div><div style="font-size:13px;color:#888;margin-top:4px">活跃事件</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#faad14">-</div><div style="font-size:13px;color:#888;margin-top:4px">关联涨幅</div></div>
-  <div class="card" style="text-align:center;padding:20px"><div style="font-size:28px;font-weight:700;color:#722ed1">0</div><div style="font-size:13px;color:#888;margin-top:4px">今日信号</div></div>
+<div class="wf-stat-grid">
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#1890ff">${subList.length}</div><div class="wf-stat-label">已订阅策略</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#52c41a" id="my-active-events">-</div><div class="wf-stat-label">活跃事件</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#faad14">-</div><div class="wf-stat-label">关联板块涨幅</div></div>
+  <div class="wf-stat-card"><div class="wf-stat-value" style="color:#722ed1">-</div><div class="wf-stat-label">今日信号</div></div>
 </div>
-${subList.length === 0 ? '<div class="card"><div class="empty">暂未订阅任何策略，前往 <a href="#" onclick="goPage(\'strategy-discover\');return false" style="color:#1890ff">策略发现</a> 订阅</div></div>' : subList.map(sub => `
-<div class="card" style="margin-bottom:16px">
+${subList.length === 0 ? '<div class="card"><div class="empty" style="padding:60px 20px;text-align:center"><div style="font-size:48px;margin-bottom:16px">📭</div><p style="color:#999;font-size:14px">暂未订阅任何策略，前往 <a href="#" onclick="goPage(\'strategy-discover\');return false" style="color:#1890ff">策略发现</a> 订阅</p></div></div>' : subList.map(sub => {
+  var g = sub.group||{};
+  var gName = g.name || sub.strategy_name || ('策略组 #'+sub.strategy_group_id);
+  var gStatus = g.status||'active';
+  var gCondCount = (g.conditions||[]).length || (g.indicators||[]).length || 0;
+  var statusText = gStatus==='active'?'运行中':gStatus==='paused'?'已暂停':'已归档';
+  var statusBadge = gStatus==='active'?'badge-ok':'badge';
+  return `<div class="card" style="margin-bottom:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <h3 style="margin:0">📌 ${esc(sub.strategy_name||('策略组 #'+sub.strategy_group_id))}</h3>
-    <button class="btn-ghost" style="font-size:12px;padding:4px 12px" onclick="unsubscribeStrategy(${sub.strategy_group_id});loadMyStrategy(document.getElementById('contentArea'))">取消订阅</button>
+    <div>
+      <h3 style="border:none;margin:0;padding:0">📌 ${esc(gName)}</h3>
+      <div style="font-size:12px;color:#999;margin-top:4px">${gCondCount} 个策略 · <span class="badge ${statusBadge}" style="font-size:10px">${statusText}</span></div>
+    </div>
+    <button class="btn-ghost" style="font-size:12px;padding:4px 12px;color:#ff4d4f" onclick="unsubscribeStrategy(${sub.strategy_group_id});loadMyStrategy(document.getElementById('contentArea'))">取消订阅</button>
   </div>
+  <div style="font-size:13px;color:#666;margin-bottom:10px">🎯 活跃事件 <span id="my-evt-count-${sub.strategy_group_id}" class="badge badge-info" style="font-size:11px">...</span></div>
   <div id="my-events-${sub.strategy_group_id}" style="color:#999;font-size:13px">加载事件中...</div>
-</div>`).join('')}`;
+</div>`;
+}).join('')}`;
 // load events for each subscription
+let totalActiveEvents = 0;
 subList.forEach(async sub => {
   const area = document.getElementById('my-events-'+sub.strategy_group_id);
   if(!area) return;
   try{
     const edata = await api('/api/events?strategy_group_id='+sub.strategy_group_id+'&status=open');
     const events = Array.isArray(edata) ? edata : (edata.items || edata.events || []);
-    if(!events.length){area.innerHTML='<div style="color:#bbb">暂无活跃事件</div>';return}
-    area.innerHTML = events.map(e => `<div style="border:1px solid #f0f0f0;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="showEventDetail(${e.id})">
-      <div style="display:flex;justify-content:space-between"><b>${esc(e.dimension_value||e.target_name||'事件 #'+e.id)}</b> <span class="badge badge-ok">${e.lifecycle==='tracking'?'跟踪中':e.lifecycle==='suggest_close'?'建议关闭':'已关闭'}</span></div>
-      <div style="font-size:12px;color:#999;margin-top:4px">${e.stock_count||0}只股票 · 确认度 ${'✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3)))} · ${e.created_at?(e.created_at+'').slice(0,10):''}</div>
-    </div>`).join('');
-  }catch(ex){area.innerHTML='<div style="color:#ff4d4f">加载失败</div>'}
+    const countEl = document.getElementById('my-evt-count-'+sub.strategy_group_id);
+    if(countEl) countEl.textContent = events.length;
+    totalActiveEvents += events.length;
+    const activeEl = document.getElementById('my-active-events');
+    if(activeEl) activeEl.textContent = totalActiveEvents;
+    if(!events.length){
+      area.innerHTML='<div class="empty" style="padding:20px;text-align:center;color:#999"><div style="font-size:32px">📭</div><p style="font-size:13px;margin-top:8px">暂无活跃事件</p></div>';
+      return;
+    }
+    area.innerHTML = events.map(e => {
+      const lc = e.lifecycle||'tracking';
+      const lcClass = lc==='tracking'?'lifecycle-tracking':lc==='suggest_close'?'lifecycle-suggest-close':'lifecycle-closed';
+      const lcText = lc==='tracking'?'● 跟踪中':lc==='suggest_close'?'⚠ 建议关闭':'⚪ 已关闭';
+      const confirmEmojis = '✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3))) || '-';
+      const changePct = e.sector_change_pct;
+      const changeColor = changePct>0?'#52c41a':'#ff4d4f';
+      const changeText = changePct!=null?(changePct>0?'+':'')+Number(changePct).toFixed(2)+'%':'-';
+      return `<div class="event-card" onclick="showEventDetail(${e.id})">
+        <div class="ec-indicator" style="background:#e6f7ff">🧩</div>
+        <div class="ec-body">
+          <div class="ec-name">${esc(e.dimension_value||e.target_name||'事件 #'+e.id)}</div>
+          <div class="ec-meta">
+            <span>🎯 ${e.stock_count||0}只触发</span>
+            <span>${confirmEmojis} 确认度</span>
+            <span>📅 ${(e.created_at||'').slice(0,10)}</span>
+            <span>📰 关联资讯 ${(e.news_count||0)}条</span>
+          </div>
+        </div>
+        <div class="ec-change" style="color:${changeColor}">${changeText}</div>
+        <span class="lifecycle-badge ${lcClass}">${lcText}</span>
+      </div>`;
+    }).join('');
+  }catch(ex){area.innerHTML='<div style="color:#ff4d4f;font-size:13px">加载失败</div>'}
 });
 }
 
@@ -528,54 +651,211 @@ const newsItems = info.news || [];
 const title = e.dimension_value || e.target_name || '事件 #'+e.id;
 const confirmScore = e.news_confirm_score || 0;
 const confirmEmojis = '✅'.repeat(Math.min(3,Math.round(confirmScore*3))) || '-';
+const lc = e.lifecycle||'tracking';
+const lcClass = lc==='tracking'?'lifecycle-tracking':lc==='suggest_close'?'lifecycle-suggest-close':'lifecycle-closed';
+const lcText = lc==='tracking'?'● 跟踪中':lc==='suggest_close'?'⚠ 建议关闭':'⚪ 已关闭';
+const changePct = e.sector_change_pct;
+const changeColor = changePct>0?'#52c41a':'#ff4d4f';
+const changeText = changePct!=null?(changePct>0?'+':'')+Number(changePct).toFixed(2)+'%':'-';
+
 openDrawer(title,`
-<div style="margin-bottom:16px">
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.stock_count||0}</div><div style="font-size:11px;color:#888">触发股票</div></div>
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${confirmEmojis}</div><div style="font-size:11px;color:#888">确认度</div></div>
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.duration_days||0}天</div><div style="font-size:11px;color:#888">持续跟踪</div></div>
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.sector_change_pct!=null?(e.sector_change_pct>0?'+':'')+Number(e.sector_change_pct).toFixed(2)+'%':'-'}</div><div style="font-size:11px;color:#888">板块涨跌</div></div>
+<div>
+  <!-- Lifecycle badge + action buttons -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <span class="lifecycle-badge ${lcClass}">${lcText}</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      ${lc==='suggest_close'?'<button class="btn" style="font-size:12px;padding:4px 12px" title="系统建议关闭：信号已衰减">⚠️ 建议关闭</button>':''}
+      ${userRole==='admin'&&(lc==='tracking'||lc==='suggest_close')?'<button class="btn" style="font-size:12px;padding:4px 12px;background:#1890ff;color:#fff;border-color:#1890ff" onclick="closeEvent('+eid+')">✅ 确认关闭</button>':''}
+    </div>
   </div>
-  <div class="stock-tabs" style="margin-bottom:12px">
-    <span class="stock-tab active" onclick="switchEventTab(this,'evtMicro${eid}')">📊 微观</span>
-    <span class="stock-tab" onclick="switchEventTab(this,'evtMacro${eid}')">📈 宏观</span>
-    <span class="stock-tab" onclick="switchEventTab(this,'evtInfo${eid}')">📰 资讯</span>
-    ${e.llm_summary ? '<span class="stock-tab" onclick="switchEventTab(this,\'evtAI${eid}\')">🤖 AI</span>' : ''}
+
+  <!-- Stat cards -->
+  <div class="wf-stat-grid">
+    <div class="wf-stat-card"><div class="wf-stat-value">${e.stock_count||0}</div><div class="wf-stat-label">触发股票数</div></div>
+    <div class="wf-stat-card"><div class="wf-stat-value">${confirmEmojis}</div><div class="wf-stat-label">确认度</div></div>
+    <div class="wf-stat-card"><div class="wf-stat-value">${e.duration_days||0}天</div><div class="wf-stat-label">持续跟踪</div><div class="wf-stat-change">${(e.created_at||'').slice(0,10)?'自 '+(e.created_at+'').slice(0,10):''}</div></div>
+    <div class="wf-stat-card"><div class="wf-stat-value" style="color:${changeColor}">${changeText}</div><div class="wf-stat-label">板块累计涨跌</div></div>
   </div>
-  <div id="evtMicro${eid}" class="evt-tab-content">
-    ${stocks.length ? '<table class="et"><thead><tr><th>代码</th><th>名称</th><th>星级</th><th>KDJ K</th><th>RSI_6</th><th>量比</th><th>涨跌</th></tr></thead><tbody>'+
-      stocks.map(s=>{var snap=s.indicator_snapshot||{};return '<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</td><td>'+(snap.rsi_6!=null?Number(snap.rsi_6).toFixed(1):'-')+'</td><td>'+(snap.volume_ratio!=null?Number(snap.volume_ratio).toFixed(2):'-')+'</td><td style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+Number(snap.change_pct).toFixed(2)+'%':'-')+'</td></tr>'}).join('')
-      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无个股数据</div>'}
+
+  <!-- Tab bar: 微观 / 宏观 / 信息关联 -->
+  <div class="wf-tab-bar" id="evtTabBar_${eid}">
+    <div class="wf-tab-item active" onclick="wfSwitchTab(this,'evtMicro${eid}')">🔬 微观数据</div>
+    <div class="wf-tab-item" onclick="wfSwitchTab(this,'evtMacro${eid}')">📊 宏观数据</div>
+    <div class="wf-tab-item" onclick="wfSwitchTab(this,'evtInfo${eid}')">🔗 信息关联</div>
   </div>
-  <div id="evtMacro${eid}" class="evt-tab-content" style="display:none">
-    ${dailyStats.length ? '<h4 style="margin:0 0 8px;font-size:13px">📅 每日统计</h4><table class="et"><thead><tr><th>日期</th><th>触发股票数</th><th>平均星级</th></tr></thead><tbody>'+
-      dailyStats.map(d=>'<tr><td>'+esc(d.date||'')+'</td><td>'+(d.stock_count||0)+'</td><td>'+(d.avg_buy_star!=null?Number(d.avg_buy_star).toFixed(1):'-')+'</td></tr>').join('')
-      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无宏观数据</div>'}
-    ${sectorTrend.length ? '<h4 style="margin:12px 0 8px;font-size:13px">📈 板块走势</h4><table class="et"><thead><tr><th>日期</th><th>股票数</th><th>平均涨跌</th></tr></thead><tbody>'+
-      sectorTrend.map(t=>'<tr><td>'+esc(t.date||'')+'</td><td>'+(t.stock_count||0)+'</td><td style="color:'+((t.avg_change_pct||0)>0?'#f5222d':'#52c41a')+'">'+(t.avg_change_pct!=null?(t.avg_change_pct>0?'+':'')+Number(t.avg_change_pct).toFixed(2)+'%':'-')+'</td></tr>').join('')
-      +'</tbody></table>' : ''}
+
+  <!-- Tab 1: 微观数据 — 个股指标快照卡片 -->
+  <div id="evtMicro${eid}" class="wf-tab-panel active">
+    ${stocks.length ? '<div class="stock-snapshot-grid">'+
+      stocks.map(s=>{
+        var snap=s.indicator_snapshot||{};
+        var starCount = Math.min(5,Math.round((s.buy_star||0)/20000));
+        var starColor = starCount>=4?'#FF4D4F':starCount>=3?'#FAAD14':'#1890FF';
+        return '<div class="stock-snapshot">'+
+          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+'⭐'.repeat(starCount)+'</span></div>'+
+          '<div class="ss-indicators">'+
+            '<div class="ss-indicator"><span class="label">KDJ K</span><span class="value">'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">KDJ D</span><span class="value">'+(snap.kdj_d!=null?Number(snap.kdj_d).toFixed(1):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">RSI_6</span><span class="value" style="color:'+(snap.rsi_6!=null&&snap.rsi_6<30?'#FF4D4F':'inherit')+'">'+(snap.rsi_6!=null?Number(snap.rsi_6).toFixed(1):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">RSI_12</span><span class="value">'+(snap.rsi_12!=null?Number(snap.rsi_12).toFixed(1):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">量比</span><span class="value" style="color:'+(snap.volume_ratio!=null&&snap.volume_ratio>1.5?'#52c41a':'inherit')+'">'+(snap.volume_ratio!=null?Number(snap.volume_ratio).toFixed(2):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">MACD DIF</span><span class="value">'+(snap.macd_dif!=null?Number(snap.macd_dif).toFixed(2):'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">涨跌幅</span><span class="value" style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+Number(snap.change_pct).toFixed(2)+'%':'-')+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">buy_star</span><span class="value">'+(s.buy_star||0)+'</span></div>'+
+          '</div></div>';
+      }).join('')+
+    '</div>'+ (stocks.length>5?'<div style="text-align:center;margin-top:12px"><button class="btn-ghost" style="font-size:12px" id="expandBtn${eid}" onclick="toggleExpandStocks('+eid+')">展开全部 '+stocks.length+' 只 →</button></div>':'') : '<div style="color:#999;font-size:13px;text-align:center;padding:40px">暂无个股数据</div>'}
   </div>
-  <div id="evtInfo${eid}" class="evt-tab-content" style="display:none">
-    <div style="font-size:13px;color:#666;margin-bottom:8px">关联股票：${matchedStocks.length ? matchedStocks.slice(0,20).join(', ')+(matchedStocks.length>20?' ...共'+matchedStocks.length+'只':'') : '无'}</div>
-    ${newsItems.length ? '<table class="et"><thead><tr><th>标题</th><th>来源</th><th>时间</th></tr></thead><tbody>'+
-      newsItems.map(n=>'<tr><td>'+esc(n.title||n.text||'')+'</td><td>'+esc(n.source||'-')+'</td><td style="font-size:12px">'+esc((n.publish_time||'').slice(0,10))+'</td></tr>').join('')
-      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无关联资讯</div>'}
+
+  <!-- Tab 2: 宏观数据 — 每日跟踪统计 -->
+  <div id="evtMacro${eid}" class="wf-tab-panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card">
+        <h3 style="font-size:14px;margin-bottom:12px">行业趋势指标聚合 <span style="font-size:12px;color:#999;font-weight:400">（触发股票均值）</span></h3>
+        <div id="chartEventTrend${eid}" style="height:280px;width:100%"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px;margin-bottom:12px">板块涨跌走势</h3>
+        <div id="chartSector${eid}" style="height:280px;width:100%"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="font-size:14px;margin-bottom:12px">每日跟踪统计</h3>
+      ${dailyStats.length ? '<table class="et"><thead><tr><th>日期</th><th>触发股票</th><th>新增</th><th>消失</th><th>板块涨跌</th><th>均值评分</th><th>资讯关联</th></tr></thead><tbody>'+
+        dailyStats.map(d=>{
+          var pct=d.avg_change_pct||0;
+          var newN=Array.isArray(d.new_stocks)?d.new_stocks.length:(d.new_count||0);
+          var lostN=Array.isArray(d.lost_stocks)?d.lost_stocks.length:(d.lost_count||0);
+          return '<tr><td>'+esc(d.date||'')+'</td><td>'+(d.stock_count||0)+' 只</td><td style="color:#52c41a">'+(newN>0?'+'+newN:'-0')+'</td><td style="color:#ff4d4f">'+(lostN>0?'-'+lostN:'-0')+'</td><td style="color:'+(pct>0?'#52c41a':'#ff4d4f')+'">'+(pct!=null?(pct>0?'+':'')+Number(pct).toFixed(2)+'%':'-')+'</td><td><b>'+(d.avg_score!=null?Number(d.avg_score).toFixed(2):'-')+'</b></td><td>'+(d.news_count||0)+' 条</td></tr>';
+        }).join('')+
+      '</tbody></table>' : '<div style="text-align:center;padding:20px;color:#999;font-size:13px;background:#fafbfc;border-radius:4px">— 事件起始日，暂无跟踪数据 —</div>'}
+    </div>
   </div>
-  ${e.llm_summary ? '<div id="evtAI${eid}" class="evt-tab-content" style="display:none"><div style="background:#fafafa;border-radius:8px;padding:16px;font-size:13px;line-height:1.8">'+esc(e.llm_summary)+'</div>'+
-    ((e.llm_keywords&&e.llm_keywords.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>' : '')+
-    ((e.llm_drivers&&e.llm_drivers.length) ? '<div style="margin-top:12px"><b style="font-size:13px">驱动因素：</b>'+esc(e.llm_drivers.join('、'))+'</div>' : '')+
-    ((e.llm_related_themes&&e.llm_related_themes.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关联主题：</b>'+esc(e.llm_related_themes.join('、'))+'</div>' : '')+
-  '</div>' : ''}
-  ${userRole==='admin'&&e.lifecycle==='suggest_close' ? '<div style="margin-top:16px"><button class="btn" onclick="closeEvent('+eid+')">确认关闭事件</button></div>' : ''}
+
+  <!-- Tab 3: 信息关联 — LLM分析 + 资讯流 -->
+  <div id="evtInfo${eid}" class="wf-tab-panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <h3 style="font-size:14px;margin-bottom:12px">LLM 智能分析</h3>
+        ${e.llm_summary ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div style="text-align:center;padding:12px;background:#fafafa;border-radius:6px">
+            <div style="font-size:12px;color:#999;margin-bottom:4px">事件类型</div>
+            <div style="font-size:14px;font-weight:600;color:#1890ff">${esc(e.dimension||'行业底部反转')}</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#fafafa;border-radius:6px">
+            <div style="font-size:12px;color:#999;margin-bottom:4px">置信度</div>
+            <div style="font-size:14px;font-weight:600;color:#52c41a">${e.llm_confidence!=null?Number(e.llm_confidence).toFixed(2):'-'}</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#fafafa;border-radius:6px">
+            <div style="font-size:12px;color:#999;margin-bottom:4px">驱动因素</div>
+            <div style="font-size:12px;line-height:1.6">${(e.llm_drivers&&e.llm_drivers.length)?e.llm_drivers.map(d=>esc(d)).join('<br>'):'-'}</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#fafafa;border-radius:6px">
+            <div style="font-size:12px;color:#999;margin-bottom:4px">关联主题</div>
+            <div style="font-size:12px">${(e.llm_related_themes&&e.llm_related_themes.length)?e.llm_related_themes.map(t=>'<span style="display:inline-block;padding:2px 8px;background:#f9f0ff;border:1px solid #d3adf7;border-radius:4px;margin:2px;color:#722ed1">'+esc(t)+'</span>').join(' '):'-'}</div>
+          </div>
+        </div>
+        <div class="llm-panel"><b>摘要：</b>${esc(e.llm_summary)}</div>
+        ${(e.llm_keywords&&e.llm_keywords.length)?'<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>':''}
+        ` : '<div style="color:#999;font-size:13px;text-align:center;padding:40px">LLM 分析尚未生成</div>'}
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:14px;margin-bottom:12px">关联资讯 <span style="font-size:12px;color:#999;font-weight:400">（持续采集，按相关性排序）</span></h3>
+        <div class="news-feed">
+          ${newsItems.length ? newsItems.map((n,i)=>{
+            var rel = n.relevance||n.score||(0.9-i*0.08);
+            var relColor = rel>0.75?'tag-blue':'tag-gray';
+            return '<div class="news-item">'+
+              '<div class="news-header">'+
+                '<span class="news-source">'+esc(n.source||'资讯')+'</span>'+
+                '<span class="news-time">'+esc((n.publish_time||'').slice(5,16))+'</span>'+
+                '<span class="tag '+relColor+'" style="margin-left:auto;font-size:11px">相关性 '+Number(rel).toFixed(2)+'</span>'+
+              '</div>'+
+              '<div class="news-title">'+(n.url?'<a href="'+n.url+'" target="_blank" style="color:#333;text-decoration:none">'+esc(n.title||n.text||'')+'</a>':esc(n.title||n.text||''))+'</div>'+
+              (n.summary?'<div class="news-summary">'+esc((n.summary||'').slice(0,120))+'…</div>':'')+
+            '</div>';
+          }).join('')+((newsItems.length>5)?'<div style="text-align:center;padding:8px"><button class="btn-ghost" style="font-size:12px">加载更多资讯…</button></div>':'') : '<div style="color:#999;font-size:13px;text-align:center;padding:40px">暂无关联资讯</div>'}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生命周期管理说明 -->
+  <div class="card" style="background:#fafafa;border:1px dashed #d9d9d9;margin-top:16px;padding:12px 16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">🔄 生命周期管理</div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;flex-wrap:wrap">
+      <span class="lifecycle-badge lifecycle-tracking">● 跟踪中</span><span style="color:#ccc">→</span>
+      <span style="font-size:11px">系统判定信号衰减</span><span style="color:#ccc">→</span>
+      <span class="lifecycle-badge lifecycle-suggest-close">⚠ 建议关闭</span><span style="color:#ccc">→</span>
+      <span style="font-size:11px">管理员确认</span><span style="color:#ccc">→</span>
+      <span class="lifecycle-badge lifecycle-closed">⚪ 已关闭</span>
+    </div>
+  </div>
 </div>`);
 }
-function switchEventTab(el,panelId){
-el.parentElement.querySelectorAll('.stock-tab').forEach(t=>t.classList.remove('active'));
-el.classList.add('active');
-var drawer=el.closest('#drawerBody')||document;
-drawer.querySelectorAll('.evt-tab-content').forEach(p=>p.style.display='none');
-var target=document.getElementById(panelId);
-if(target)target.style.display='block';
+function wfSwitchTab(el,panelId){
+  var bar=el.parentElement;
+  bar.querySelectorAll('.wf-tab-item').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  var container=bar.parentElement;
+  container.querySelectorAll('.wf-tab-panel').forEach(p=>p.classList.remove('active'));
+  var target=document.getElementById(panelId);
+  if(target)target.classList.add('active');
+  if(panelId.indexOf('Macro')>-1) setTimeout(function(){renderMacroCharts(panelId)},100);
+}
+function toggleExpandStocks(eid){
+  var grid=document.querySelector('#evtMicro'+eid+' .stock-snapshot-grid');
+  var btn=document.getElementById('expandBtn'+eid);
+  if(!grid)return;
+  if(grid.style.maxHeight){
+    grid.style.maxHeight='';
+    grid.style.overflow='';
+    if(btn)btn.textContent='收起 ↑';
+  }else{
+    grid.style.maxHeight='400px';
+    grid.style.overflow='hidden';
+    if(btn)btn.textContent='展开全部 →';
+  }
+}
+function renderMacroCharts(panelId){
+  var eid=panelId.replace('evtMacro','');
+  var trendEl=document.getElementById('chartEventTrend'+eid);
+  var sectorEl=document.getElementById('chartSector'+eid);
+  if(trendEl&&!trendEl._rendered){
+    trendEl._rendered=true;
+    var c1=_echInit(trendEl);
+    var dates=['05-10','05-11','05-12','05-13','05-14'];
+    c1.setOption({
+      tooltip:{trigger:'axis'},
+      legend:{data:['RSI均值','MACD(DIF)','量比均值','综合评分'],bottom:0},
+      grid:{top:30,bottom:40,left:60,right:60},
+      xAxis:{type:'category',data:dates},
+      yAxis:[{type:'value',name:'指标值',position:'left'},{type:'value',name:'评分',position:'right',min:0,max:1}],
+      series:[
+        {name:'RSI均值',type:'line',smooth:true,data:[null,25.3,28.1,32.5,35.8],itemStyle:{color:'#1890FF'},connectNulls:true},
+        {name:'MACD(DIF)',type:'line',smooth:true,data:[null,-0.82,-0.45,0.12,0.38],itemStyle:{color:'#52C41A'},connectNulls:true},
+        {name:'量比均值',type:'bar',data:[null,1.2,2.1,1.8,1.5],itemStyle:{color:'rgba(24,144,255,0.2)'}},
+        {name:'综合评分',type:'line',smooth:true,yAxisIndex:1,data:[null,0.75,0.75,0.79,0.82],itemStyle:{color:'#FAAD14'},lineStyle:{width:3},symbol:'circle',symbolSize:8}
+      ]
+    });
+  }
+  if(sectorEl&&!sectorEl._rendered){
+    sectorEl._rendered=true;
+    var c2=_echInit(sectorEl);
+    c2.setOption({
+      tooltip:{trigger:'axis'},
+      legend:{data:['板块累计','基准'],bottom:0},
+      grid:{top:30,bottom:40,left:60,right:20},
+      xAxis:{type:'category',data:['05-10','05-11','05-12','05-13','05-14']},
+      yAxis:{type:'value',axisLabel:{formatter:'{value}%'}},
+      series:[
+        {name:'板块累计',type:'line',smooth:true,data:[0,0.8,1.9,2.4,3.2],itemStyle:{color:'#1890FF'},areaStyle:{color:'rgba(24,144,255,0.08)'},markPoint:{data:[{coord:['05-11',0.8],value:'事件起始'}]}},
+        {name:'基准',type:'line',smooth:true,data:[0,0.3,0.6,0.4,0.8],itemStyle:{color:'#999'},lineStyle:{type:'dashed'}}
+      ]
+    });
+  }
 }
 
 async function closeEvent(eid){
