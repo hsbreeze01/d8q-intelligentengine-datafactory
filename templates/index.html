@@ -521,24 +521,61 @@ const [micro,macro,info] = await Promise.all([
   api('/api/events/'+eid+'/info').catch(()=>({}))
 ]);
 const stocks = micro.stocks || micro.items || [];
-const trendData = macro.trend || macro.items || [];
-const infoData = info.info || info;
-openDrawer(e.target_name||'事件详情',`
+const dailyStats = macro.daily_stats || [];
+const sectorTrend = macro.sector_trend || [];
+const matchedStocks = info.matched_stocks || [];
+const newsItems = info.news || [];
+const title = e.dimension_value || e.target_name || '事件 #'+e.id;
+const confirmScore = e.news_confirm_score || 0;
+const confirmEmojis = '✅'.repeat(Math.min(3,Math.round(confirmScore*3))) || '-';
+openDrawer(title,`
 <div style="margin-bottom:16px">
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
     <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.stock_count||0}</div><div style="font-size:11px;color:#888">触发股票</div></div>
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${'✅'.repeat(Math.min(3,Math.round((e.news_confirm_score||0)*3)))||'-'}</div><div style="font-size:11px;color:#888">确认度</div></div>
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${confirmEmojis}</div><div style="font-size:11px;color:#888">确认度</div></div>
     <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.duration_days||0}天</div><div style="font-size:11px;color:#888">持续跟踪</div></div>
-    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.sector_change_pct!=null?(e.sector_change_pct>0?'+':'')+e.sector_change_pct.toFixed(2)+'%':'-'}</div><div style="font-size:11px;color:#888">板块涨跌</div></div>
+    <div style="text-align:center;padding:12px;background:#fafafa;border-radius:8px"><div style="font-size:20px;font-weight:700">${e.sector_change_pct!=null?(e.sector_change_pct>0?'+':'')+Number(e.sector_change_pct).toFixed(2)+'%':'-'}</div><div style="font-size:11px;color:#888">板块涨跌</div></div>
   </div>
-  <h4 style="margin:16px 0 8px">📊 触发个股</h4>
-  ${stocks.length ? '<table class="et"><thead><tr><th>代码</th><th>名称</th><th>星级</th><th>KDJ K</th><th>RSI_6</th><th>量比</th><th>涨跌</th></tr></thead><tbody>'+
-    stocks.map(s=>{var snap=s.indicator_snapshot||{};return '<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(snap.kdj_k!=null?snap.kdj_k.toFixed(1):'-')+'</td><td>'+(snap.rsi_6!=null?snap.rsi_6.toFixed(1):'-')+'</td><td>'+(snap.volume_ratio!=null?snap.volume_ratio.toFixed(2):'-')+'</td><td style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+snap.change_pct.toFixed(2)+'%':'-')+'</td></tr>'}).join('')
-    +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无个股数据</div>'}
-  ${e.llm_summary ? '<h4 style="margin:16px 0 8px">🤖 AI 分析</h4><div style="background:#fafafa;border-radius:8px;padding:16px;font-size:13px;line-height:1.8">'+esc(e.llm_summary)+'</div>' : ''}
-  ${(e.llm_keywords&&e.llm_keywords.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>' : ''}
+  <div class="stock-tabs" style="margin-bottom:12px">
+    <span class="stock-tab active" onclick="switchEventTab(this,'evtMicro${eid}')">📊 微观</span>
+    <span class="stock-tab" onclick="switchEventTab(this,'evtMacro${eid}')">📈 宏观</span>
+    <span class="stock-tab" onclick="switchEventTab(this,'evtInfo${eid}')">📰 资讯</span>
+    ${e.llm_summary ? '<span class="stock-tab" onclick="switchEventTab(this,\'evtAI${eid}\')">🤖 AI</span>' : ''}
+  </div>
+  <div id="evtMicro${eid}" class="evt-tab-content">
+    ${stocks.length ? '<table class="et"><thead><tr><th>代码</th><th>名称</th><th>星级</th><th>KDJ K</th><th>RSI_6</th><th>量比</th><th>涨跌</th></tr></thead><tbody>'+
+      stocks.map(s=>{var snap=s.indicator_snapshot||{};return '<tr><td>'+esc(s.stock_code)+'</td><td>'+esc(s.stock_name||'')+'</td><td>⭐'+(s.buy_star||0)+'</td><td>'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</td><td>'+(snap.rsi_6!=null?Number(snap.rsi_6).toFixed(1):'-')+'</td><td>'+(snap.volume_ratio!=null?Number(snap.volume_ratio).toFixed(2):'-')+'</td><td style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+Number(snap.change_pct).toFixed(2)+'%':'-')+'</td></tr>'}).join('')
+      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无个股数据</div>'}
+  </div>
+  <div id="evtMacro${eid}" class="evt-tab-content" style="display:none">
+    ${dailyStats.length ? '<h4 style="margin:0 0 8px;font-size:13px">📅 每日统计</h4><table class="et"><thead><tr><th>日期</th><th>触发股票数</th><th>平均星级</th></tr></thead><tbody>'+
+      dailyStats.map(d=>'<tr><td>'+esc(d.date||'')+'</td><td>'+(d.stock_count||0)+'</td><td>'+(d.avg_buy_star!=null?Number(d.avg_buy_star).toFixed(1):'-')+'</td></tr>').join('')
+      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无宏观数据</div>'}
+    ${sectorTrend.length ? '<h4 style="margin:12px 0 8px;font-size:13px">📈 板块走势</h4><table class="et"><thead><tr><th>日期</th><th>股票数</th><th>平均涨跌</th></tr></thead><tbody>'+
+      sectorTrend.map(t=>'<tr><td>'+esc(t.date||'')+'</td><td>'+(t.stock_count||0)+'</td><td style="color:'+((t.avg_change_pct||0)>0?'#f5222d':'#52c41a')+'">'+(t.avg_change_pct!=null?(t.avg_change_pct>0?'+':'')+Number(t.avg_change_pct).toFixed(2)+'%':'-')+'</td></tr>').join('')
+      +'</tbody></table>' : ''}
+  </div>
+  <div id="evtInfo${eid}" class="evt-tab-content" style="display:none">
+    <div style="font-size:13px;color:#666;margin-bottom:8px">关联股票：${matchedStocks.length ? matchedStocks.slice(0,20).join(', ')+(matchedStocks.length>20?' ...共'+matchedStocks.length+'只':'') : '无'}</div>
+    ${newsItems.length ? '<table class="et"><thead><tr><th>标题</th><th>来源</th><th>时间</th></tr></thead><tbody>'+
+      newsItems.map(n=>'<tr><td>'+esc(n.title||n.text||'')+'</td><td>'+esc(n.source||'-')+'</td><td style="font-size:12px">'+esc((n.publish_time||'').slice(0,10))+'</td></tr>').join('')
+      +'</tbody></table>' : '<div style="color:#999;font-size:13px">暂无关联资讯</div>'}
+  </div>
+  ${e.llm_summary ? '<div id="evtAI${eid}" class="evt-tab-content" style="display:none"><div style="background:#fafafa;border-radius:8px;padding:16px;font-size:13px;line-height:1.8">'+esc(e.llm_summary)+'</div>'+
+    ((e.llm_keywords&&e.llm_keywords.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关键词：</b>'+e.llm_keywords.map(k=>'<span style="display:inline-block;padding:2px 10px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:14px;font-size:12px;margin:2px">'+esc(k)+'</span>').join('')+'</div>' : '')+
+    ((e.llm_drivers&&e.llm_drivers.length) ? '<div style="margin-top:12px"><b style="font-size:13px">驱动因素：</b>'+esc(e.llm_drivers.join('、'))+'</div>' : '')+
+    ((e.llm_related_themes&&e.llm_related_themes.length) ? '<div style="margin-top:12px"><b style="font-size:13px">关联主题：</b>'+esc(e.llm_related_themes.join('、'))+'</div>' : '')+
+  '</div>' : ''}
   ${userRole==='admin'&&e.lifecycle==='suggest_close' ? '<div style="margin-top:16px"><button class="btn" onclick="closeEvent('+eid+')">确认关闭事件</button></div>' : ''}
 </div>`);
+}
+function switchEventTab(el,panelId){
+el.parentElement.querySelectorAll('.stock-tab').forEach(t=>t.classList.remove('active'));
+el.classList.add('active');
+var drawer=el.closest('#drawerBody')||document;
+drawer.querySelectorAll('.evt-tab-content').forEach(p=>p.style.display='none');
+var target=document.getElementById(panelId);
+if(target)target.style.display='block';
 }
 
 async function closeEvent(eid){

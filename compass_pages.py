@@ -235,3 +235,51 @@ def strategy_admin_edit(group_id):
         "strategy/admin_edit.html",
         group=group, user=_get_user_info(), is_admin=True,
     )
+
+
+@compass_bp.route("/strategy/admin/groups/<int:group_id>/")
+def strategy_admin_detail(group_id):
+    """策略组详情页 — 统计卡片 + 活跃事件 + 信号快照 + 信号趋势图表"""
+    if not _require_login():
+        return redirect("/login")
+    if not _is_admin():
+        return redirect("/login")
+    group_data, status = _compass_request("GET", f"/api/strategy/groups/{group_id}/")
+    group = group_data.get("group", group_data) if isinstance(group_data, dict) else group_data
+    events_data, _ = _compass_request("GET", f"/api/strategy/events/?strategy_group_id={group_id}&status=open")
+    events = events_data if isinstance(events_data, list) else events_data.get("items", events_data.get("events", []))
+    return render_template(
+        "strategy/admin_detail.html",
+        group=group, events=events or [],
+        user=_get_user_info(), is_admin=True,
+    )
+
+
+@compass_bp.route("/strategy/admin/groups/<int:group_id>/backtest/")
+def strategy_admin_backtest(group_id):
+    """回测页 — 统计摘要 + 收益曲线 + 月度收益图表"""
+    if not _require_login():
+        return redirect("/login")
+    if not _is_admin():
+        return redirect("/login")
+    group_data, status = _compass_request("GET", f"/api/strategy/groups/{group_id}/")
+    group = group_data.get("group", group_data) if isinstance(group_data, dict) else group_data
+    return render_template(
+        "strategy/admin_backtest.html",
+        group=group, user=_get_user_info(), is_admin=True,
+    )
+
+
+@compass_bp.route("/strategy/admin/groups/<int:group_id>/run/")
+def strategy_admin_run(group_id):
+    """运行管理页 — 调度配置 + 运行历史时间线"""
+    if not _require_login():
+        return redirect("/login")
+    if not _is_admin():
+        return redirect("/login")
+    group_data, status = _compass_request("GET", f"/api/strategy/groups/{group_id}/")
+    group = group_data.get("group", group_data) if isinstance(group_data, dict) else group_data
+    return render_template(
+        "strategy/admin_run.html",
+        group=group, user=_get_user_info(), is_admin=True,
+    )

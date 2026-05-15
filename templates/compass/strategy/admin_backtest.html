@@ -1,0 +1,118 @@
+{% extends "strategy/base.html" %}
+{% block title %}{{ group.name | default('回测') }} - 回测{% endblock %}
+{% block head %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .toolbar .back-btn { text-decoration: none; color: #555; font-size: 14px; }
+    .toolbar .back-btn:hover { color: #1890FF; }
+    .toolbar .toolbar-actions { margin-left: auto; display: flex; gap: 8px; }
+    .stats-grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1200px) { .stats-grid-6 { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 768px) { .stats-grid-6 { grid-template-columns: repeat(2, 1fr); } }
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <a href="/strategy/admin/groups/{{ group.id | default(0) }}/" class="back-btn">← 返回详情</a>
+    <h1 class="page-title" style="margin-bottom:0;">{{ group.name | default('策略组') }} — 回测</h1>
+    <div class="toolbar-actions">
+        <select id="timeRange" class="form-control" style="width:140px;">
+            <option value="7">近 7 天</option>
+            <option value="30" selected>近 30 天</option>
+            <option value="90">近 90 天</option>
+            <option value="180">近 180 天</option>
+        </select>
+        <button class="btn btn-primary" onclick="runBacktest()">运行回测</button>
+    </div>
+</div>
+
+<!-- 统计摘要 -->
+<div class="stats-grid-6">
+    <div class="stat-card"><div class="stat-value" id="bt-return">-</div><div class="stat-label">累计收益</div></div>
+    <div class="stat-card"><div class="stat-value" id="bt-winrate">-</div><div class="stat-label">胜率</div></div>
+    <div class="stat-card"><div class="stat-value" id="bt-plratio">-</div><div class="stat-label">盈亏比</div></div>
+    <div class="stat-card"><div class="stat-value" id="bt-drawdown">-</div><div class="stat-label">最大回撤</div></div>
+    <div class="stat-card"><div class="stat-value" id="bt-trades">-</div><div class="stat-label">总交易次数</div></div>
+    <div class="stat-card"><div class="stat-value" id="bt-avgdays">-</div><div class="stat-label">平均持仓天数</div></div>
+</div>
+
+<!-- 图表区域 -->
+<div class="chart-row">
+    <div class="card">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">收益曲线 vs 基准</h2>
+        <div id="returnChart" style="width:100%;height:360px;"></div>
+    </div>
+    <div class="card">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">月度收益分布</h2>
+        <div id="monthlyChart" style="width:100%;height:360px;"></div>
+    </div>
+</div>
+
+<script>
+var GROUP_ID = {{ group.id | default(0) }};
+
+async function runBacktest() {
+    var days = document.getElementById('timeRange').value;
+    try {
+        var data = await fetchJSON('/api/strategy/groups/' + GROUP_ID + '/backtest/', {
+            method: 'POST',
+            body: JSON.stringify({ days: parseInt(days) })
+        });
+        renderBacktest(data);
+        showToast('回测完成', 'success');
+    } catch (e) {
+        showToast('回测失败: ' + e.message, 'error');
+    }
+}
+
+function renderBacktest(data) {
+    var summary = data.summary || {};
+    document.getElementById('bt-return').textContent = summary.cumulative_return != null ? (summary.cumulative_return * 100).toFixed(2) + '%' : '-';
+    document.getElementById('bt-winrate').textContent = summary.win_rate != null ? (summary.win_rate * 100).toFixed(1) + '%' : '-';
+    document.getElementById('bt-plratio').textContent = summary.profit_loss_ratio != null ? summary.profit_loss_ratio.toFixed(2) : '-';
+    document.getElementById('bt-drawdown').textContent = summary.max_drawdown != null ? (summary.max_drawdown * 100).toFixed(2) + '%' : '-';
+    document.getElementById('bt-trades').textContent = summary.total_trades || '-';
+    document.getElementById('bt-avgdays').textContent = summary.avg_holding_days != null ? summary.avg_holding_days.toFixed(1) : '-';
+
+    // Return curve chart
+    var curve = data.return_curve || [];
+    if (curve.length > 0) {
+        var chart1 = echarts.init(document.getElementById('returnChart'));
+        chart1.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['策略', '基准'] },
+            xAxis: { type: 'category', data: curve.map(function(d) { return d.date; }) },
+            yAxis: { type: 'value', name: '收益率 (%)' },
+            series: [
+                { name: '策略', type: 'line', data: curve.map(function(d) { return ((d.strategy || 0) * 100).toFixed(2); }), smooth: true, lineStyle: { color: '#1890FF' } },
+                { name: '基准', type: 'line', data: curve.map(function(d) { return ((d.benchmark || 0) * 100).toFixed(2); }), smooth: true, lineStyle: { color: '#999' } }
+            ],
+            grid: { left: 60, right: 20, bottom: 30, top: 40 }
+        });
+        window.addEventListener('resize', function() { chart1.resize(); });
+    }
+
+    // Monthly chart
+    var monthly = data.monthly || [];
+    if (monthly.length > 0) {
+        var chart2 = echarts.init(document.getElementById('monthlyChart'));
+        chart2.setOption({
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: monthly.map(function(d) { return d.month; }) },
+            yAxis: { type: 'value', name: '收益 (%)' },
+            series: [{
+                type: 'bar', data: monthly.map(function(d) { return { value: ((d.return || 0) * 100).toFixed(2), itemStyle: { color: d.return >= 0 ? '#52C41A' : '#FF4D4F' } }; })
+            }],
+            grid: { left: 60, right: 20, bottom: 30, top: 20 }
+        });
+        window.addEventListener('resize', function() { chart2.resize(); });
+    }
+}
+
+// Auto-load with default range
+runBacktest();
+</script>
+{% endblock %}

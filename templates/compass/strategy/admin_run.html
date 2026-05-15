@@ -1,0 +1,137 @@
+{% extends "strategy/base.html" %}
+{% block title %}{{ group.name | default('运行管理') }} - 运行管理{% endblock %}
+{% block head %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .toolbar .back-btn { text-decoration: none; color: #555; font-size: 14px; }
+    .toolbar .back-btn:hover { color: #1890FF; }
+    .toolbar .toolbar-actions { margin-left: auto; display: flex; gap: 8px; }
+
+    /* Timeline */
+    .timeline { position: relative; padding-left: 30px; margin-top: 16px; }
+    .timeline::before {
+        content: ''; position: absolute; left: 10px; top: 0; bottom: 0;
+        width: 2px; background: #F0F0F0;
+    }
+    .timeline-item { position: relative; margin-bottom: 20px; padding: 12px 16px; background: #FAFAFA; border-radius: 6px; }
+    .timeline-item::before {
+        content: ''; position: absolute; left: -24px; top: 16px;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #1890FF; border: 2px solid #FFF; box-shadow: 0 0 0 2px #D9D9D9;
+    }
+    .timeline-item.success::before { background: #52C41A; box-shadow: 0 0 0 2px #B7EB8F; }
+    .timeline-item.fail::before { background: #FF4D4F; box-shadow: 0 0 0 2px #FFCCC7; }
+    .timeline-item .tl-time { font-size: 12px; color: #999; }
+    .timeline-item .tl-desc { font-size: 14px; color: #333; margin-top: 4px; }
+
+    .schedule-config { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+    .schedule-config .field label { display: block; font-size: 12px; color: #999; margin-bottom: 4px; }
+    .schedule-config .field select,
+    .schedule-config .field input { width: 160px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <a href="/strategy/admin/groups/{{ group.id | default(0) }}/" class="back-btn">← 返回详情</a>
+    <h1 class="page-title" style="margin-bottom:0;">{{ group.name | default('策略组') }} — 运行管理</h1>
+    <div class="toolbar-actions">
+        {% if group.status == 'active' %}
+        <button class="btn btn-warning" onclick="pauseGroup()">⏸ 暂停</button>
+        {% elif group.status == 'paused' %}
+        <button class="btn btn-success" onclick="resumeGroup()">▶ 恢复</button>
+        {% endif %}
+        <button class="btn btn-primary" onclick="triggerRun()">🔄 立即执行</button>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card"><div class="stat-value" id="stat-status">-</div><div class="stat-label">当前状态</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-next-run">-</div><div class="stat-label">下次执行</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-today-signals">-</div><div class="stat-label">今日信号数</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-success-rate">-</div><div class="stat-label">成功率(近7日)</div></div>
+</div>
+
+<!-- 调度配置 -->
+<div class="card">
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">调度配置</h2>
+    <div class="schedule-config">
+        <div class="field">
+            <label>执行频率</label>
+            <select id="schedFrequency" class="form-control">
+                <option value="hourly">每小时</option>
+                <option value="daily" selected>每天</option>
+                <option value="weekly">每周</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>执行时间</label>
+            <input type="text" id="schedTime" class="form-control" placeholder="09:30" value="{{ group.scan_cron | default('') }}">
+        </div>
+        <div class="field">
+            <label>股票池</label>
+            <input type="text" id="schedPool" class="form-control" placeholder="全部 A 股" style="width:240px;" value="{{ group.stock_pool | default('') }}">
+        </div>
+    </div>
+</div>
+
+<!-- 运行历史 -->
+<div class="card">
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">运行历史</h2>
+    <div id="runTimeline" class="timeline">
+        <div class="loading"><div class="spinner"></div><p style="margin-top:12px;">加载运行历史...</p></div>
+    </div>
+</div>
+
+<script>
+var GROUP_ID = {{ group.id | default(0) }};
+var GROUP_STATUS = '{{ group.status | default("unknown") }}';
+
+// Init stats
+document.getElementById('stat-status').textContent = GROUP_STATUS === 'active' ? '运行中' : (GROUP_STATUS === 'paused' ? '已暂停' : GROUP_STATUS);
+
+// Load runs
+fetchJSON('/api/strategy/groups/' + GROUP_ID + '/runs/').then(function(data) {
+    var items = data.items || data || [];
+    var container = document.getElementById('runTimeline');
+    if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><p>暂无运行记录</p></div>';
+        return;
+    }
+    container.innerHTML = items.map(function(r) {
+        var cls = r.status === 'success' ? 'success' : (r.status === 'fail' ? 'fail' : '');
+        return '<div class="timeline-item ' + cls + '">' +
+            '<div class="tl-time">' + (r.run_time || r.created_at || '-') + '</div>' +
+            '<div class="tl-desc">' + (r.description || r.message || r.status || '-') + '</div>' +
+            '</div>';
+    }).join('');
+}).catch(function() {
+    document.getElementById('runTimeline').innerHTML = '<div class="empty-state"><p>加载失败</p></div>';
+});
+
+async function triggerRun() {
+    try {
+        await fetchJSON('/api/strategy/groups/' + GROUP_ID + '/run/trigger/', { method: 'POST' });
+        showToast('已触发执行', 'success');
+        setTimeout(function() { location.reload(); }, 1000);
+    } catch (e) { showToast('触发失败: ' + e.message, 'error'); }
+}
+
+async function pauseGroup() {
+    try {
+        await fetchJSON('/api/strategy/groups/' + GROUP_ID, { method: 'PUT', body: JSON.stringify({ status: 'paused' }) });
+        showToast('已暂停', 'success');
+        setTimeout(function() { location.reload(); }, 600);
+    } catch (e) { showToast('操作失败: ' + e.message, 'error'); }
+}
+
+async function resumeGroup() {
+    try {
+        await fetchJSON('/api/strategy/groups/' + GROUP_ID, { method: 'PUT', body: JSON.stringify({ status: 'active' }) });
+        showToast('已恢复', 'success');
+        setTimeout(function() { location.reload(); }, 600);
+    } catch (e) { showToast('操作失败: ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

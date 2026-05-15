@@ -2020,6 +2020,47 @@ def proxy_event_info(event_id):
     return jsonify(data), code
 
 
+@app.route("/api/strategy/groups/<int:group_id>/stats/", methods=["GET"])
+def proxy_strategy_group_stats(group_id):
+    """策略组详情统计数据代理"""
+    data, code = _strategy_proxy("GET", f"/api/strategy/groups/{group_id}/stats/")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>/backtest/", methods=["GET", "POST"])
+def proxy_strategy_group_backtest(group_id):
+    """回测数据代理 — GET 获取结果，POST 触发回测"""
+    if request.method == "GET":
+        qs = request.query_string.decode() or ""
+        data, code = _strategy_proxy("GET", f"/api/strategy/groups/{group_id}/backtest/?{qs}")
+    else:
+        data, code = _strategy_proxy("POST", f"/api/strategy/groups/{group_id}/backtest/", request.json)
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>/runs/", methods=["GET"])
+def proxy_strategy_group_runs(group_id):
+    """运行历史代理"""
+    qs = request.query_string.decode() or ""
+    data, code = _strategy_proxy("GET", f"/api/strategy/groups/{group_id}/runs/?{qs}")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>/signals/", methods=["GET"])
+def proxy_strategy_group_signals(group_id):
+    """今日信号快照代理"""
+    qs = request.query_string.decode() or ""
+    data, code = _strategy_proxy("GET", f"/api/strategy/groups/{group_id}/signals/?{qs}")
+    return jsonify(data), code
+
+
+@app.route("/api/strategy/groups/<int:group_id>/run/trigger/", methods=["POST"])
+def proxy_strategy_group_run_trigger(group_id):
+    """手动触发执行代理"""
+    data, code = _strategy_proxy("POST", f"/api/strategy/groups/{group_id}/run/trigger/", request.json)
+    return jsonify(data), code
+
+
 @app.route("/api/strategy/<int:group_id>/scan", methods=["POST"])
 def proxy_strategy_scan(group_id):
     data, code = _strategy_proxy("POST", f"/api/strategy/{group_id}/scan", request.json, timeout=10)

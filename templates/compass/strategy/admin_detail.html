@@ -1,0 +1,100 @@
+{% extends "strategy/base.html" %}
+{% block title %}{{ group.name | default('策略组详情') }} - 详情{% endblock %}
+{% block head %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .toolbar .back-btn { text-decoration: none; color: #555; font-size: 14px; }
+    .toolbar .back-btn:hover { color: #1890FF; }
+    .toolbar .toolbar-actions { margin-left: auto; display: flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+    <a href="/strategy/admin/groups/" class="back-btn">← 返回列表</a>
+    <h1 class="page-title" style="margin-bottom:0;">{{ group.name | default('策略组详情') }}</h1>
+    {% if group.status == 'active' %}
+    <span class="badge badge-active">运行中</span>
+    {% elif group.status == 'paused' %}
+    <span class="badge badge-paused">已暂停</span>
+    {% else %}
+    <span class="badge badge-archived">已归档</span>
+    {% endif %}
+    <div class="toolbar-actions">
+        <a href="/strategy/admin/groups/{{ group.id }}/backtest/" class="btn btn-outline btn-sm">📊 回测</a>
+        <a href="/strategy/admin/groups/{{ group.id }}/run/" class="btn btn-outline btn-sm">⚙ 运行管理</a>
+        <a href="/strategy/admin/groups/{{ group.id }}/edit" class="btn btn-primary btn-sm">编辑</a>
+    </div>
+</div>
+
+<!-- 统计卡片 — 由前端 JS 从 /api/strategy/groups/<id>/stats/ 异步加载 -->
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="stat-value" id="stat-strategies">-</div><div class="stat-label">策略数量</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-hit-rate">-</div><div class="stat-label">综合命中率</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-signals">-</div><div class="stat-label">今日信号</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-profit">-</div><div class="stat-label">累计收益</div></div>
+</div>
+
+<!-- 活跃事件列表 -->
+<div class="card">
+    <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">活跃事件</h2>
+    <div id="eventsList">
+        {% if events %}
+        {% for ev in events %}
+        <div class="card" style="cursor:pointer;margin-bottom:12px;" onclick="location.href='/strategy/events/{{ ev.id }}/'">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <strong>{{ ev.dimension_value | default(ev.name | default('事件')) }}</strong>
+                    <span style="margin-left:8px;">{{ renderLifecycleBadge(ev.lifecycle | default('tracking'))|safe }}</span>
+                </div>
+                <div style="font-size:13px;color:#888;">触发 {{ ev.stock_count | default(0) }} 只</div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state"><p>暂无活跃事件</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 信号快照 + 趋势图表 — 由前端 JS 异步加载 -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="card">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">今日信号快照</h2>
+        <div id="signalsTable" class="table-wrapper">
+            <table><thead><tr><th>股票</th><th>方向</th><th>触发策略</th><th>得分</th><th>时间</th></tr></thead>
+            <tbody id="signalsBody"><tr><td colspan="5" style="text-align:center;color:#999;">加载中...</td></tr></tbody></table>
+        </div>
+    </div>
+    <div class="card">
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">近 7 日信号趋势</h2>
+        <div id="signalTrendChart" style="width:100%;height:300px;"></div>
+    </div>
+</div>
+
+<script>
+var GROUP_ID = {{ group.id | default(0) }};
+
+// Load stats
+fetchJSON('/api/strategy/groups/' + GROUP_ID + '/stats/').then(function(data) {
+    document.getElementById('stat-strategies').textContent = data.strategy_count || '-';
+    document.getElementById('stat-hit-rate').textContent = data.hit_rate != null ? (data.hit_rate * 100).toFixed(1) + '%' : '-';
+    document.getElementById('stat-signals').textContent = data.today_signals != null ? '买' + (data.today_buy || 0) + '/卖' + (data.today_sell || 0) : '-';
+    document.getElementById('stat-profit').textContent = data.cumulative_profit != null ? (data.cumulative_profit * 100).toFixed(2) + '%' : '-';
+}).catch(function() {});
+
+// Load signals
+fetchJSON('/api/strategy/groups/' + GROUP_ID + '/signals/').then(function(data) {
+    var items = data.items || data || [];
+    var tbody = document.getElementById('signalsBody');
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">今日暂无信号</td></tr>'; return; }
+    tbody.innerHTML = items.map(function(s) {
+        return '<tr><td>' + (s.stock_name || s.stock_code || '-') + '</td><td>' + (s.direction || '-') +
+            '</td><td>' + (s.strategy_name || '-') + '</td><td>' + (s.score != null ? s.score.toFixed(1) : '-') +
+            '</td><td>' + (s.time || '-') + '</td></tr>';
+    }).join('');
+}).catch(function() {
+    document.getElementById('signalsBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">加载失败</td></tr>';
+});
+</script>
+{% endblock %}
