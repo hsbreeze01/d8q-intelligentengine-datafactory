@@ -100,9 +100,9 @@ def _run_task(task):
                 import json as _j
                 logs = _j.load(f)
             # 查找今日同 subject 的 creation 记录
-            today_creation = [l for l in logs if l.get("type") == "creation"
-                              and l.get("subject") == task_subject
-                              and l.get("time", "").startswith(today)]
+            today_creation = [entry for entry in logs if entry.get("type") == "creation"
+                              and entry.get("subject") == task_subject
+                              and entry.get("time", "").startswith(today)]
             if today_creation and not today_creation[0].get("success", False):
                 logger.info("跳过 publish %s: 今日 creation 失败 (%s)", task_subject, today_creation[0].get("result_summary", ""))
                 return {"error": "skipped_creation_failed", "subject": task_subject, "reason": "今日创作任务失败，跳过发布"}
