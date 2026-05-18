@@ -1,5 +1,55 @@
 [
   {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.2,
+    "time": "2026-05-18T08:30:11.573251"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
+    "duration": 0.3,
+    "time": "2026-05-17T08:30:01.102921"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": true,
+    "result_summary": "微软暗藏后手，AI江湖风云再起⁉️",
+    "duration": 0,
+    "time": "2026-05-16T10:40:56.197809"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "error",
+    "duration": 0.2,
+    "time": "2026-05-16T08:40:55.807535"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "微软暗藏后手，AI江湖风云再起⁉️",
+    "duration": 4.1,
+    "time": "2026-05-16T08:30:58.172630"
+  },
+  {
     "task_id": "5d3cba25",
     "type": "publish",
     "subject": "人工智能",

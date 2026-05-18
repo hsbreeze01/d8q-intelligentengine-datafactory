@@ -3,11 +3,10 @@ import fcntl
 import json
 import logging
 import os
-import random
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 # 确保调度器日志输出到文件
@@ -25,20 +24,6 @@ sys.path.insert(0, "/home/ecs-assist-user/d8q-data-agent/scripts")
 
 # 各任务类型的默认执行时间 (HH:MM)
 DEFAULT_RUN_AT = {"creation": "08:30", "publish": "08:50"}
-
-# 每日随机偏移（防止固定时间规律被检测为自动化）
-_daily_offsets = {"_date": None, "creation": 0, "publish": 0}
-
-def _get_daily_offsets():
-    """每天生成一次随机偏移量，creation 在 -5~+40 分钟，publish 在 creation+5~+50 分钟"""
-    global _daily_offsets
-    today = datetime.now().strftime("%Y-%m-%d")
-    if _daily_offsets["_date"] != today:
-        creation_offset = random.randint(-5, 40)   # 08:25 ~ 09:10
-        publish_offset = random.randint(max(creation_offset + 5, -5), 50)  # 确保 publish > creation, 08:25 ~ 09:40
-        _daily_offsets = {"_date": today, "creation": creation_offset, "publish": publish_offset}
-        logger.info("每日随机偏移: creation=%+dmin, publish=%+dmin", creation_offset, publish_offset)
-    return _daily_offsets
 
 
 def _load_tasks():
@@ -270,24 +255,18 @@ def _tick():
         # 先轮询已投递的 publish 队列任务
         _poll_pending()
 
-        # 先执行creation，再执行publish（加每日随机偏移）
-        offsets = _get_daily_offsets()
+        # 先执行creation，再执行publish
         for task_type in ("creation", "publish"):
             for task in tasks:
                 if task.get("type") != task_type:
                     continue
                 run_h, run_m = _parse_run_at(task)
-                # 应用每日随机偏移
-                offset_min = offsets.get(task_type, 0)
-                base_time = datetime(now.year, now.month, now.day, run_h, run_m)
-                adjusted_time = base_time + timedelta(minutes=offset_min)
-                adj_h, adj_m = adjusted_time.hour, adjusted_time.minute
-                if now.hour != adj_h or now.minute < adj_m:
+                if now.hour != run_h or now.minute < run_m:
                     continue
                 if not _should_run(task):
                     continue
-                logger.info("调度执行: %s %s(%s) run_at=%02d:%02d offset=%+dmin adjusted=%02d:%02d",
-                            task.get("id"), task_type, task.get("subject"), run_h, run_m, offset_min, adj_h, adj_m)
+                logger.info("调度执行: %s %s(%s) run_at=%02d:%02d",
+                            task.get("id"), task_type, task.get("subject"), run_h, run_m)
                 _run_task(task)
                 task["last_run"] = now.strftime("%Y-%m-%d %H:%M:%S")
                 changed = True

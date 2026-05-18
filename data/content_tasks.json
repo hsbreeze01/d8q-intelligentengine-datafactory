@@ -8,7 +8,7 @@
     "created_at": "2026-04-15T00:02:42.066662",
     "status": "active",
     "run_at": "08:30",
-    "last_run": "2026-05-15 08:30:40"
+    "last_run": "2026-05-18 08:30:11"
   },
   {
     "type": "publish",
@@ -19,9 +19,10 @@
     "created_at": "2026-04-15T00:02:42.127723",
     "status": "active",
     "run_at": "08:40",
-    "last_run": "2026-05-15 08:40:42",
-    "queue_task_id": "1e201955",
-    "queue_status": "failed"
+    "last_run": "2026-05-18 08:40:11",
+    "queue_task_id": "2c6a997f",
+    "queue_status": "completed",
+    "queue_trigger": "manual"
   },
   {
     "type": "creation",
