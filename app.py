@@ -75,11 +75,17 @@ def get_db():
     return conn
 
 
+_wal_initialized = False
+
+
 @contextmanager
 def get_db_ctx():
+    global _wal_initialized
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    if not _wal_initialized:
+        conn.execute("PRAGMA journal_mode=WAL")
+        _wal_initialized = True
     try:
         yield conn
     finally:
@@ -1068,9 +1074,8 @@ def update_llm_config():
 @app.route("/api/push/config", methods=["GET"])
 def get_push_config():
     username = session.get("username", "")
-    conn = get_db()
-    row = conn.execute("SELECT * FROM push_configs WHERE user_id=?", (username,)).fetchone()
-    conn.close()
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT * FROM push_configs WHERE user_id=?", (username,)).fetchone()
     if row:
         return jsonify(dict(row))
     return jsonify({"user_id": username, "email": "", "enabled_types": "[]",
@@ -1081,16 +1086,15 @@ def get_push_config():
 def update_push_config():
     username = session.get("username", "")
     body = request.json or {}
-    conn = get_db()
-    conn.execute(
-        "INSERT OR REPLACE INTO push_configs "
-        "(user_id, email, enabled_types, daily_time, weekly_day, alert_threshold, webhook_url) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (username, body.get("email", ""), json.dumps(body.get("enabled_types", [])),
-         body.get("daily_time", "08:00"), body.get("weekly_day", "friday"),
-         body.get("alert_threshold", 30), body.get("webhook_url", "")))
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO push_configs "
+            "(user_id, email, enabled_types, daily_time, weekly_day, alert_threshold, webhook_url) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, body.get("email", ""), json.dumps(body.get("enabled_types", [])),
+             body.get("daily_time", "08:00"), body.get("weekly_day", "friday"),
+             body.get("alert_threshold", 30), body.get("webhook_url", "")))
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -1235,24 +1239,22 @@ def research_by_track(track_id):
     refresh = request.args.get("refresh") == "1"
     today = datetime.now().strftime("%Y-%m-%d")
 
-    conn = get_db()
-    track = conn.execute("SELECT name, keywords FROM tracks WHERE id=?", (track_id,)).fetchone()
-    if not track:
-        conn.close()
-        return jsonify({"error": "赛道不存在"}), 404
+    with get_db_ctx() as conn:
+        track = conn.execute("SELECT name, keywords FROM tracks WHERE id=?", (track_id,)).fetchone()
+        if not track:
+            return jsonify({"error": "赛道不存在"}), 404
 
-    # 检查缓存（同一赛道同一天只调一次LLM）
-    if not refresh:
-        cache = conn.execute(
-            "SELECT data FROM research_cache WHERE track_id=? AND date=?",
-            (track_id, today)).fetchone()
-        if cache:
-            conn.close()
-            result = json.loads(cache["data"])
-            result["cached"] = True
-            return jsonify(result)
+        # 检查缓存（同一赛道同一天只调一次LLM）
+        cache = None
+        if not refresh:
+            cache = conn.execute(
+                "SELECT data FROM research_cache WHERE track_id=? AND date=?",
+                (track_id, today)).fetchone()
 
-    conn.close()
+    if cache:
+        result = json.loads(cache["data"])
+        result["cached"] = True
+        return jsonify(result)
 
     keywords = json.loads(track["keywords"])
     all_reports = []
@@ -1284,11 +1286,10 @@ def research_by_track(track_id):
             result["ai_summary"] = None
 
     # 写入缓存
-    conn = get_db()
-    conn.execute("INSERT OR REPLACE INTO research_cache (track_id, date, data) VALUES (?,?,?)",
-                (track_id, today, json.dumps(result, ensure_ascii=False)))
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        conn.execute("INSERT OR REPLACE INTO research_cache (track_id, date, data) VALUES (?,?,?)",
+                    (track_id, today, json.dumps(result, ensure_ascii=False)))
+        conn.commit()
     result["cached"] = False
     return jsonify(result)
 
@@ -1297,63 +1298,50 @@ def research_by_track(track_id):
 def analytics_overview():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         dau = conn.execute("SELECT COUNT(DISTINCT user_id) FROM user_events WHERE DATE(event_time)=DATE('now')").fetchone()[0]
         mau = conn.execute("SELECT COUNT(DISTINCT user_id) FROM user_events WHERE event_time >= datetime('now', '-30 days')").fetchone()[0]
         today_events = conn.execute("SELECT COUNT(*) FROM user_events WHERE DATE(event_time)=DATE('now')").fetchone()[0]
         top = conn.execute("SELECT function_name, COUNT(*) as c FROM user_events WHERE DATE(event_time)=DATE('now') GROUP BY function_name ORDER BY c DESC LIMIT 1").fetchone()
         return jsonify({"dau": dau, "mau": mau, "today_events": today_events,
             "top_function": {"name": top[0], "count": top[1]} if top else {"name": "-", "count": 0}})
-    finally:
-        conn.close()
 
 @app.route("/api/analytics/functions")
 def analytics_functions():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     days = int(request.args.get("days", 30))
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         cutoff = "datetime('now', '-{} days')".format(days) if days < 9999 else "datetime('2000-01-01')"
         total = conn.execute("SELECT COUNT(*) FROM user_events WHERE event_time >= " + cutoff).fetchone()[0]
         rows = conn.execute("SELECT function_name, COUNT(*) as c FROM user_events WHERE event_time >= " + cutoff + " GROUP BY function_name ORDER BY c DESC").fetchall()
         return jsonify({"functions": [{"name": r[0], "count": r[1], "percentage": round(r[1]/max(total,1)*100, 1)} for r in rows], "total": total})
-    finally:
-        conn.close()
 
 @app.route("/api/analytics/users")
 def analytics_users():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     days = int(request.args.get("days", 30))
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         cutoff = "datetime('now', '-{} days')".format(days) if days < 9999 else "datetime('2000-01-01')"
         rows = conn.execute("SELECT user_id, MAX(event_time) as last_active, COUNT(DISTINCT function_name) as func_count, COUNT(*) as total_calls, ROUND(CAST(COUNT(*) AS FLOAT) / MAX(julianday('now') - julianday(MIN(event_time)), 1), 1) as daily_avg FROM user_events WHERE event_time >= " + cutoff + " GROUP BY user_id ORDER BY total_calls DESC").fetchall()
         return jsonify({"users": [{"user_id": r[0], "last_active": r[1], "function_count": r[2], "total_calls": r[3], "daily_avg": r[4]} for r in rows]})
-    finally:
-        conn.close()
 
 @app.route("/api/analytics/trends")
 def analytics_trends():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     days = int(request.args.get("days", 30))
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         rows = conn.execute("SELECT DATE(event_time) as date, COUNT(DISTINCT user_id) as dau, COUNT(*) as total_calls FROM user_events WHERE event_time >= datetime('now', '-{} days') GROUP BY DATE(event_time) ORDER BY date".format(days)).fetchall()
         return jsonify({"trends": [{"date": r[0], "dau": r[1], "total_calls": r[2]} for r in rows]})
-    finally:
-        conn.close()
 
 @app.route("/api/analytics/cold-hot")
 def analytics_cold_hot():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     days = int(request.args.get("days", 30))
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         users = [r[0] for r in conn.execute("SELECT DISTINCT user_id FROM user_events WHERE event_time >= datetime('now', '-{} days') ORDER BY user_id".format(days)).fetchall()]
         functions = [r[0] for r in conn.execute("SELECT DISTINCT function_name FROM user_events WHERE event_time >= datetime('now', '-{} days') ORDER BY function_name".format(days)).fetchall()]
         user_idx = {u: i for i, u in enumerate(users)}
@@ -1364,8 +1352,6 @@ def analytics_cold_hot():
             if r[0] in user_idx and r[1] in func_idx:
                 matrix[user_idx[r[0]]][func_idx[r[1]]] = r[2]
         return jsonify({"users": users, "functions": functions, "matrix": matrix})
-    finally:
-        conn.close()
 
 
 # 启动调度器（gunicorn preload模式下只启动一次）
@@ -1591,9 +1577,8 @@ def _execute_rule_check(rule):
 def get_monitor_rules():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
-    conn = get_db()
-    rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules ORDER BY builtin DESC, id").fetchall()]
-    conn.close()
+    with get_db_ctx() as conn:
+        rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules ORDER BY builtin DESC, id").fetchall()]
     return jsonify({"rules": rules})
 
 @app.route("/api/monitor/rules", methods=["POST"])
@@ -1610,13 +1595,12 @@ def create_monitor_rule():
         return jsonify({"error": "规则名称不能为空"}), 400
     if rtype not in ("http", "system", "custom"):
         return jsonify({"error": "不支持的检查类型"}), 400
-    conn = get_db()
-    cur = conn.execute(
-        "INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,0,?)",
-        (name, rtype, json.dumps(config), severity, interval_sec))
-    conn.commit()
-    rid = cur.lastrowid
-    conn.close()
+    with get_db_ctx() as conn:
+        cur = conn.execute(
+            "INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,0,?)",
+            (name, rtype, json.dumps(config), severity, interval_sec))
+        conn.commit()
+        rid = cur.lastrowid
     return jsonify({"id": rid, "success": True}), 201
 
 @app.route("/api/monitor/rules/<int:rule_id>", methods=["PUT"])
