@@ -82,14 +82,8 @@ class TestMonitorCookieAlert(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        # Patch get_db to use our temp DB
-        _orig_get_db = _app_module.get_db
+        # Patch get_db_ctx to use our temp DB
         _orig_get_db_ctx = _app_module.get_db_ctx
-
-        def _test_get_db():
-            conn = sqlite3.connect(_TEST_DB)
-            conn.row_factory = sqlite3.Row
-            return conn
 
         @contextmanager
         def _test_get_db_ctx():
@@ -100,14 +94,12 @@ class TestMonitorCookieAlert(unittest.TestCase):
             finally:
                 conn.close()
 
-        _app_module.get_db = _test_get_db
         _app_module.get_db_ctx = _test_get_db_ctx
         _app = _app_module.app
         _app.config["TESTING"] = True
-        return _app, _app_module, _orig_get_db, _orig_get_db_ctx
+        return _app, _app_module, _orig_get_db_ctx
 
-    def _restore_get_db(self, _app_module, _orig_get_db, _orig_get_db_ctx):
-        _app_module.get_db = _orig_get_db
+    def _restore_get_db(self, _app_module, _orig_get_db_ctx):
         _app_module.get_db_ctx = _orig_get_db_ctx
 
     @patch("app.urllib.request.urlopen")

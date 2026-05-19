@@ -60,7 +60,7 @@ def _init_test_db():
 
 
 class _TrackTaskUITestBase(unittest.TestCase):
-    """Base class that sets up a test Flask client with mocked DB."""
+    """Base class that sets up a test Flask client."""
 
     @classmethod
     def setUpClass(cls):
@@ -72,7 +72,7 @@ class _TrackTaskUITestBase(unittest.TestCase):
             os.unlink(_TEST_DB)
 
     def _get_client(self):
-        """Return a Flask test client with patched get_db."""
+        """Return a Flask test client."""
         import app as _app_module
 
         conn_clean = sqlite3.connect(_TEST_DB)
@@ -80,24 +80,13 @@ class _TrackTaskUITestBase(unittest.TestCase):
         conn_clean.commit()
         conn_clean.close()
 
-        _orig_get_db = _app_module.get_db
-
-        def _test_get_db():
-            conn = sqlite3.connect(_TEST_DB)
-            conn.row_factory = sqlite3.Row
-            return conn
-
-        _app_module.get_db = _test_get_db
         _app = _app_module.app
         _app.config["TESTING"] = True
         client = _app.test_client()
         with client.session_transaction() as sess:
             sess["role"] = "admin"
             sess["username"] = "admin"
-        return client, _app_module, _orig_get_db
-
-    def _restore(self, _app_module, _orig):
-        _app_module.get_db = _orig
+        return client, _app_module
 
 
 class TestKeywordsProxy(_TrackTaskUITestBase):
@@ -106,68 +95,59 @@ class TestKeywordsProxy(_TrackTaskUITestBase):
     @patch("app.urllib.request.urlopen")
     def test_keywords_proxy_returns_data(self, mock_urlopen):
         """Proxy should forward keywords response from data-agent."""
-        client, mod, orig = self._get_client()
-        try:
-            resp_mock = MagicMock()
-            resp_mock.status = 200
-            resp_mock.read.return_value = json.dumps({
-                "track_id": 3,
-                "keywords": ["碳纤维", "复合材料", "石墨烯"],
-                "count": 3
-            }).encode()
-            resp_mock.__enter__ = lambda s: s
-            resp_mock.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = resp_mock
+        client, mod = self._get_client()
+        resp_mock = MagicMock()
+        resp_mock.status = 200
+        resp_mock.read.return_value = json.dumps({
+            "track_id": 3,
+            "keywords": ["碳纤维", "复合材料", "石墨烯"],
+            "count": 3
+        }).encode()
+        resp_mock.__enter__ = lambda s: s
+        resp_mock.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = resp_mock
 
-            resp = client.get("/api/proxy/tracks/3/keywords")
-            self.assertEqual(resp.status_code, 200)
-            data = resp.get_json()
-            self.assertEqual(data["track_id"], 3)
-            self.assertIn("碳纤维", data["keywords"])
-            self.assertEqual(data["count"], 3)
-        finally:
-            self._restore(mod, orig)
+        resp = client.get("/api/proxy/tracks/3/keywords")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["track_id"], 3)
+        self.assertIn("碳纤维", data["keywords"])
+        self.assertEqual(data["count"], 3)
 
     @patch("app.urllib.request.urlopen")
     def test_keywords_proxy_forwards_correct_url(self, mock_urlopen):
         """Proxy should call the agent API with the correct path."""
-        client, mod, orig = self._get_client()
-        try:
-            resp_mock = MagicMock()
-            resp_mock.status = 200
-            resp_mock.read.return_value = json.dumps({
-                "track_id": 5, "keywords": [], "count": 0
-            }).encode()
-            resp_mock.__enter__ = lambda s: s
-            resp_mock.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = resp_mock
+        client, mod = self._get_client()
+        resp_mock = MagicMock()
+        resp_mock.status = 200
+        resp_mock.read.return_value = json.dumps({
+            "track_id": 5, "keywords": [], "count": 0
+        }).encode()
+        resp_mock.__enter__ = lambda s: s
+        resp_mock.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = resp_mock
 
-            client.get("/api/proxy/tracks/5/keywords")
+        client.get("/api/proxy/tracks/5/keywords")
 
-            called_url = mock_urlopen.call_args[0][0]
-            if isinstance(called_url, str):
-                url_str = called_url
-            else:
-                url_str = getattr(called_url, "full_url", str(called_url))
+        called_url = mock_urlopen.call_args[0][0]
+        if isinstance(called_url, str):
+            url_str = called_url
+        else:
+            url_str = getattr(called_url, "full_url", str(called_url))
 
-            self.assertIn("/api/tracks/5/keywords", url_str,
-                          f"Expected /api/tracks/5/keywords in URL, got {url_str}")
-        finally:
-            self._restore(mod, orig)
+        self.assertIn("/api/tracks/5/keywords", url_str,
+                      f"Expected /api/tracks/5/keywords in URL, got {url_str}")
 
     @patch("app.urllib.request.urlopen")
     def test_keywords_proxy_error_returns_502(self, mock_urlopen):
         """If agent is unreachable, proxy should return 502."""
-        client, mod, orig = self._get_client()
-        try:
-            mock_urlopen.side_effect = Exception("Connection refused")
+        client, mod = self._get_client()
+        mock_urlopen.side_effect = Exception("Connection refused")
 
-            resp = client.get("/api/proxy/tracks/99/keywords")
-            self.assertEqual(resp.status_code, 502)
-            data = resp.get_json()
-            self.assertIn("error", data)
-        finally:
-            self._restore(mod, orig)
+        resp = client.get("/api/proxy/tracks/99/keywords")
+        self.assertEqual(resp.status_code, 502)
+        data = resp.get_json()
+        self.assertIn("error", data)
 
 
 class TestTrackTaskListBadge(_TrackTaskUITestBase):
@@ -176,30 +156,27 @@ class TestTrackTaskListBadge(_TrackTaskUITestBase):
     @patch("app.urllib.request.urlopen")
     def test_task_list_proxy(self, mock_urlopen):
         """GET /api/tasks should return tasks from agent (proxy check)."""
-        client, mod, orig = self._get_client()
-        try:
-            resp_mock = MagicMock()
-            resp_mock.status = 200
-            resp_mock.read.return_value = json.dumps([
-                {"id": "t1", "subject": "新材料", "track_id": 3,
-                 "sources": ["cailianshe"], "cron_expr": "0 */2 * * *",
-                 "max_results": 20, "enabled": True},
-                {"id": "t2", "subject": "核电", "track_id": None,
-                 "sources": ["nbd"], "cron_expr": "0 9 * * *",
-                 "max_results": 10, "enabled": True}
-            ]).encode()
-            resp_mock.__enter__ = lambda s: s
-            resp_mock.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = resp_mock
+        client, mod = self._get_client()
+        resp_mock = MagicMock()
+        resp_mock.status = 200
+        resp_mock.read.return_value = json.dumps([
+            {"id": "t1", "subject": "新材料", "track_id": 3,
+             "sources": ["cailianshe"], "cron_expr": "0 */2 * * *",
+             "max_results": 20, "enabled": True},
+            {"id": "t2", "subject": "核电", "track_id": None,
+             "sources": ["nbd"], "cron_expr": "0 9 * * *",
+             "max_results": 10, "enabled": True}
+        ]).encode()
+        resp_mock.__enter__ = lambda s: s
+        resp_mock.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = resp_mock
 
-            resp = client.get("/api/tasks")
-            self.assertEqual(resp.status_code, 200)
-            data = resp.get_json()
-            self.assertEqual(len(data), 2)
-            self.assertEqual(data[0]["track_id"], 3)
-            self.assertIsNone(data[1]["track_id"])
-        finally:
-            self._restore(mod, orig)
+        resp = client.get("/api/tasks")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["track_id"], 3)
+        self.assertIsNone(data[1]["track_id"])
 
 
 class TestCollectTaskSubmit(_TrackTaskUITestBase):
@@ -208,70 +185,64 @@ class TestCollectTaskSubmit(_TrackTaskUITestBase):
     @patch("app.urllib.request.urlopen")
     def test_create_track_task_sends_track_id(self, mock_urlopen):
         """POST /api/tasks with track_id should forward to agent."""
-        client, mod, orig = self._get_client()
-        try:
-            resp_mock = MagicMock()
-            resp_mock.status = 200
-            resp_mock.read.return_value = json.dumps({
-                "id": "new1", "track_id": 3, "subject": "新材料",
-                "cron_expr": "0 */2 * * *", "max_results": 20
-            }).encode()
-            resp_mock.__enter__ = lambda s: s
-            resp_mock.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = resp_mock
+        client, mod = self._get_client()
+        resp_mock = MagicMock()
+        resp_mock.status = 200
+        resp_mock.read.return_value = json.dumps({
+            "id": "new1", "track_id": 3, "subject": "新材料",
+            "cron_expr": "0 */2 * * *", "max_results": 20
+        }).encode()
+        resp_mock.__enter__ = lambda s: s
+        resp_mock.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = resp_mock
 
-            body = {
-                "track_id": 3,
-                "cron_expr": "0 */2 * * *",
-                "max_results": 20
-            }
-            resp = client.post("/api/tasks",
-                               data=json.dumps(body),
-                               content_type="application/json")
-            self.assertEqual(resp.status_code, 200)
+        body = {
+            "track_id": 3,
+            "cron_expr": "0 */2 * * *",
+            "max_results": 20
+        }
+        resp = client.post("/api/tasks",
+                           data=json.dumps(body),
+                           content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
 
-            # Verify the forwarded request body
-            call_args = mock_urlopen.call_args[0][0]
-            sent_body = json.loads(call_args.data.decode())
-            self.assertEqual(sent_body["track_id"], 3)
-            self.assertNotIn("sources", sent_body)
-        finally:
-            self._restore(mod, orig)
+        # Verify the forwarded request body
+        call_args = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(call_args.data.decode())
+        self.assertEqual(sent_body["track_id"], 3)
+        self.assertNotIn("sources", sent_body)
 
     @patch("app.urllib.request.urlopen")
     def test_create_custom_task_sends_subject_sources(self, mock_urlopen):
         """POST /api/tasks without track_id should forward subject+sources."""
-        client, mod, orig = self._get_client()
-        try:
-            resp_mock = MagicMock()
-            resp_mock.status = 200
-            resp_mock.read.return_value = json.dumps({
-                "id": "new2", "subject": "核电",
-                "sources": ["nbd", "36kr"],
-                "cron_expr": "0 9 * * *", "max_results": 10
-            }).encode()
-            resp_mock.__enter__ = lambda s: s
-            resp_mock.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = resp_mock
+        client, mod = self._get_client()
+        resp_mock = MagicMock()
+        resp_mock.status = 200
+        resp_mock.read.return_value = json.dumps({
+            "id": "new2", "subject": "核电",
+            "sources": ["nbd", "36kr"],
+            "cron_expr": "0 9 * * *", "max_results": 10
+        }).encode()
+        resp_mock.__enter__ = lambda s: s
+        resp_mock.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = resp_mock
 
-            body = {
-                "subject": "核电",
-                "sources": ["nbd", "36kr"],
-                "cron_expr": "0 9 * * *",
-                "max_results": 10
-            }
-            resp = client.post("/api/tasks",
-                               data=json.dumps(body),
-                               content_type="application/json")
-            self.assertEqual(resp.status_code, 200)
+        body = {
+            "subject": "核电",
+            "sources": ["nbd", "36kr"],
+            "cron_expr": "0 9 * * *",
+            "max_results": 10
+        }
+        resp = client.post("/api/tasks",
+                           data=json.dumps(body),
+                           content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
 
-            call_args = mock_urlopen.call_args[0][0]
-            sent_body = json.loads(call_args.data.decode())
-            self.assertEqual(sent_body["subject"], "核电")
-            self.assertIn("nbd", sent_body["sources"])
-            self.assertNotIn("track_id", sent_body)
-        finally:
-            self._restore(mod, orig)
+        call_args = mock_urlopen.call_args[0][0]
+        sent_body = json.loads(call_args.data.decode())
+        self.assertEqual(sent_body["subject"], "核电")
+        self.assertIn("nbd", sent_body["sources"])
+        self.assertNotIn("track_id", sent_body)
 
 
 class TestFrontendContainsTrackUI(unittest.TestCase):

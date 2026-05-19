@@ -67,14 +67,6 @@ COMPASS_API = "http://localhost:8087"
 PUBLISHER_API = "http://localhost:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
-
-# DEPRECATED: Use get_db_ctx() for new code. See get_db_ctx() for auto-close.
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 _wal_initialized = False
 
 
