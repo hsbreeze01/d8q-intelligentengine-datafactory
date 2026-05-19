@@ -8,6 +8,7 @@ import secrets
 import sys
 import urllib.request
 import urllib.parse
+from contextlib import contextmanager
 from datetime import timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -45,13 +46,12 @@ def _track_event(response):
     try:
         duration = int((_time.time() - getattr(request, '_track_start', _time.time())) * 1000)
         func_name = _classify_function(path)
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO user_events (user_id, event_time, function_name, method, path, status_code, duration_ms) VALUES (?, datetime('now'), ?, ?, ?, ?, ?)",
-            (username, func_name, request.method, path, response.status_code, duration)
-        )
-        conn.commit()
-        conn.close()
+        with get_db_ctx() as conn:
+            conn.execute(
+                "INSERT INTO user_events (user_id, event_time, function_name, method, path, status_code, duration_ms) VALUES (?, datetime('now'), ?, ?, ?, ?, ?)",
+                (username, func_name, request.method, path, response.status_code, duration)
+            )
+            conn.commit()
     except Exception:
         pass
     _cleanup_old_events()
@@ -68,10 +68,22 @@ PUBLISHER_API = "http://localhost:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 
+# DEPRECATED: Use get_db_ctx() for new code. See get_db_ctx() for auto-close.
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@contextmanager
+def get_db_ctx():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 # === 用户行为事件采集 ===
@@ -100,40 +112,39 @@ FUNCTION_MAP = {
 
 
 def _init_monitor_tables():
-    conn = get_db()
-    conn.executescript(
-        "CREATE TABLE IF NOT EXISTS monitor_rules ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "name TEXT NOT NULL, "
-        "type TEXT NOT NULL, "
-        "config_json TEXT NOT NULL, "
-        "severity TEXT NOT NULL DEFAULT 'warning', "
-        "enabled INTEGER NOT NULL DEFAULT 1, "
-        "builtin INTEGER NOT NULL DEFAULT 0, "
-        "interval_sec INTEGER NOT NULL DEFAULT 60, "
-        "created_at DATETIME DEFAULT (datetime('now'))"
-        "); "
-        "CREATE TABLE IF NOT EXISTS monitor_results ("
-        "rule_id INTEGER NOT NULL, "
-        "status TEXT NOT NULL, "
-        "message TEXT, "
-        "detail_json TEXT, "
-        "checked_at DATETIME DEFAULT (datetime('now'))"
-        ")"
-    )
-    count = conn.execute("SELECT count(*) FROM monitor_rules WHERE builtin=1").fetchone()[0]
-    if count == 0:
-        builtin_rules = [
-            ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate?mode=fast", "judge": "valid", "timeout": 10, "status_url": PUBLISHER_API + "/api/cookie/status"}), "critical", 120),
-            ("Ghost Browser CDP 连通性", "http", json.dumps({"url": "http://localhost:9222/json/version", "timeout": 5}), "critical", 60),
-            ("发布锁状态", "system", json.dumps({"check": "file_not_exists", "path": "/tmp/d8q_publishing.lock"}), "warning", 30),
-            ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 10}), "critical", 120),
-        ]
-        for name, rtype, cfg, sev, interval in builtin_rules:
-            conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
-                        (name, rtype, cfg, sev, interval))
-        conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS monitor_rules ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "name TEXT NOT NULL, "
+            "type TEXT NOT NULL, "
+            "config_json TEXT NOT NULL, "
+            "severity TEXT NOT NULL DEFAULT 'warning', "
+            "enabled INTEGER NOT NULL DEFAULT 1, "
+            "builtin INTEGER NOT NULL DEFAULT 0, "
+            "interval_sec INTEGER NOT NULL DEFAULT 60, "
+            "created_at DATETIME DEFAULT (datetime('now'))"
+            "); "
+            "CREATE TABLE IF NOT EXISTS monitor_results ("
+            "rule_id INTEGER NOT NULL, "
+            "status TEXT NOT NULL, "
+            "message TEXT, "
+            "detail_json TEXT, "
+            "checked_at DATETIME DEFAULT (datetime('now'))"
+            ")"
+        )
+        count = conn.execute("SELECT count(*) FROM monitor_rules WHERE builtin=1").fetchone()[0]
+        if count == 0:
+            builtin_rules = [
+                ("小红书 Cookie 有效性", "custom", json.dumps({"url": PUBLISHER_API + "/api/cookie/validate?mode=fast", "judge": "valid", "timeout": 10, "status_url": PUBLISHER_API + "/api/cookie/status"}), "critical", 120),
+                ("Ghost Browser CDP 连通性", "http", json.dumps({"url": "http://localhost:9222/json/version", "timeout": 5}), "critical", 60),
+                ("发布锁状态", "system", json.dumps({"check": "file_not_exists", "path": "/tmp/d8q_publishing.lock"}), "warning", 30),
+                ("发布服务健康", "http", json.dumps({"url": PUBLISHER_API + "/api/health", "timeout": 10}), "critical", 120),
+            ]
+            for name, rtype, cfg, sev, interval in builtin_rules:
+                conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
+                            (name, rtype, cfg, sev, interval))
+            conn.commit()
 
 
 def _classify_function(path):
@@ -143,24 +154,22 @@ def _classify_function(path):
     return "其他"
 
 def _init_events_table():
-    conn = get_db()
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.executescript(
-        "CREATE TABLE IF NOT EXISTS user_events ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "user_id TEXT NOT NULL, "
-        "event_time DATETIME NOT NULL, "
-        "function_name TEXT NOT NULL, "
-        "method TEXT, "
-        "path TEXT, "
-        "status_code INTEGER, "
-        "duration_ms INTEGER"
-        "); "
-        "CREATE INDEX IF NOT EXISTS idx_ue_user_time ON user_events(user_id, event_time); "
-        "CREATE INDEX IF NOT EXISTS idx_ue_func_time ON user_events(function_name, event_time);"
-    )
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS user_events ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id TEXT NOT NULL, "
+            "event_time DATETIME NOT NULL, "
+            "function_name TEXT NOT NULL, "
+            "method TEXT, "
+            "path TEXT, "
+            "status_code INTEGER, "
+            "duration_ms INTEGER"
+            "); "
+            "CREATE INDEX IF NOT EXISTS idx_ue_user_time ON user_events(user_id, event_time); "
+            "CREATE INDEX IF NOT EXISTS idx_ue_func_time ON user_events(function_name, event_time);"
+        )
+        conn.commit()
 
 try:
     _init_events_table()
@@ -177,10 +186,9 @@ def _cleanup_old_events():
         return
     _last_cleanup_date = today
     try:
-        conn = get_db()
-        conn.execute("DELETE FROM user_events WHERE event_time < datetime('now', '-90 days')")
-        conn.commit()
-        conn.close()
+        with get_db_ctx() as conn:
+            conn.execute("DELETE FROM user_events WHERE event_time < datetime('now', '-90 days')")
+            conn.commit()
     except Exception:
         pass
 
@@ -243,9 +251,8 @@ def proxy_tracks(**kwargs):
     _role = session.get("role", "viewer")
     if _username and request.args.get("view") != "all":
         # Check if user has any subscriptions
-        _conn = get_db()
-        _has_subs = _conn.execute("SELECT 1 FROM user_subscriptions WHERE user_id=? LIMIT 1", (_username,)).fetchone()
-        _conn.close()
+        with get_db_ctx() as _conn:
+            _has_subs = _conn.execute("SELECT 1 FROM user_subscriptions WHERE user_id=? LIMIT 1", (_username,)).fetchone()
         if _has_subs:
             sep = "&" if "?" in url else "?"
             url = url + sep + "user_id=" + urllib.parse.quote(_username)
@@ -292,15 +299,11 @@ def weekly_generate():
     body = request.json or {}
     track_id = body.get("track_id", 1)
     days = body.get("days", 7)
-    import sqlite3
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    track = conn.execute("SELECT name FROM tracks WHERE id=?", (track_id,)).fetchone()
+    with get_db_ctx() as conn:
+        track = conn.execute("SELECT name FROM tracks WHERE id=?", (track_id,)).fetchone()
     if not track:
-        conn.close()
         return jsonify({"error": "赛道不存在"}), 404
     track_name = track["name"]
-    conn.close()
     news = _fetch_news(track_name, days)
     if not news:
         return jsonify({"error": "无资讯数据"}), 404
@@ -336,8 +339,7 @@ def weekly_generate():
 # --- News API ---
 @app.route("/api/meta")
 def meta():
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         subjects = [r[0] for r in conn.execute("SELECT DISTINCT subject FROM financial_news ORDER BY subject")]
         sources = [r[0] for r in conn.execute("SELECT DISTINCT source FROM financial_news ORDER BY source")]
         # Subject 校验过滤：排除测试标记和非法 subject
@@ -345,8 +347,6 @@ def meta():
         _ctrl_re = re.compile(r"[\x00-\x1f\x7f-\x9f]")
         subjects = [s for s in subjects if isinstance(s, str) and 2 <= len(s) <= 50 and not _ctrl_re.search(s) and not _test_re.search(s)]
         return jsonify({"subjects": subjects, "sources": sources})
-    finally:
-        conn.close()
 
 
 @app.route("/api/news")
@@ -379,14 +379,11 @@ def news():
     _news_role = session.get("role", "viewer")
     _news_view = request.args.get("view", "")
     if _news_username and _news_view != "all":
-        conn_u = get_db()
-        try:
+        with get_db_ctx() as conn_u:
             _sub_rows = conn_u.execute(
                 "SELECT t.name FROM user_subscriptions us JOIN tracks t ON us.track_id = t.id WHERE us.user_id = ?",
                 (_news_username,)
             ).fetchall()
-        finally:
-            conn_u.close()
         if _sub_rows:
             _track_names = [r[0] for r in _sub_rows]
             _placeholders = ",".join(["?"] * len(_track_names))
@@ -394,8 +391,7 @@ def news():
             params.extend(_track_names)
         # If no subscriptions, return full data (new user guidance)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         total = conn.execute("SELECT count(*) FROM financial_news" + clause, params).fetchone()[0]
         subjects_count = conn.execute("SELECT count(DISTINCT subject) FROM financial_news" + clause, params).fetchone()[0]
         sources_count = conn.execute("SELECT count(DISTINCT source) FROM financial_news" + clause, params).fetchone()[0]
@@ -409,8 +405,6 @@ def news():
             d.pop("file_path", None)
             items.append(d)
         return jsonify({"total": total, "subjects": subjects_count, "sources": sources_count, "items": items, "page": page, "size": size})
-    finally:
-        conn.close()
 
 
 # --- Task API (proxy to agent) ---
