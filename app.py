@@ -1513,6 +1513,37 @@ def _execute_system_check(config):
             return ("ok" if result == 0 else "error"), ("端口开放" if result == 0 else "端口不可达"), {"port": port}
         except Exception as e:
             return "error", str(e)[:200], {}
+    elif check == "mysql_ping":
+        import pymysql
+        host = config.get("host", "127.0.0.1")
+        port = config.get("port", 3306)
+        user = config.get("user", "root")
+        password = config.get("password", "")
+        try:
+            conn = pymysql.connect(host=host, port=port, user=user, password=password,
+                                   connect_timeout=5, read_timeout=3)
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            conn.close()
+            return "ok", "MySQL 连接正常", {}
+        except Exception as e:
+            return "error", f"MySQL 连接失败: {str(e)[:80]}", {"error": str(e)[:200]}
+    elif check == "disk_usage":
+        threshold = config.get("threshold_pct", 85)
+        path = config.get("path", "/")
+        try:
+            st = os.statvfs(path)
+            total = st.f_blocks * st.f_frsize
+            used = (st.f_blocks - st.f_bfree) * st.f_frsize
+            pct = round(used / total * 100, 1)
+            avail_gb = round(st.f_bavail * st.f_frsize / 1024**3, 1)
+            status = "ok" if pct < threshold else ("warning" if pct < 95 else "error")
+            msg = f"磁盘使用 {pct}% (剩余 {avail_gb}GB)"
+            if pct >= threshold:
+                msg += f" [超过阈值 {threshold}%]"
+            return status, msg, {"used_pct": pct, "avail_gb": avail_gb, "threshold": threshold}
+        except Exception as e:
+            return "error", str(e)[:200], {}
     return "unknown", f"未知检查: {check}", {}
 
 def _execute_custom_check(config):
