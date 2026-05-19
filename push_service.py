@@ -20,8 +20,10 @@ def _get_push_configs():
     """获取所有启用推送的用户配置"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM push_configs WHERE email IS NOT NULL AND email != ''").fetchall()
-    conn.close()
+    try:
+        rows = conn.execute("SELECT * FROM push_configs WHERE email IS NOT NULL AND email != ''").fetchall()
+    finally:
+        conn.close()
     return [dict(r) for r in rows]
 
 
@@ -57,24 +59,25 @@ def send_daily_brief():
     """发送每日早报"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    try:
+        # 获取热度数据
+        heat = conn.execute("""
+            SELECT t.name, h.score, h.news_count,
+                   (h.score - COALESCE(prev.score, h.score)) as change
+            FROM tracks t
+            LEFT JOIN track_heat_daily h ON h.track_id=t.id
+                AND h.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id)
+            LEFT JOIN track_heat_daily prev ON prev.track_id=t.id
+                AND prev.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id AND date < h.date)
+            WHERE t.status='active'
+        """).fetchall()
 
-    # 获取热度数据
-    heat = conn.execute("""
-        SELECT t.name, h.score, h.news_count,
-               (h.score - COALESCE(prev.score, h.score)) as change
-        FROM tracks t
-        LEFT JOIN track_heat_daily h ON h.track_id=t.id
-            AND h.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id)
-        LEFT JOIN track_heat_daily prev ON prev.track_id=t.id
-            AND prev.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id AND date < h.date)
-        WHERE t.status='active'
-    """).fetchall()
-
-    # 获取今日要闻
-    news = conn.execute(
-        "SELECT title, source, publish_time FROM financial_news ORDER BY publish_time DESC LIMIT 5"
-    ).fetchall()
-    conn.close()
+        # 获取今日要闻
+        news = conn.execute(
+            "SELECT title, source, publish_time FROM financial_news ORDER BY publish_time DESC LIMIT 5"
+        ).fetchall()
+    finally:
+        conn.close()
 
     today = datetime.now().strftime("%Y-%m-%d")
     heat_rows = "".join(

@@ -10,18 +10,19 @@ def detect_heat_anomaly():
     """检测热度异动：今日 vs 昨日涨幅超阈值的赛道，触发邮件告警"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-
-    rows = conn.execute("""
-        SELECT t.name, h.score,
-               COALESCE(prev.score, 0) as prev_score
-        FROM tracks t
-        JOIN track_heat_daily h ON h.track_id=t.id
-            AND h.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id)
-        LEFT JOIN track_heat_daily prev ON prev.track_id=t.id
-            AND prev.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id AND date < h.date)
-        WHERE t.status='active' AND h.score > 0
-    """).fetchall()
-    conn.close()
+    try:
+        rows = conn.execute("""
+            SELECT t.name, h.score,
+                   COALESCE(prev.score, 0) as prev_score
+            FROM tracks t
+            JOIN track_heat_daily h ON h.track_id=t.id
+                AND h.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id)
+            LEFT JOIN track_heat_daily prev ON prev.track_id=t.id
+                AND prev.date=(SELECT MAX(date) FROM track_heat_daily WHERE track_id=t.id AND date < h.date)
+            WHERE t.status='active' AND h.score > 0
+        """).fetchall()
+    finally:
+        conn.close()
 
     alerts = []
     for r in rows:
