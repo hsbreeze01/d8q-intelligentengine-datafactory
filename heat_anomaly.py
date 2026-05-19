@@ -1,5 +1,8 @@
 """热度异动检测 + 政策影响分析 - 每日定时任务"""
-import json, logging, sqlite3, urllib.request
+import json
+import logging
+import sqlite3
+import urllib.request
 
 logger = logging.getLogger(__name__)
 

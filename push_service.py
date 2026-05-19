@@ -1,5 +1,9 @@
 """推送服务 - 邮件发送（早报+周报+异动提醒）"""
-import json, logging, os, smtplib, sqlite3
+import json
+import logging
+import os
+import smtplib
+import sqlite3
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
