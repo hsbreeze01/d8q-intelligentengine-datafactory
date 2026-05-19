@@ -74,6 +74,7 @@ class TestMonitorCookieAlert(unittest.TestCase):
     def _get_app(self):
         """Create a Flask test app using the temp DB."""
         import app as _app_module
+        from contextlib import contextmanager
 
         # Clear cached results so each test starts fresh
         conn = sqlite3.connect(_TEST_DB)
@@ -83,24 +84,36 @@ class TestMonitorCookieAlert(unittest.TestCase):
 
         # Patch get_db to use our temp DB
         _orig_get_db = _app_module.get_db
+        _orig_get_db_ctx = _app_module.get_db_ctx
 
         def _test_get_db():
             conn = sqlite3.connect(_TEST_DB)
             conn.row_factory = sqlite3.Row
             return conn
 
+        @contextmanager
+        def _test_get_db_ctx():
+            conn = sqlite3.connect(_TEST_DB)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            finally:
+                conn.close()
+
         _app_module.get_db = _test_get_db
+        _app_module.get_db_ctx = _test_get_db_ctx
         _app = _app_module.app
         _app.config["TESTING"] = True
-        return _app, _app_module, _orig_get_db
+        return _app, _app_module, _orig_get_db, _orig_get_db_ctx
 
-    def _restore_get_db(self, _app_module, _orig):
-        _app_module.get_db = _orig
+    def _restore_get_db(self, _app_module, _orig_get_db, _orig_get_db_ctx):
+        _app_module.get_db = _orig_get_db
+        _app_module.get_db_ctx = _orig_get_db_ctx
 
     @patch("app.urllib.request.urlopen")
     def test_cookie_failure_triggers_alert(self, mock_urlopen):
         """Simulate Cookie validation returning valid=false and verify alert_count > 0."""
-        _app, _app_module, _orig = self._get_app()
+        _app, _app_module, _orig, _orig_ctx = self._get_app()
         try:
             # Mock responses: Cookie validate returns valid=False
             def _mock_response(url_or_req, **kwargs):
@@ -156,12 +169,12 @@ class TestMonitorCookieAlert(unittest.TestCase):
                                  f"Cookie rule status should be 'error', got '{cookie_rule['status']}'")
                 self.assertEqual(cookie_rule["severity"], "critical")
         finally:
-            self._restore_get_db(_app_module, _orig)
+            self._restore_get_db(_app_module, _orig, _orig_ctx)
 
     @patch("app.urllib.request.urlopen")
     def test_cookie_valid_no_alert(self, mock_urlopen):
         """When Cookie is valid, there should be no Cookie-related alert."""
-        _app, _app_module, _orig = self._get_app()
+        _app, _app_module, _orig, _orig_ctx = self._get_app()
         try:
             def _mock_response(url_or_req, **kwargs):
                 url_str = getattr(url_or_req, "full_url", str(url_or_req))
@@ -204,7 +217,7 @@ class TestMonitorCookieAlert(unittest.TestCase):
                 self.assertEqual(cookie_rule["status"], "ok",
                                  f"Cookie rule should be 'ok', got '{cookie_rule['status']}'")
         finally:
-            self._restore_get_db(_app_module, _orig)
+            self._restore_get_db(_app_module, _orig, _orig_ctx)
 
 
 if __name__ == "__main__":

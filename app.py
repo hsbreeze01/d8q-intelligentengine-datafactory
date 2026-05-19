@@ -1608,96 +1608,89 @@ def update_monitor_rule(rule_id):
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     body = request.json or {}
-    conn = get_db()
-    rule = conn.execute("SELECT * FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
-    if not rule:
-        conn.close()
-        return jsonify({"error": "规则不存在"}), 404
-    if rule["builtin"]:
-        if "enabled" in body:
-            conn.execute("UPDATE monitor_rules SET enabled=? WHERE id=?", (int(body["enabled"]), rule_id))
+    with get_db_ctx() as conn:
+        rule = conn.execute("SELECT * FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
+        if not rule:
+            return jsonify({"error": "规则不存在"}), 404
+        if rule["builtin"]:
+            if "enabled" in body:
+                conn.execute("UPDATE monitor_rules SET enabled=? WHERE id=?", (int(body["enabled"]), rule_id))
+                conn.commit()
+            return jsonify({"success": True})
+        fields, values = [], []
+        for k in ("name", "type", "severity", "interval_sec", "enabled"):
+            if k in body:
+                fields.append(f"{k}=?")
+                values.append(int(body[k]) if k == "enabled" else body[k])
+        if "config" in body:
+            fields.append("config_json=?")
+            values.append(json.dumps(body["config"]))
+        if fields:
+            values.append(rule_id)
+            conn.execute(f"UPDATE monitor_rules SET {','.join(fields)} WHERE id=?", values)
             conn.commit()
-        conn.close()
         return jsonify({"success": True})
-    fields, values = [], []
-    for k in ("name", "type", "severity", "interval_sec", "enabled"):
-        if k in body:
-            fields.append(f"{k}=?")
-            values.append(int(body[k]) if k == "enabled" else body[k])
-    if "config" in body:
-        fields.append("config_json=?")
-        values.append(json.dumps(body["config"]))
-    if fields:
-        values.append(rule_id)
-        conn.execute(f"UPDATE monitor_rules SET {','.join(fields)} WHERE id=?", values)
-        conn.commit()
-    conn.close()
-    return jsonify({"success": True})
 
 @app.route("/api/monitor/rules/<int:rule_id>", methods=["DELETE"])
 def delete_monitor_rule(rule_id):
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
-    conn = get_db()
-    rule = conn.execute("SELECT builtin FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
-    if not rule:
-        conn.close()
-        return jsonify({"error": "规则不存在"}), 404
-    if rule["builtin"]:
-        conn.close()
-        return jsonify({"error": "内置规则不可删除"}), 403
-    conn.execute("DELETE FROM monitor_rules WHERE id=?", (rule_id,))
-    conn.execute("DELETE FROM monitor_results WHERE rule_id=?", (rule_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+    with get_db_ctx() as conn:
+        rule = conn.execute("SELECT builtin FROM monitor_rules WHERE id=?", (rule_id,)).fetchone()
+        if not rule:
+            return jsonify({"error": "规则不存在"}), 404
+        if rule["builtin"]:
+            return jsonify({"error": "内置规则不可删除"}), 403
+        conn.execute("DELETE FROM monitor_rules WHERE id=?", (rule_id,))
+        conn.execute("DELETE FROM monitor_results WHERE rule_id=?", (rule_id,))
+        conn.commit()
+        return jsonify({"success": True})
 
 @app.route("/api/monitor/status", methods=["GET"])
 def monitor_status():
     if session.get("role") != "admin":
         return jsonify({"error": "权限不足"}), 403
     from datetime import datetime as _dt
-    conn = get_db()
-    rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules WHERE enabled=1").fetchall()]
-    rule_results = []
-    alert_count = 0
-    for rule in rules:
-        cached = conn.execute("SELECT * FROM monitor_results WHERE rule_id=? ORDER BY checked_at DESC LIMIT 1", (rule["id"],)).fetchone()
-        should_check = True
-        if cached:
-            try:
-                from datetime import datetime as _dtm
-                checked_ts = _dtm.strptime(cached["checked_at"], "%Y-%m-%d %H:%M:%S").timestamp()
-                if _time.time() - checked_ts < rule["interval_sec"]:
-                    st = cached["status"]
-                    raw = {}
-                    try:
-                        dj = cached.get("detail_json") or ""
-                        if dj:
-                            raw = json.loads(dj)
-                    except Exception:
-                        pass
-                    rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
-                        "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"], "raw_data": raw})
-                    if st != "ok":
-                        alert_count += 1
-                    should_check = False
-            except Exception:
-                pass
-        if should_check:
-            try:
-                status, message, detail = _execute_rule_check(rule)
-            except Exception as e:
-                status, message, detail = "error", str(e)[:200], {}
-            checked_at = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn.execute("INSERT INTO monitor_results (rule_id,status,message,detail_json,checked_at) VALUES (?,?,?,?,?)",
-                (rule["id"], status, message, json.dumps(detail) if detail else "", checked_at))
-            conn.commit()
-            if status != "ok":
-                alert_count += 1
-            rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
-                "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
-    conn.close()
+    with get_db_ctx() as conn:
+        rules = [dict(r) for r in conn.execute("SELECT * FROM monitor_rules WHERE enabled=1").fetchall()]
+        rule_results = []
+        alert_count = 0
+        for rule in rules:
+            cached = conn.execute("SELECT * FROM monitor_results WHERE rule_id=? ORDER BY checked_at DESC LIMIT 1", (rule["id"],)).fetchone()
+            should_check = True
+            if cached:
+                try:
+                    from datetime import datetime as _dtm
+                    checked_ts = _dtm.strptime(cached["checked_at"], "%Y-%m-%d %H:%M:%S").timestamp()
+                    if _time.time() - checked_ts < rule["interval_sec"]:
+                        st = cached["status"]
+                        raw = {}
+                        try:
+                            dj = cached.get("detail_json") or ""
+                            if dj:
+                                raw = json.loads(dj)
+                        except Exception:
+                            pass
+                        rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
+                            "severity": rule["severity"], "status": st, "message": cached["message"], "checked_at": cached["checked_at"], "raw_data": raw})
+                        if st != "ok":
+                            alert_count += 1
+                        should_check = False
+                except Exception:
+                    pass
+            if should_check:
+                try:
+                    status, message, detail = _execute_rule_check(rule)
+                except Exception as e:
+                    status, message, detail = "error", str(e)[:200], {}
+                checked_at = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+                conn.execute("INSERT INTO monitor_results (rule_id,status,message,detail_json,checked_at) VALUES (?,?,?,?,?)",
+                    (rule["id"], status, message, json.dumps(detail) if detail else "", checked_at))
+                conn.commit()
+                if status != "ok":
+                    alert_count += 1
+                rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
+                    "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
     import subprocess
     services = {}
     http_svcs = {"agent":{"port":8000,"path":"/api/health"},"stockshark":{"port":5000,"path":"/health"},
