@@ -1,5 +1,4 @@
 """D8Q 智能资讯工厂 - 前后端一体 Web 应用 v2 (含任务管理)"""
-import sqlite3
 import json
 import re
 import logging
@@ -60,28 +59,13 @@ def _track_event(response):
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
 app.register_blueprint(compass_bp)
-DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://localhost:5000"
 COMPASS_API = "http://localhost:8087"
 PUBLISHER_API = "http://localhost:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
-_wal_initialized = False
-
-
-@contextmanager
-def get_db_ctx():
-    global _wal_initialized
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    if not _wal_initialized:
-        conn.execute("PRAGMA journal_mode=WAL")
-        _wal_initialized = True
-    try:
-        yield conn
-    finally:
-        conn.close()
+from datafactory.infrastructure.db_utils import DB_PATH, get_db_ctx  # noqa: E402
 
 
 # === 用户行为事件采集 ===

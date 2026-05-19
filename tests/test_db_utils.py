@@ -2,14 +2,12 @@
 import sqlite3
 import os
 import tempfile
-from unittest import mock
 
 import pytest
 
 
 def _make_db_utils(db_path):
     """Create a fresh db_utils module wired to *db_path*."""
-    import importlib
     import types
 
     mod = types.ModuleType("db_utils_under_test")
