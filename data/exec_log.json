@@ -6,6 +6,16 @@
     "trigger": "scheduler",
     "success": false,
     "result_summary": "无资讯数据",
+    "duration": 0.4,
+    "time": "2026-05-20T08:53:06.888293"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": false,
+    "result_summary": "无资讯数据",
     "duration": 0.2,
     "time": "2026-05-19T08:30:16.298801"
   },
