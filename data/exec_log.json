@@ -4,6 +4,56 @@
     "type": "creation",
     "subject": "人工智能",
     "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI政策大爆发，国产春天要来了？",
+    "duration": 4.0,
+    "time": "2026-05-24T08:29:22.340526"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "国产AI生态起飞🚀，金融圈要变天？",
+    "duration": 3.7,
+    "time": "2026-05-23T08:33:45.712535"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🚀AI要上天？2028星际计划曝光！",
+    "duration": 4.2,
+    "time": "2026-05-22T08:41:13.803269"
+  },
+  {
+    "task_id": "5d3cba25",
+    "type": "publish",
+    "subject": "人工智能",
+    "trigger": "manual",
+    "success": false,
+    "result_summary": "🤖东南亚竟成AI巨头新战场？",
+    "duration": 0,
+    "time": "2026-05-21T09:08:57.202505"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖东南亚竟成AI巨头新战场？",
+    "duration": 3.3,
+    "time": "2026-05-21T08:32:56.910941"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
     "success": false,
     "result_summary": "无资讯数据",
     "duration": 0.4,

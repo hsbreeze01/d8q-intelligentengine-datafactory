@@ -60,9 +60,9 @@ app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
 app.register_blueprint(compass_bp)
 AGENT_API = "http://localhost:8000"
-SHARK_API = "http://localhost:5000"
+SHARK_API = "http://49.234.48.221:5000"
 COMPASS_API = "http://localhost:8087"
-PUBLISHER_API = "http://localhost:8089"
+PUBLISHER_API = "http://49.234.48.221:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 from datafactory.infrastructure.db_utils import DB_PATH, get_db_ctx  # noqa: E402
@@ -1084,14 +1084,15 @@ def service_status():
     # HTTP 健康检查的服务
     http_services = {
         "agent":         {"port": 8000, "path": "/api/health"},
-        "stockshark":    {"port": 5000, "path": "/health"},
+        "stockshark":    {"host": "49.234.48.221", "port": 5000, "path": "/health"},
         "compass":       {"port": 8087, "path": "/health"},
         "factory":       {"port": 8088, "path": "/"},
-        "infopublisher": {"port": 8089, "path": "/api/publish", "method": "GET"},
+        "infopublisher": {"host": "49.234.48.221", "port": 8089, "path": "/api/publish", "method": "GET"},
     }
     for name, cfg in http_services.items():
         try:
-            url = f"http://localhost:{cfg['port']}{cfg['path']}"
+            host = cfg.get("host", "localhost")
+            url = f"http://{host}:{cfg['port']}{cfg['path']}"
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=5):
                 services[name] = {"status": "ok", "type": "http", "port": cfg["port"]}
@@ -1104,23 +1105,13 @@ def service_status():
         except Exception:
             services[name] = {"status": "down", "type": "http", "port": cfg["port"]}
 
-    # systemd 管理的基础服务
-    for svc in ["xvfb", "ghost_browser"]:
-        try:
-            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace(chr(95),chr(45))}"],
-                               capture_output=True, text=True, timeout=3)
-            active = r.stdout.strip() == "active"
-            entry = {"status": "active" if active else "inactive", "type": "systemd"}
-            if svc == "ghost_browser" and active:
-                try:
-                    req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
-                    with urllib.request.urlopen(req, timeout=3):
-                        entry["cdp"] = "ok"
-                except Exception:
-                    entry["cdp"] = "down"
-            services[svc] = entry
-        except Exception:
-            services[svc] = {"status": "unknown", "type": "systemd"}
+    # Ghost Browser 在 49 - 通过 SSH 隧道 (localhost:9222) 检测
+    try:
+        req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
+        with urllib.request.urlopen(req, timeout=5):
+            services["ghost_browser"] = {"status": "active", "type": "cdp_tunnel", "cdp": "ok"}
+    except Exception:
+        services["ghost_browser"] = {"status": "down", "type": "remote_cdp", "cdp": "down"}
 
     from datetime import datetime
     return jsonify({"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "services": services}), 200
@@ -1669,13 +1660,16 @@ def monitor_status():
                     "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
     import subprocess
     services = {}
-    http_svcs = {"agent":{"port":8000,"path":"/api/health"},"stockshark":{"port":5000,"path":"/health"},
-        "compass":{"port":8087,"path":"/health"},"factory":{"port":8088,"path":"/"},
-        "infopublisher":{"port":8089,"path":"/api/publish"}}
+    http_svcs = {"agent":{"host":"localhost","port":8000,"path":"/api/health"},
+        "stockshark":{"host":"49.234.48.221","port":5000,"path":"/health"},
+        "compass":{"host":"localhost","port":8087,"path":"/health"},
+        "factory":{"host":"localhost","port":8088,"path":"/"},
+        "infopublisher":{"host":"49.234.48.221","port":8089,"path":"/api/publish"}}
     for name, cfg in http_svcs.items():
         start = _time.time()
         try:
-            req = urllib.request.Request(f"http://localhost:{cfg['port']}{cfg['path']}", method="GET")
+            host = cfg.get("host", "localhost")
+            req = urllib.request.Request(f"http://{host}:{cfg['port']}{cfg['path']}", method="GET")
             with urllib.request.urlopen(req, timeout=5):
                 services[name] = {"status": "ok", "port": cfg["port"], "elapsed_ms": int((_time.time()-start)*1000)}
         except urllib.error.HTTPError as e:
@@ -1689,25 +1683,16 @@ def monitor_status():
         except Exception:
             services[name] = {"status": "down", "port": cfg["port"]}
             alert_count += 1
-    for svc in ["xvfb", "ghost_browser"]:
-        try:
-            r = subprocess.run(["systemctl", "is-active", f"d8q-{svc.replace('_','-')}"], capture_output=True, text=True, timeout=3)
-            active = r.stdout.strip() == "active"
-            entry = {"status": "active" if active else "inactive", "type": "systemd"}
-            if not active:
-                alert_count += 1
-            if svc == "ghost_browser" and active:
-                try:
-                    start = _time.time()
-                    req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
-                    with urllib.request.urlopen(req, timeout=3):
-                        entry["cdp"] = "ok"
-                        entry["elapsed_ms"] = int((_time.time()-start)*1000)
-                except Exception:
-                    entry["cdp"] = "down"
-            services[svc] = entry
-        except Exception:
-            services[svc] = {"status": "unknown", "type": "systemd"}
+    # Ghost Browser 在 49 - 通过 SSH 隧道 (localhost:9222) 检测
+    try:
+        start = _time.time()
+        req = urllib.request.Request("http://localhost:9222/json/version", method="GET")
+        with urllib.request.urlopen(req, timeout=5):
+            services["ghost_browser"] = {"status": "active", "type": "cdp_tunnel", "cdp": "ok",
+                "elapsed_ms": int((_time.time()-start)*1000)}
+    except Exception:
+        services["ghost_browser"] = {"status": "down", "type": "remote_cdp", "cdp": "down"}
+        alert_count += 1
     return jsonify({"services": services, "rules": rule_results, "alert_count": alert_count,
         "timestamp": _dt.now().strftime("%Y-%m-%d %H:%M:%S")})
 
