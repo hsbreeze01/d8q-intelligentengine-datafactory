@@ -1,5 +1,12 @@
 {% extends "strategy/base.html" %}
-{% block title %}我的策略{% endblock %}
+{% block title %}我的策略
+<script>
+document.querySelectorAll('.buy-star-inline').forEach(function(el) {
+    var code = parseInt(el.getAttribute('data-code') || '0');
+    el.innerHTML = renderBuyStarCompact(code);
+});
+</script>
+{% endblock %}
 {% block head %}
 <style>
     .group-section { margin-bottom: 28px; }
@@ -78,7 +85,6 @@
                 <div class="event-meta">
                     <span>触发 <strong>{{ evt.stock_count|default(0) }}</strong> 只股票</span>
                     <span class="buy-star-inline" data-code="{{ evt.buy_star|default(0) }}"></span>
-                    <script>(function(){ var el = document.querySelector('.buy-star-inline[data-code="{{ evt.buy_star|default(0) }}"]'); if(el) el.innerHTML = renderBuyStarCompact({{ evt.buy_star|default(0) }}); })();</script>
                     <span>持续 {{ evt.duration_days|default('?') }} 天</span>
                 </div>
             </div>
@@ -96,4 +102,11 @@
     {% endif %}
 </div>
 {% endfor %}
+<script>
+document.querySelectorAll('.buy-star-inline').forEach(function(el) {
+    var code = parseInt(el.getAttribute('data-code') || '0');
+    el.innerHTML = renderBuyStarCompact(code);
+});
+</script>
+
 {% endblock %}
