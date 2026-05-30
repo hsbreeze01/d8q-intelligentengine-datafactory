@@ -119,8 +119,9 @@
             <span class="value blue">{{ event.stock_count|default(0) }}</span>
         </div>
         <div class="summary-stat">
-            <span class="label">买入星级</span>
-            <span class="value">{{ renderStars(event.buy_star|default(0))|safe }}</span>
+            <span class="label">买入信号</span>
+            <span class="value" id="eventBuyStar"></span>
+            <script>document.getElementById('eventBuyStar').innerHTML = renderBuyStar({{ event.buy_star|default(0) }});</script>
         </div>
         <div class="summary-stat">
             <span class="label">持续天数</span>
@@ -262,13 +263,13 @@ async function loadMicro() {
         // Scatter chart
         if (items.length > 0) {
             const scatterData = items.filter(s => s.indicator_snapshot && s.indicator_snapshot.RSI != null)
-                .map(s => [s.buy_star || 0, s.indicator_snapshot.RSI, s.stock_name || s.stock_code]);
+                .map(s => [decodeBuyStar(s.buy_star || 0).signalCount, s.indicator_snapshot.RSI, s.stock_name || s.stock_code]);
             if (scatterData.length > 0) {
                 const chart = echarts.init(document.getElementById('scatterChart'));
                 chart.setOption({
                     title: { text: '买入星级 vs RSI', left: 'center', textStyle: { fontSize: 14 } },
-                    tooltip: { trigger: 'item', formatter: p => p.data[2] + '<br/>星级: ' + p.data[0] + '<br/>RSI: ' + p.data[1].toFixed(2) },
-                    xAxis: { name: '买入星级', type: 'value', min: 0, max: 6 },
+                    tooltip: { trigger: 'item', formatter: p => p.data[2] + '<br/>信号数: ' + p.data[0] + '<br/>RSI: ' + p.data[1].toFixed(2) },
+                    xAxis: { name: '信号数', type: 'value', min: 0, max: 8 },
                     yAxis: { name: 'RSI', type: 'value' },
                     series: [{ type: 'scatter', data: scatterData, symbolSize: 10,
                         itemStyle: { color: '#1890FF' } }]

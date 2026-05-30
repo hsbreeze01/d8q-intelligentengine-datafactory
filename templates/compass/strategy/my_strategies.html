@@ -77,7 +77,8 @@
                 <div class="event-title">{{ evt.dimension_value or ('事件 #' ~ evt.id) }}</div>
                 <div class="event-meta">
                     <span>触发 <strong>{{ evt.stock_count|default(0) }}</strong> 只股票</span>
-                    <span class="stars">{{ '★' * (evt.buy_star|default(0)|int) }}{{ '☆' * (5 - evt.buy_star|default(0)|int) }}</span>
+                    <span class="buy-star-inline" data-code="{{ evt.buy_star|default(0) }}"></span>
+                    <script>(function(){ var el = document.querySelector('.buy-star-inline[data-code="{{ evt.buy_star|default(0) }}"]'); if(el) el.innerHTML = renderBuyStarCompact({{ evt.buy_star|default(0) }}); })();</script>
                     <span>持续 {{ evt.duration_days|default('?') }} 天</span>
                 </div>
             </div>

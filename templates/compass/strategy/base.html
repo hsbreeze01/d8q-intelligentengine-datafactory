@@ -222,13 +222,44 @@
             return '<span class="badge ' + info.cls + '">' + info.text + '</span>';
         }
 
+        function decodeBuyStar(code) {
+            code = code || 0;
+            if (code === -1) return { signalCount: 0, tags: ['风险否决'], cls: 'risk' };
+            if (code === 0) return { signalCount: 0, tags: [], cls: 'none' };
+            var c = code, tags = [];
+            if (c >= 300000000) { tags.push('BOLL中轨'); c -= 300000000; }
+            if (c >= 20000000)  { tags.push('MA20支撑'); c -= 20000000; }
+            if (c >= 1000000)   { tags.push('3日MA5'); c -= 1000000; }
+            if (c >= 100000)    { tags.push('2日MA5'); c -= 100000; }
+            if (c >= 10000)     { tags.push('MA5支撑'); c -= 10000; }
+            if (c >= 1000)      { tags.push('低位反转'); c -= 1000; }
+            if (c >= 10)        { tags.push('KDJ底部'); c -= 10; }
+            if (c >= 1)         { tags.push('金叉'); }
+            return { signalCount: tags.length, tags: tags, cls: 'signal' };
+        }
+
+        function renderBuyStar(code) {
+            var info = decodeBuyStar(code);
+            if (info.cls === 'risk')
+                return '<span style="color:#FF4D4F;font-size:12px">⚠ 风险否决</span>';
+            if (info.cls === 'none')
+                return '<span style="color:#bbb">—</span>';
+            return '<span style="font-size:11px;color:#555">' + info.tags.map(function(t) {
+                return '<span style="display:inline-block;padding:1px 5px;margin:0 2px;border-radius:3px;background:#E6F7FF;color:#1890FF;font-size:11px">' + t + '</span>';
+            }).join('') + '</span>';
+        }
+
+        function renderBuyStarCompact(code) {
+            var info = decodeBuyStar(code);
+            if (info.cls === 'risk')
+                return '<span style="color:#FF4D4F;font-size:12px">⚠</span>';
+            if (info.cls === 'none')
+                return '<span style="color:#bbb">—</span>';
+            return '<span style="color:#1890FF;font-size:11px;font-weight:600">' + info.signalCount + '信号</span>';
+        }
+
         function renderStars(score, max = 5) {
-            let html = '';
-            const s = Math.round(score || 0);
-            for (let i = 0; i < max; i++) {
-                html += i < s ? '★' : '☆';
-            }
-            return '<span style="color:#FAAD14;font-size:16px;letter-spacing:2px;">' + html + '</span>';
+            return renderBuyStar(score);
         }
 
         function showToast(msg, type = 'info') {
