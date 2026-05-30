@@ -696,7 +696,7 @@ openDrawer(title,`
         var starCount = decodeBuyStar(s.buy_star||0).signalCount;
         var starColor = starCount>=5?'#FF4D4F':starCount>=3?'#FAAD14':'#1890FF';
         return '<div class="stock-snapshot">'+
-          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+(s.buy_star||0)+' <span style="font-size:10px;color:#999">('+starCount+'信号)</span></span></div>'+
+          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||s.stock_code||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+(s.buy_star||0)+' <span style="font-size:10px;color:#999">('+starCount+'信号)</span></span></div>'+
           '<div class="ss-indicators">'+
             '<div class="ss-indicator"><span class="label">KDJ K</span><span class="value">'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">KDJ D</span><span class="value">'+(snap.kdj_d!=null?Number(snap.kdj_d).toFixed(1):'-')+'</span></div>'+
