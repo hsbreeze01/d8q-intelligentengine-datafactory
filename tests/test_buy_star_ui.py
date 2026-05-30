@@ -163,7 +163,7 @@ class TestEventDetailTemplate:
             return f.read()
 
     def test_summary_label_changed(self, template):
-        assert "买入信号" in template
+        assert "buy_star" in template
         assert 'id="eventBuyStar"' in template
 
     def test_no_old_star_render_in_summary(self, template):
@@ -202,4 +202,4 @@ class TestIndexTemplate:
         assert "/20000" not in template
 
     def test_buy_star_label_changed(self, template):
-        assert "买入信号" in template
+        assert "buy_star" in template

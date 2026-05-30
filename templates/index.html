@@ -696,7 +696,7 @@ openDrawer(title,`
         var starCount = decodeBuyStar(s.buy_star||0).signalCount;
         var starColor = starCount>=5?'#FF4D4F':starCount>=3?'#FAAD14':'#1890FF';
         return '<div class="stock-snapshot">'+
-          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+'⭐'.repeat(starCount)+'</span></div>'+
+          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+(s.buy_star||0)+' <span style="font-size:10px;color:#999">('+starCount+'信号)</span></span></div>'+
           '<div class="ss-indicators">'+
             '<div class="ss-indicator"><span class="label">KDJ K</span><span class="value">'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">KDJ D</span><span class="value">'+(snap.kdj_d!=null?Number(snap.kdj_d).toFixed(1):'-')+'</span></div>'+
@@ -705,7 +705,8 @@ openDrawer(title,`
             '<div class="ss-indicator"><span class="label">量比</span><span class="value" style="color:'+(snap.volume_ratio!=null&&snap.volume_ratio>1.5?'#52c41a':'inherit')+'">'+(snap.volume_ratio!=null?Number(snap.volume_ratio).toFixed(2):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">MACD DIF</span><span class="value">'+(snap.macd_dif!=null?Number(snap.macd_dif).toFixed(2):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">涨跌幅</span><span class="value" style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+Number(snap.change_pct).toFixed(2)+'%':'-')+'</span></div>'+
-            '<div class="ss-indicator"><span class="label">买入信号</span><span class="value">'+renderBuyStar(s.buy_star||0)+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">buy_star</span><span class="value">'+(s.buy_star||0)+'</span></div>'+
+            '<div class="ss-indicator"><span class="label">信号</span><span class="value">'+renderBuyStar(s.buy_star||0)+'</span></div>'+
           '</div></div>';
       }).join('')+
     '</div>'+ (stocks.length>5?'<div style="text-align:center;margin-top:12px"><button class="btn-ghost" style="font-size:12px" id="expandBtn${eid}" onclick="toggleExpandStocks('+eid+')">展开全部 '+stocks.length+' 只 →</button></div>':'') : '<div style="color:#999;font-size:13px;text-align:center;padding:40px">暂无个股数据</div>'}

@@ -119,6 +119,10 @@
             <span class="value blue">{{ event.stock_count|default(0) }}</span>
         </div>
         <div class="summary-stat">
+            <span class="label">buy_star</span>
+            <span class="value">{{ event.buy_star|default(0) }}</span>
+        </div>
+        <div class="summary-stat">
             <span class="label">买入信号</span>
             <span class="value" id="eventBuyStar"></span>
             <script>document.getElementById('eventBuyStar').innerHTML = renderBuyStar({{ event.buy_star|default(0) }});</script>
@@ -159,7 +163,7 @@
     <div id="micro-content" style="display:none">
         <div class="table-wrapper">
             <table class="micro-table" id="microTable">
-                <thead><tr><th>股票代码</th><th>名称</th><th>买入星级</th><th>指标快照</th></tr></thead>
+                <thead><tr><th>股票代码</th><th>名称</th><th>买入星级</th><th>指标快照</th><th>buy_star</th><th>信号</th></tr></thead>
                 <tbody id="microBody"></tbody>
             </table>
         </div>
@@ -257,7 +261,7 @@ async function loadMicro() {
             const snapshot = s.indicator_snapshot || {};
             const snapStr = Object.entries(snapshot).map(([k,v]) => k + ': ' + (typeof v === 'number' ? v.toFixed(2) : v)).join(', ');
             return '<tr><td>' + (s.stock_code || '-') + '</td><td>' + (s.stock_name || '-') + '</td><td>' +
-                renderStars(s.buy_star || 0) + '</td><td style="font-size:12px;color:#777;">' + (snapStr || '-') + '</td></tr>';
+                (s.buy_star || 0) + '</td><td>' + renderStars(s.buy_star || 0) + '</td><td style="font-size:12px;color:#777;">' + (snapStr || '-') + '</td></tr>';
         }).join('');
 
         // Scatter chart
