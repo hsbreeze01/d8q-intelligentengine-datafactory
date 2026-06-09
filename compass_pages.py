@@ -128,8 +128,8 @@ def compass_policy():
 def strategy_discover():
     if not _require_login():
         return redirect("/login")
-    groups_data, _ = _compass_request("GET", "/api/strategy/groups/?status=active")
-    subs_data, _ = _compass_request("GET", "/api/strategy/subscriptions/")
+    groups_data, _ = _compass_request("GET", "/api/strategy/groups?status=active")
+    subs_data, _ = _compass_request("GET", "/api/strategy/subscriptions")
     groups = groups_data if isinstance(groups_data, list) else groups_data.get("groups", groups_data.get("items", []))
     subscriptions = subs_data if isinstance(subs_data, list) else subs_data.get("subscriptions", subs_data.get("items", []))
     sub_ids = {s.get("strategy_group_id") for s in (subscriptions or [])}
@@ -151,7 +151,7 @@ def strategy_discover():
 def strategy_my():
     if not _require_login():
         return redirect("/login")
-    subs_data, _ = _compass_request("GET", "/api/strategy/subscriptions/")
+    subs_data, _ = _compass_request("GET", "/api/strategy/subscriptions")
     subscriptions = subs_data if isinstance(subs_data, list) else subs_data.get("subscriptions", subs_data.get("items", []))
     strategy_events = []
     for sub in (subscriptions or []):
@@ -203,7 +203,7 @@ def strategy_admin_list():
         return redirect("/login")
     if not _is_admin():
         return redirect("/login")
-    groups_data, _ = _compass_request("GET", "/api/strategy/groups/")
+    groups_data, _ = _compass_request("GET", "/api/strategy/groups")
     groups = groups_data if isinstance(groups_data, list) else groups_data.get("groups", groups_data.get("items", []))
     return render_template(
         "strategy/admin_list.html",
@@ -283,3 +283,66 @@ def strategy_admin_run(group_id):
         "strategy/admin_run.html",
         group=group, user=_get_user_info(), is_admin=True,
     )
+
+
+# --- 选股策略回测报告页面 ---
+@compass_bp.route("/strategy/backtest-report/")
+def strategy_backtest_report():
+    """展示短期+中期选股策略回测结果"""
+    import json, os
+    from datetime import datetime
+    report_path = '/home/ecs-assist-user/stock_strategy/output/backtest_result.json'
+
+    # 默认数据(如果json不存在则用回测脚本生成)
+    default_metrics = {'annual_return': 0, 'max_drawdown': 0, 'sharpe_ratio': 0,
+                       'calmar_ratio': 0, 'win_rate': 0, 'profit_loss_ratio': 0, 'alpha': 0}
+    short = dict(default_metrics, grade='—')
+    mid = dict(default_metrics, grade='—')
+    combined = dict(default_metrics)
+    report_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    if os.path.exists(report_path):
+        try:
+            with open(report_path) as f:
+                data = json.load(f)
+            short = data.get('short', short)
+            mid = data.get('mid', mid)
+            combined = data.get('combined', combined)
+            report_time = data.get('report_time', report_time)
+        except Exception:
+            pass
+    else:
+        # 运行回测并保存结果
+        try:
+            import subprocess
+            subprocess.Popen(['/usr/local/bin/python3.12',
+                             '/home/ecs-assist-user/stock_strategy/run_backtest.py', '--json'],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    return render_template('compass/strategy/backtest_report.html',
+                           short=short, mid=mid, combined=combined,
+                           report_time=report_time)
+
+
+@compass_bp.route("/strategy/backtest-chart/")
+def strategy_backtest_chart():
+    """净值曲线可视化"""
+    import json, os
+    report_path = '/home/ecs-assist-user/stock_strategy/output/backtest_nav.json'
+    dates, nav_data, bench_data = [], [], []
+    if os.path.exists(report_path):
+        try:
+            with open(report_path) as f:
+                data = json.load(f)
+            dates = data.get('dates', [])
+            nav_data = data.get('nav', [])
+            bench_data = data.get('benchmark', [])
+        except Exception:
+            pass
+    return render_template('compass/strategy/backtest_chart.html',
+                           nav_json=json.dumps(nav_data),
+                           bench_json=json.dumps(bench_data),
+                           dates_json=json.dumps(dates),
+                           user=_get_user_info(), is_admin=_is_admin())

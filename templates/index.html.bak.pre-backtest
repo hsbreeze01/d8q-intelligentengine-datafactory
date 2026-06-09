@@ -334,7 +334,6 @@ const PAGES=[
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
 {id:'_div2'},
 {id:'strategy-discover',icon:'🔍',label:'策略发现',title:'策略发现'},
-{id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心'},
 {id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
 {id:'_div'},
@@ -376,9 +375,6 @@ function _echInit(el){var c=echarts.init(el);_registerChart(c);return c}
 function api(url,opt){return fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>{if(!r.ok)return r.json().then(d=>{throw new Error(d.error||'请求失败 ('+r.status+')')});return r.json()})}
 function apiV(url,opt){if(window.viewAll&&url.includes('/api/')){const sep=url.includes('?')?'&':'?';return api(url+sep+'view=all',opt)}return api(url,opt)}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
-function decodeBuyStar(code){code=code||0;if(code===-1)return{signalCount:0,tags:['风险否决'],cls:'risk'};if(code===0)return{signalCount:0,tags:[],cls:'none'};var c=code,tags=[];if(c>=3e8){tags.push('BOLL中轨');c-=3e8}if(c>=2e7){tags.push('MA20支撑');c-=2e7}if(c>=1e6){tags.push('3日MA5');c-=1e6}if(c>=1e5){tags.push('2日MA5');c-=1e5}if(c>=1e4){tags.push('MA5支撑');c-=1e4}if(c>=1e3){tags.push('低位反转');c-=1e3}if(c>=10){tags.push('KDJ底部');c-=10}if(c>=1)tags.push('金叉');return{signalCount:tags.length,tags:tags,cls:'signal'}}
-function renderBuyStar(code){var info=decodeBuyStar(code);if(info.cls==='risk')return'<span style="color:#FF4D4F;font-size:12px">⚠ 风险否决</span>';if(info.cls==='none')return'<span style="color:#bbb">—</span>';return'<span style="font-size:11px;color:#555">'+info.tags.map(function(t){return'<span style="display:inline-block;padding:1px 5px;margin:0 2px;border-radius:3px;background:#E6F7FF;color:#1890FF;font-size:11px">'+t+'</span>'}).join('')+'</span>'}
-
 function tagHtml(type){const m={policy:'政策',funding:'融资',tech:'技术',market:'市场',report:'研报'};return`<span class="tag tag-${type||'tech'}">${m[type]||type||''}</span>`}
 function cronToLabel(c){if(!c)return'-';const m={'0 */1 * * *':'每小时','0 */2 * * *':'每2小时','0 */4 * * *':'每4小时','0 */6 * * *':'每6小时','0 8,12,18 * * *':'每天3次(8/12/18点)','0 9 * * 1-5':'工作日每天1次'};if(m[c])return m[c];const dm=c.match(/^0 (\d{1,2}) \* \* \*$/);if(dm)return'每天 '+dm[1]+'点';const wm=c.match(/^0 (\d{1,2}) \* \* (\d+)$/);if(wm){const wd=['','周一','周二','周三','周四','周五','周六','周日'];return(wd[parseInt(wm[2])]||'周'+wm[2])+' '+wm[1]+'点'}return c}
 function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',monthly:'每月'};return m[f]||f}
@@ -386,7 +382,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,'strategy-discover':loadStrategyDiscover,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -693,10 +689,10 @@ openDrawer(title,`
     ${stocks.length ? '<div class="stock-snapshot-grid">'+
       stocks.map(s=>{
         var snap=s.indicator_snapshot||{};
-        var starCount = decodeBuyStar(s.buy_star||0).signalCount;
-        var starColor = starCount>=5?'#FF4D4F':starCount>=3?'#FAAD14':'#1890FF';
+        var starCount = Math.min(5,Math.round((s.buy_star||0)/20000));
+        var starColor = starCount>=4?'#FF4D4F':starCount>=3?'#FAAD14':'#1890FF';
         return '<div class="stock-snapshot">'+
-          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||s.stock_code||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+(s.buy_star||0)+' <span style="font-size:10px;color:#999">('+starCount+'信号)</span></span></div>'+
+          '<div class="ss-header"><span class="ss-name">'+esc(s.stock_code)+' '+esc(s.stock_name||'')+'</span><span class="ss-score" style="color:'+starColor+'">'+'⭐'.repeat(starCount)+'</span></div>'+
           '<div class="ss-indicators">'+
             '<div class="ss-indicator"><span class="label">KDJ K</span><span class="value">'+(snap.kdj_k!=null?Number(snap.kdj_k).toFixed(1):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">KDJ D</span><span class="value">'+(snap.kdj_d!=null?Number(snap.kdj_d).toFixed(1):'-')+'</span></div>'+
@@ -706,7 +702,6 @@ openDrawer(title,`
             '<div class="ss-indicator"><span class="label">MACD DIF</span><span class="value">'+(snap.macd_dif!=null?Number(snap.macd_dif).toFixed(2):'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">涨跌幅</span><span class="value" style="color:'+(snap.change_pct>0?'#f5222d':'#52c41a')+'">'+(snap.change_pct!=null?(snap.change_pct>0?'+':'')+Number(snap.change_pct).toFixed(2)+'%':'-')+'</span></div>'+
             '<div class="ss-indicator"><span class="label">buy_star</span><span class="value">'+(s.buy_star||0)+'</span></div>'+
-            '<div class="ss-indicator"><span class="label">信号</span><span class="value">'+renderBuyStar(s.buy_star||0)+'</span></div>'+
           '</div></div>';
       }).join('')+
     '</div>'+ (stocks.length>5?'<div style="text-align:center;margin-top:12px"><button class="btn-ghost" style="font-size:12px" id="expandBtn${eid}" onclick="toggleExpandStocks('+eid+')">展开全部 '+stocks.length+' 只 →</button></div>':'') : '<div style="color:#999;font-size:13px;text-align:center;padding:40px">暂无个股数据</div>'}
@@ -2995,215 +2990,5 @@ async function loadRecTracks(){
 
 
 init();
-
-
-// ============================================================
-// 回测中心
-// ============================================================
-async function loadBacktest(el){
-  // Load presets and benchmarks in parallel
-  const [presetsData, benchmarksData] = await Promise.all([
-    api('/api/backtest/presets').catch(()=>({data:[]})),
-    api('/api/backtest/benchmarks').catch(()=>({data:[]}))
-  ]);
-  const presets = presetsData.data || [];
-  const benchmarks = benchmarksData.data || [];
-  const defaultBm = benchmarks.find(b=>b.default) || {code:'000300',name:'沪深300'};
-
-  el.innerHTML = `
-<style>
-.bt-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
-.bt-form .f{display:flex;flex-direction:column}
-.bt-form .f label{font-size:12px;color:#666;margin-bottom:4px}
-.bt-form .f input,.bt-form .f select{padding:8px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px}
-.bt-form .f input:focus,.bt-form .f select:focus{border-color:#1890ff;outline:none}
-.bt-preset-row{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-.bt-preset{padding:8px 16px;border:2px solid #e8e8e8;border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s}
-.bt-preset:hover{border-color:#1890ff;color:#1890ff}
-.bt-preset.active{border-color:#1890ff;background:#e6f7ff;color:#1890ff;font-weight:600}
-.bt-result{display:none}
-.bt-result.show{display:block}
-.bt-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.bt-stat{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);text-align:center}
-.bt-stat .v{font-size:24px;font-weight:700}
-.bt-stat .l{font-size:12px;color:#999;margin-top:4px}
-.bt-stat.green .v{color:#52c41a}
-.bt-stat.red .v{color:#ff4d4f}
-.bt-stat.blue .v{color:#1890ff}
-.bt-stat.gold .v{color:#faad14}
-.bt-chart{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
-.bt-trades{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.bt-vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
-.bt-vs-card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.bt-vs-card h4{font-size:14px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
-.bt-vs-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
-.bt-vs-row .k{color:#666}
-.bt-loading{text-align:center;padding:60px;font-size:16px;color:#1890ff}
-</style>
-
-<div class="card">
-  <h3>🔬 策略回测中心</h3>
-  <p style="font-size:13px;color:#666;margin-bottom:16px">选择预设策略或自定义条件，基于历史数据验证策略表现，对比大盘基准</p>
-
-  <div class="bt-preset-row" id="btPresets">
-    <div class="bt-preset active" data-idx="-1" onclick="btSelectPreset(-1)">✏️ 自定义</div>
-    ${presets.map((p,i)=>'<div class="bt-preset" data-idx="'+i+'" onclick="btSelectPreset('+i+')">'+esc(p.name)+'</div>').join('')}
-  </div>
-
-  <div class="bt-form" id="btForm">
-    <div class="f"><label>策略名称</label><input id="btName" value="自定义策略"></div>
-    <div class="f"><label>起始日期</label><input id="btStart" type="date" value="2025-01-01"></div>
-    <div class="f"><label>结束日期</label><input id="btEnd" type="date" value="2026-05-27"></div>
-    <div class="f"><label>初始资金</label><input id="btCapital" type="number" value="1000000"></div>
-    <div class="f"><label>最大持仓数</label><input id="btMaxPos" type="number" value="10"></div>
-    <div class="f"><label>单只仓位(%)</label><input id="btPosPct" type="number" value="10"></div>
-    <div class="f"><label>止损(%)</label><input id="btSL" type="number" value="-8" step="0.1"></div>
-    <div class="f"><label>止盈(%)</label><input id="btTP" type="number" value="20" step="0.1"></div>
-    <div class="f"><label>最大持仓天数</label><input id="btHold" type="number" value="20"></div>
-    <div class="f"><label>基准指数</label><select id="btBench">${benchmarks.map(b=>'<option value="'+b.code+'"'+(b.default?' selected':'')+'>'+esc(b.name)+'</option>').join('')}</select></div>
-    <div class="f"><label>信号逻辑</label><select id="btLogic"><option value="AND">AND (全部满足)</option><option value="OR">OR (任一满足)</option><option value="SCORING">SCORING (评分达标)</option></select></div>
-    <div class="f" style="align-items:flex-end"><button class="btn btn-lg" onclick="btRun()" id="btRunBtn">▶ 开始回测</button></div>
-  </div>
-</div>
-
-<div id="btResult" class="bt-result">
-  <div class="bt-stats" id="btStats"></div>
-  <div class="bt-vs" id="btVs"></div>
-  <div class="bt-chart"><div id="btChart" style="width:100%;height:400px"></div></div>
-  <div class="bt-trades"><h3>交易明细 <span id="btTradeCount" style="font-size:12px;color:#999;font-weight:400"></span></h3><div id="btTradeTable"></div></div>
-</div>
-<div id="btLoading" class="bt-loading" style="display:none">⏳ 回测计算中，请稍候...</div>
-`;
-
-  window._btPresets = presets;
-  window._btChart = null;
-}
-
-function btSelectPreset(idx){
-  document.querySelectorAll('.bt-preset').forEach((el,i)=>el.classList.toggle('active',el.dataset.idx==idx));
-  if(idx>=0 && window._btPresets && window._btPresets[idx]){
-    const p = window._btPresets[idx];
-    const c = p.config || {};
-    document.getElementById('btName').value = p.name;
-    document.getElementById('btSL').value = (c.stop_loss_pct||0)*100;
-    document.getElementById('btTP').value = (c.take_profit_pct||0)*100;
-    document.getElementById('btHold').value = c.max_holding_days||20;
-    document.getElementById('btBench').value = c.benchmark||'000300';
-    document.getElementById('btLogic').value = c.signal_logic||'AND';
-    document.getElementById('btMaxPos').value = c.max_positions||10;
-    document.getElementById('btPosPct').value = (c.position_size_pct||0.1)*100;
-  }
-}
-
-async function btRun(){
-  const btn = document.getElementById('btRunBtn');
-  const loading = document.getElementById('btLoading');
-  const result = document.getElementById('btResult');
-  btn.disabled=true;btn.textContent='计算中...';
-  loading.style.display='block';result.classList.remove('show');
-
-  // Build conditions from preset or custom
-  const presetIdx = Array.from(document.querySelectorAll('.bt-preset')).findIndex(el=>el.classList.contains('active'));
-  let entryConditions = [];
-  let exitConditions = [];
-  let scoringThreshold = null;
-
-  if(presetIdx>0 && window._btPresets[presetIdx-1]){
-    const p = window._btPresets[presetIdx-1];
-    entryConditions = p.config.entry_conditions || [];
-    exitConditions = p.config.exit_conditions || [];
-    scoringThreshold = p.config.scoring_threshold;
-  } else {
-    // Custom: use RSI bottom as default
-    entryConditions = [
-      {indicator:"rsi_6",operator:"<",value:30},
-      {indicator:"kdj_k",operator:"<",value:20}
-    ];
-    exitConditions = [{indicator:"rsi_6",operator:">",value:70}];
-  }
-
-  const body = {
-    name: document.getElementById('btName').value,
-    start_date: document.getElementById('btStart').value,
-    end_date: document.getElementById('btEnd').value,
-    initial_capital: parseInt(document.getElementById('btCapital').value),
-    max_positions: parseInt(document.getElementById('btMaxPos').value),
-    position_size_pct: parseInt(document.getElementById('btPosPct').value)/100,
-    entry_conditions: entryConditions,
-    exit_conditions: exitConditions,
-    signal_logic: document.getElementById('btLogic').value,
-    scoring_threshold: scoringThreshold,
-    stop_loss_pct: parseInt(document.getElementById('btSL').value)/100,
-    take_profit_pct: parseInt(document.getElementById('btTP').value)/100,
-    max_holding_days: parseInt(document.getElementById('btHold').value),
-    benchmark: document.getElementById('btBench').value
-  };
-
-  try{
-    const data = await api('/api/backtest/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!data.success){toast(data.error||'回测失败',true);return}
-    btRenderResult(data.data);
-  }catch(e){toast(e.message,true)}
-  finally{btn.disabled=false;btn.textContent='▶ 开始回测';loading.style.display='none';result.classList.add('show');setTimeout(()=>{if(window._btChart)window._btChart.resize()},50)}
-}
-
-function btRenderResult(d){
-  const s = d.stats||{};
-  const fmtPct = v=>(v==null?'-':(v*100).toFixed(2)+'%');
-  const fmtNum = v=>(v==null?'-':v.toLocaleString());
-
-  // Stats cards
-  document.getElementById('btStats').innerHTML = `
-    <div class="bt-stat ${s.total_return>=0?'green':'red'}"><div class="v">${fmtPct(s.total_return)}</div><div class="l">策略总收益</div></div>
-    <div class="bt-stat ${s.excess_return!=null?(s.excess_return>=0?'green':'red'):'blue'}"><div class="v">${fmtPct(s.excess_return)}</div><div class="l">超额收益</div></div>
-    <div class="bt-stat blue"><div class="v">${fmtPct(s.max_drawdown)}</div><div class="l">最大回撤</div></div>
-    <div class="bt-stat gold"><div class="v">${fmtPct(s.win_rate)}</div><div class="l">胜率 (${s.total_trades}笔)</div></div>
-  `;
-
-  // VS comparison
-  const bmReturn = s.benchmark_return;
-  const hasBm = bmReturn!=null;
-  document.getElementById('btVs').innerHTML = hasBm ? `
-    <div class="bt-vs-card">
-      <h4>📊 策略 vs ${esc(d.benchmark_name||d.benchmark||'基准')}</h4>
-      <div class="bt-vs-row"><span class="k">策略总收益</span><b style="color:${s.total_return>=0?'#52c41a':'#ff4d4f'}">${fmtPct(s.total_return)}</b></div>
-      <div class="bt-vs-row"><span class="k">基准总收益</span><b>${fmtPct(bmReturn)}</b></div>
-      <div class="bt-vs-row"><span class="k">策略年化</span><b>${fmtPct(s.annualized_return)}</b></div>
-      <div class="bt-vs-row"><span class="k">基准年化</span><b>${fmtPct(s.benchmark_annualized)}</b></div>
-      <div class="bt-vs-row"><span class="k">Alpha</span><b>${s.alpha!=null?s.alpha.toFixed(4):'-'}</b></div>
-      <div class="bt-vs-row"><span class="k">Beta</span><b>${s.beta!=null?s.beta.toFixed(4):'-'}</b></div>
-      <div class="bt-vs-row"><span class="k">信息比率</span><b>${s.information_ratio!=null?s.information_ratio.toFixed(2):'-'}</b></div>
-    </div>
-    <div class="bt-vs-card">
-      <h4>📉 风险对比</h4>
-      <div class="bt-vs-row"><span class="k">策略最大回撤</span><b style="color:#ff4d4f">${fmtPct(s.max_drawdown)}</b></div>
-      <div class="bt-vs-row"><span class="k">基准最大回撤</span><b>${fmtPct(s.benchmark_max_drawdown)}</b></div>
-      <div class="bt-vs-row"><span class="k">Sharpe</span><b>${s.sharpe_ratio!=null?s.sharpe_ratio.toFixed(2):'-'}</b></div>
-      <div class="bt-vs-row"><span class="k">笔均盈亏</span><b>${fmtNum(s.avg_pnl_per_trade)}</b></div>
-      <div class="bt-vs-row"><span class="k">平均持仓</span><b>${s.avg_holding_days||'-'}天</b></div>
-      <div class="bt-vs-row"><span class="k">交易天数</span><b>${s.trade_dates||'-'}天</b></div>
-    </div>
-  ` : '';
-
-  // Chart
-  const curve = (d.equity_curve_sample||[]);
-  const bmCurve = (d.benchmark_curve_sample||[]);
-  if(window._btChart){window._btChart.dispose();window._btChart=null}
-  const chartDom = document.getElementById('btChart');
-  if(chartDom && curve.length>0){
-    window._btChart = echarts.init(chartDom);
-    const dates = curve.map(p=>p.date);
-    const series = [{name:'策略权益',type:'line',data:curve.map(p=>p.equity),smooth:true,lineStyle:{width:2},itemStyle:{color:'#1890ff'}}];
-    if(bmCurve.length>0) series.push({name:(d.benchmark_name||'基准')+'权益',type:'line',data:bmCurve.map(p=>p.benchmark_equity),smooth:true,lineStyle:{width:2,type:'dashed'},itemStyle:{color:'#faad14'}});
-    window._btChart.setOption({tooltip:{trigger:'axis'},legend:{data:series.map(s=>s.name)},grid:{left:'3%',right:'4%',bottom:'3%',containLabel:true},xAxis:{type:'category',data:dates,axisLabel:{fontSize:10,rotate:30}},yAxis:{type:'value',axisLabel:{formatter:v=>(v/10000).toFixed(0)+'万'}},series});
-    window.addEventListener('resize',()=>window._btChart&&window._btChart.resize());
-  }
-
-  // Trades table
-  const trades = (d.trades||[]).filter(t=>t.action==='sell');
-  document.getElementById('btTradeCount').textContent = `共 ${d.total_trades} 笔交易（买入+卖出），盈利 ${s.win_trades} 笔，亏损 ${s.lose_trades} 笔`;
-  if(trades.length===0){document.getElementById('btTradeTable').innerHTML='<div class="empty">无交易记录</div>';return}
-  document.getElementById('btTradeTable').innerHTML = `<table class="et"><thead><tr><th>日期</th><th>股票</th><th>买入价</th><th>卖出价</th><th>盈亏</th><th>收益率</th><th>持仓天数</th><th>原因</th></tr></thead><tbody>${trades.slice(0,50).map(t=>'<tr><td>'+t.date+'</td><td>'+t.stock_code+'</td><td>'+t.price.toFixed(2)+'</td><td>'+(t.pnl>=0?'<span style="color:#52c41a">+'+t.pnl.toFixed(0)+'</span>':'<span style="color:#ff4d4f">'+t.pnl.toFixed(0)+'</span>')+'</td><td>'+(t.pnl_pct>=0?'+':'')+(t.pnl_pct*100).toFixed(1)+'%</td><td>'+t.holding_days+'</td><td>'+esc(t.reason||'')+'</td></tr>').join('')}</tbody></table>`;
-}
 
 </script>

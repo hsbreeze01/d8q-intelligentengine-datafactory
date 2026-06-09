@@ -1,0 +1,49 @@
+{% extends "compass/strategy/base.html" %}
+{% block title %}净值曲线{% endblock %}
+{% block content %}
+<h1 class="page-title">📈 策略净值曲线</h1>
+<div class="card">
+    <div id="nav-chart" style="height:400px"></div>
+</div>
+<div class="card">
+    <div id="drawdown-chart" style="height:250px"></div>
+</div>
+<script>
+var navData = {{ nav_json | safe }};
+var benchData = {{ bench_json | safe }};
+var dates = {{ dates_json | safe }};
+
+// 净值曲线
+var chart1 = echarts.init(document.getElementById('nav-chart'));
+chart1.setOption({
+    title: {text: '策略净值 vs 沪深300', left: 'center'},
+    tooltip: {trigger: 'axis'},
+    legend: {data: ['组合净值','沪深300'], top: 30},
+    xAxis: {type: 'category', data: dates, axisLabel:{rotate:45}},
+    yAxis: {type: 'value', name: '净值'},
+    grid: {bottom: 80},
+    series: [
+        {name:'组合净值', type:'line', data: navData, lineStyle:{width:2,color:'#1890FF'}, showSymbol:false},
+        {name:'沪深300', type:'line', data: benchData, lineStyle:{width:1.5,color:'#999',type:'dashed'}, showSymbol:false}
+    ]
+});
+
+// 回撤曲线
+var ddData = [];
+var peak = navData[0];
+for(var i=0;i<navData.length;i++){
+    if(navData[i]>peak) peak=navData[i];
+    ddData.push(((navData[i]-peak)/peak*100).toFixed(2));
+}
+var chart2 = echarts.init(document.getElementById('drawdown-chart'));
+chart2.setOption({
+    title: {text: '回撤曲线', left: 'center'},
+    tooltip: {trigger: 'axis', formatter:'{b}<br/>回撤: {c}%'},
+    xAxis: {type: 'category', data: dates, axisLabel:{rotate:45}},
+    yAxis: {type: 'value', name: '%', max:0},
+    grid: {bottom: 80},
+    series: [{type:'line', data: ddData, areaStyle:{color:'rgba(255,77,79,0.15)'}, lineStyle:{color:'#FF4D4F',width:1.5}, showSymbol:false}]
+});
+window.addEventListener('resize',function(){chart1.resize();chart2.resize();});
+</script>
+{% endblock %}
