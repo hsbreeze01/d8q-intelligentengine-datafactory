@@ -205,10 +205,36 @@ def _init_alert_tables():
             conn.commit()
 
 
+
+def _init_score_history_table():
+    """初始化自选股评分历史表"""
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS score_history ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "stock_code TEXT NOT NULL, "
+            "stock_name TEXT, "
+            "date TEXT NOT NULL, "
+            "total_score REAL, "
+            "technical_score REAL, "
+            "trend_score REAL, "
+            "fundamental_score REAL, "
+            "volume_score REAL, "
+            "signal TEXT, "
+            "risk_level TEXT, "
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+            "UNIQUE(stock_code, date)"
+            "); "
+            "CREATE INDEX IF NOT EXISTS idx_sh_code_date ON score_history(stock_code, date DESC); "
+            "CREATE INDEX IF NOT EXISTS idx_sh_date ON score_history(date);"
+        )
+        conn.commit()
+
 try:
     _init_events_table()
     _init_monitor_tables()
     _init_alert_tables()
+    _init_score_history_table()
 except Exception:
     pass
 
@@ -2376,6 +2402,188 @@ def mark_all_alerts_read():
         conn.execute("UPDATE alerts SET is_read=1 WHERE user_id=? AND is_read=0", (username,))
         conn.commit()
     return jsonify({"message": "全部已标记已读"})
+
+
+
+# === 自选股日报 API ===
+
+@app.route("/api/watchlist/daily-report", methods=["GET"])
+def watchlist_daily_report():
+    """自选股日报：今日评分、昨日对比、7天sparkline"""
+    from datetime import datetime, timedelta
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    with get_db_ctx() as conn:
+        # 获取当前用户自选股
+        stocks = conn.execute(
+            "SELECT stock_code, stock_name FROM user_watchlist WHERE user_id=?", (username,)
+        ).fetchall()
+        if not stocks:
+            return jsonify({"items": [], "summary": {"total_stocks": 0, "improved": 0, "declined": 0, "unchanged": 0}})
+
+        items = []
+        improved = declined = unchanged = 0
+
+        for row in stocks:
+            code, name = row["stock_code"], row["stock_name"]
+
+            # 今日评分
+            t = conn.execute(
+                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level "
+                "FROM score_history WHERE stock_code=? AND date=?", (code, today)
+            ).fetchone()
+
+            # 昨日评分
+            y = conn.execute(
+                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level "
+                "FROM score_history WHERE stock_code=? AND date=?", (code, yesterday)
+            ).fetchone()
+
+            today_data = dict(t) if t else None
+            yesterday_data = dict(y) if y else None
+
+            change = None
+            dimensions = {}
+            if today_data and yesterday_data and today_data.get("total_score") is not None and yesterday_data.get("total_score") is not None:
+                change = round(today_data["total_score"] - yesterday_data["total_score"], 2)
+                dimensions = {
+                    "technical_change": round((today_data.get("technical_score") or 0) - (yesterday_data.get("technical_score") or 0), 2),
+                    "trend_change": round((today_data.get("trend_score") or 0) - (yesterday_data.get("trend_score") or 0), 2),
+                    "fundamental_change": round((today_data.get("fundamental_score") or 0) - (yesterday_data.get("fundamental_score") or 0), 2),
+                    "volume_change": round((today_data.get("volume_score") or 0) - (yesterday_data.get("volume_score") or 0), 2),
+                }
+                if change > 0:
+                    improved += 1
+                elif change < 0:
+                    declined += 1
+                else:
+                    unchanged += 1
+            else:
+                unchanged += 1
+
+            # 7天sparkline
+            spark_rows = conn.execute(
+                "SELECT total_score FROM score_history WHERE stock_code=? AND date>=? ORDER BY date ASC",
+                (code, week_ago)
+            ).fetchall()
+            sparkline = [r["total_score"] for r in spark_rows if r["total_score"] is not None]
+
+            items.append({
+                "stock_code": code,
+                "stock_name": name,
+                "today": today_data,
+                "yesterday": yesterday_data,
+                "change": change,
+                "dimensions": dimensions,
+                "sparkline": sparkline,
+            })
+
+        # 按|change|降序排列
+        items.sort(key=lambda x: abs(x["change"]) if x["change"] is not None else -1, reverse=True)
+
+    return jsonify({
+        "items": items,
+        "summary": {"total_stocks": len(stocks), "improved": improved, "declined": declined, "unchanged": unchanged}
+    })
+
+
+@app.route("/api/watchlist/<code>/score-history", methods=["GET"])
+def watchlist_score_history(code):
+    """查询某只股票的评分历史"""
+    from datetime import datetime, timedelta
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+
+    days = min(int(request.args.get("days", 7)), 90)
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    with get_db_ctx() as conn:
+        rows = conn.execute(
+            "SELECT date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level "
+            "FROM score_history WHERE stock_code=? AND date>=? ORDER BY date ASC",
+            (code, since)
+        ).fetchall()
+
+        history = [dict(r) for r in rows]
+        scores = [r["total_score"] for r in rows if r["total_score"] is not None]
+        trend = {}
+        if scores:
+            trend = {"min": round(min(scores), 2), "max": round(max(scores), 2), "avg": round(sum(scores)/len(scores), 2), "latest": scores[-1]}
+
+        # 获取stock_name
+        name_row = conn.execute(
+            "SELECT stock_name FROM score_history WHERE stock_code=? LIMIT 1", (code,)
+        ).fetchone()
+        stock_name = name_row["stock_name"] if name_row else code
+
+    return jsonify({"stock_code": code, "stock_name": stock_name, "history": history, "trend": trend})
+
+
+@app.route("/api/watchlist/recalculate", methods=["POST"])
+def watchlist_recalculate():
+    """手动触发评分计算"""
+    from datetime import datetime
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+
+    body = request.json or {}
+    stock_codes = body.get("stock_codes")
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    with get_db_ctx() as conn:
+        if stock_codes:
+            placeholders = ",".join(["?"] * len(stock_codes))
+            stocks = conn.execute(
+                f"SELECT DISTINCT stock_code, stock_name FROM user_watchlist WHERE stock_code IN ({placeholders})",
+                stock_codes
+            ).fetchall()
+        else:
+            stocks = conn.execute("SELECT DISTINCT stock_code, stock_name FROM user_watchlist").fetchall()
+
+    calculated = 0
+    failed = 0
+
+    for row in stocks:
+        code, name = row["stock_code"], row["stock_name"]
+        try:
+            url = SHARK_API + "/api/analysis/stock/comprehensive"
+            body_bytes = json.dumps({"stock_code": code}).encode()
+            req_obj = urllib.request.Request(url, data=body_bytes, method="POST")
+            req_obj.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req_obj, timeout=60) as resp:
+                data = json.loads(resp.read())
+            total_score = data.get("score")
+            if total_score is not None:
+                # Extract signals from short/mid/long term
+                short_signal = (data.get("short_term") or {}).get("signal", "")
+                mid_signal = (data.get("mid_term") or {}).get("signal", "")
+                long_signal = (data.get("long_term") or {}).get("signal", "")
+                signal = short_signal or mid_signal or long_signal
+                with get_db_ctx() as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (code, name or data.get("stock_name", code), today, total_score, None,
+                         None, None, None, signal, data.get("risk_level"))
+                    )
+                    conn.commit()
+                calculated += 1
+            else:
+                failed += 1
+                logger.warning("recalculate: %s 无 score, data=%s", code, str(data)[:200])
+        except Exception as e:
+            failed += 1
+            logger.error("recalculate: %s 失败: %s", code, e)
+
+    return jsonify({"calculated": calculated, "failed": failed, "date": today})
 
 
 @app.route("/<path:path>")

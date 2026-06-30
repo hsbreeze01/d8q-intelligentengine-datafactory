@@ -272,6 +272,79 @@ def _run_alert_scan():
         logger.error("预警扫描任务失败: %s", e)
 
 
+
+# 自选股每日评分计算
+_score_calc_last_run = ""
+
+def daily_score_calculation():
+    """每日评分计算：遍历所有用户自选股，调用SHARK获取评分并存入score_history"""
+    global _score_calc_last_run
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _score_calc_last_run == today:
+        return
+    now = datetime.now()
+    if now.hour != 8 or now.minute < 30 or now.minute > 35:
+        return
+    _score_calc_last_run = today
+
+    import urllib.request
+    import urllib.parse
+    import sqlite3
+
+    SHARK_API = "http://49.234.48.221:5000"
+    DB_PATH = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
+
+    logger.info("开始每日自选股评分计算")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        stocks = conn.execute("SELECT DISTINCT stock_code, stock_name FROM user_watchlist").fetchall()
+        conn.close()
+    except Exception as e:
+        logger.error("评分计算: 获取自选股列表失败: %s", e)
+        return
+
+    calculated = 0
+    failed = 0
+
+    for row in stocks:
+        code, name = row["stock_code"], row["stock_name"]
+        try:
+            url = SHARK_API + "/api/analysis/stock/comprehensive"
+            body_bytes = json.dumps({"stock_code": code}).encode()
+            req = urllib.request.Request(url, data=body_bytes, method="POST")
+            req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read())
+
+            total_score = data.get("score")
+            if total_score is not None:
+                short_signal = (data.get("short_term") or {}).get("signal", "")
+                mid_signal = (data.get("mid_term") or {}).get("signal", "")
+                long_signal = (data.get("long_term") or {}).get("signal", "")
+                signal = short_signal or mid_signal or long_signal
+                conn = sqlite3.connect(DB_PATH)
+                conn.execute(
+                    "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (code, name or data.get("stock_name", code), today, total_score, None,
+                     None, None, None, signal, data.get("risk_level"))
+                )
+                conn.commit()
+                conn.close()
+                calculated += 1
+                logger.info("评分计算: %s(%s) total_score=%.1f", code, name, total_score)
+            else:
+                failed += 1
+                logger.warning("评分计算: %s 无 score, data=%s", code, str(data)[:200])
+        except Exception as e:
+            failed += 1
+            logger.error("评分计算: %s 失败: %s", code, e)
+
+    logger.info("每日评分计算完成: calculated=%d, failed=%d", calculated, failed)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -291,6 +364,9 @@ def _tick():
 
         # 预警扫描(每30分钟)
         _run_alert_scan()
+
+        # 每日自选股评分计算(08:30)
+        daily_score_calculation()
 
         # 先轮询已投递的 publish 队列任务
         _poll_pending()

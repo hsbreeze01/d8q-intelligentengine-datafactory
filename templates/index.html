@@ -272,6 +272,36 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .sev-urgent{border-left:4px solid #ff4d4f !important}
 .sev-important{border-left:4px solid #faad14 !important}
 .sev-normal{border-left:4px solid #d9d9d9 !important}
+
+/* === 评分日报表格 === */
+.daily-summary{display:flex;gap:16px;align-items:center;margin-bottom:16px;font-size:14px;color:#666}
+.daily-summary .ds-item{display:flex;align-items:center;gap:4px}
+.daily-summary .ds-up{color:#ff4d4f;font-weight:600}
+.daily-summary .ds-down{color:#52c41a;font-weight:600}
+.daily-table{width:100%;border-collapse:collapse;font-size:13px}
+.daily-table th{background:#fafafa;padding:10px 12px;text-align:left;font-weight:500;border-bottom:2px solid #f0f0f0;white-space:nowrap}
+.daily-table td{padding:10px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+.daily-table tr:hover{background:#f0f7ff;cursor:pointer}
+.daily-table .score-cell{font-size:16px;font-weight:700}
+.change-up{color:#ff4d4f;font-weight:600}
+.change-down{color:#52c41a;font-weight:600}
+.change-zero{color:#999}
+.signal-bullish{color:#ff4d4f;font-weight:500}
+.signal-bearish{color:#52c41a;font-weight:500}
+.signal-neutral{color:#999}
+.risk-low{background:#f6ffed;color:#52c41a;padding:2px 8px;border-radius:10px;font-size:12px;display:inline-block}
+.risk-mid{background:#fffbe6;color:#faad14;padding:2px 8px;border-radius:10px;font-size:12px;display:inline-block}
+.risk-high{background:#fff2f0;color:#ff4d4f;padding:2px 8px;border-radius:10px;font-size:12px;display:inline-block}
+.sparkline-cell{width:120px;height:30px;display:inline-block}
+.daily-table .action-btn{padding:3px 10px;font-size:12px;border-radius:4px;cursor:pointer;border:1px solid #d9d9d9;background:#fff;margin-right:4px;transition:all .15s}
+.daily-table .action-btn:hover{border-color:#1890ff;color:#1890ff}
+.daily-table .action-btn.del:hover{border-color:#ff4d4f;color:#ff4d4f}
+.attr-modal-dim{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.attr-modal-dim .dim-label{font-size:13px;color:#666;min-width:60px}
+.attr-modal-dim .dim-values{font-size:14px}
+.attr-modal-dim .dim-change{font-size:13px;margin-left:8px}
+.attr-modal-dim.main-factor{background:#f0f7ff;border-radius:8px;padding:12px;border:1px solid #bae7ff}
+.attr-modal-dim.main-factor::after{content:'主要变化因素';font-size:11px;color:#1890ff;margin-left:8px}
 </style>
 <body>
 <div class="sidebar">
@@ -1190,19 +1220,124 @@ el.innerHTML=`
 </div>
 </div>
 <div id="dimResults" style="display:none"></div>
-<div class="card" style="padding:20px 24px"><h3>我的自选 <a class="more" onclick="loadStock(document.getElementById('contentArea'))">🔄 刷新</a></h3><div id="watchlistArea" class="stock-grid">加载中...</div></div>
+<div class="card" style="padding:20px 24px"><h3>我的自选 <a class="more" onclick="loadStock(document.getElementById('contentArea'))">🔄 刷新</a></h3><div id="watchlistArea">加载中...</div></div>
 <div id="stockResult"></div>`;
 loadWatchlist();
 }
 async function loadWatchlist(){
-const data=await api('/api/watchlist');
 const el=document.getElementById('watchlistArea');
-if(!data||!data.length){el.innerHTML='<div class="empty" style="grid-column:1/-1;padding:40px">暂无自选股，搜索后点击「+ 自选」添加</div>';return}
+try{
+const report=await api('/api/watchlist/daily-report');
+if(report&&report.items){renderDailyReport(report,el);return}
+}catch(e){console.warn('daily-report fallback',e)}
+const data=await api('/api/watchlist');
+if(!data||!data.length){el.innerHTML='<div class="empty" style="padding:40px">暂无自选股，搜索后点击「+ 自选」添加</div>';return}
 el.innerHTML=data.map(s=>`<div class="stock-card" onclick="showStockDetail('${s.stock_code}')">
 <div class="sc-name">${esc(s.stock_name||s.stock_code)}</div>
 <div class="sc-code">${s.stock_code}</div>
 <span class="sc-del" onclick="event.stopPropagation();delWatchlist('${s.stock_code}')">×</span>
 </div>`).join('');
+}
+function renderDailyReport(data,el){
+var s=data.summary||{};
+var items=data.items||[];
+if(!items.length){el.innerHTML='<div class="empty" style="padding:40px">暂无自选股，搜索后点击「+ 自选」添加</div>';return}
+var html='<div class="daily-summary">';
+html+='<span class="ds-item">\u{1f4ca} <strong>'+(s.total_stocks||items.length)+'</strong>只自选</span>';
+html+='<span class="ds-item ds-up">\u2191 '+(s.improved||0)+'只上升</span>';
+html+='<span class="ds-item ds-down">\u2193 '+(s.declined||0)+'只下降</span>';
+html+='</div>';
+html+='<div style="overflow-x:auto"><table class="daily-table"><thead><tr>';
+html+='<th>代码</th><th>名称</th><th>今日分</th><th>变化</th><th>信号</th><th>风险</th><th>7日走势</th><th>操作</th>';
+html+='</tr></thead><tbody>';
+items.forEach(function(item){
+var today=item.today||{};
+var chg=item.change||0;
+var chgCls=chg>0?'change-up':chg<0?'change-down':'change-zero';
+var chgTxt=chg>0?'+'+chg+'\u2191':chg<0?chg+'\u2193':'0';
+var sigMap={bullish:'\u770b\u591a',bearish:'\u770b\u7a7a',neutral:'\u4e2d\u6027'};
+var sigCls={bullish:'signal-bullish',bearish:'signal-bearish',neutral:'signal-neutral'};
+var sig=today.signal||'neutral';
+var riskMap={'\u4f4e':'risk-low','\u4e2d':'risk-mid','\u9ad8':'risk-high'};
+var risk=today.risk_level||'\u4e2d';
+var scoreColor=(today.total_score||0)>=70?'#52c41a':(today.total_score||0)>=40?'#faad14':'#ff4d4f';
+var sparkData=JSON.stringify(item.sparkline||[]);
+var itemJson=JSON.stringify(item).replace(/'/g,'\\u0027');
+html+='<tr onclick="showScoreAttribution(JSON.parse(this.dataset.stock))" data-stock=\''+itemJson.replace(/'/g,'&#39;')+'\' >';
+html+='<td style="font-family:monospace;font-weight:500">'+esc(item.stock_code)+'</td>';
+html+='<td>'+esc(item.stock_name||item.stock_code)+'</td>';
+html+='<td class="score-cell" style="color:'+scoreColor+'">'+(today.total_score||'-')+'</td>';
+html+='<td class="'+chgCls+'">'+chgTxt+'</td>';
+html+='<td class="'+(sigCls[sig]||'signal-neutral')+'">'+(sigMap[sig]||'\u4e2d\u6027')+'</td>';
+html+='<td><span class="'+(riskMap[risk]||'risk-mid')+'">'+esc(risk)+'</span></td>';
+html+='<td><div class="sparkline-cell" data-spark=\''+sparkData.replace(/'/g,'&#39;')+'\'></div></td>';
+html+='<td><button class="action-btn" onclick="event.stopPropagation();showStockDetail(\''+item.stock_code+'\')">\u5206\u6790</button>';
+html+='<button class="action-btn del" onclick="event.stopPropagation();delWatchlist(\''+item.stock_code+'\')">\u5220\u9664</button></td>';
+html+='</tr>';
+});
+html+='</tbody></table></div>';
+el.innerHTML=html;
+renderSparklines();
+}
+function renderSparklines(){
+setTimeout(function(){
+document.querySelectorAll('.sparkline-cell').forEach(function(cell){
+var data=[];
+try{data=JSON.parse(cell.getAttribute('data-spark'))||[]}catch(e){}
+if(!data.length)return;
+var color=data[data.length-1]>data[0]?'#ff4d4f':'#52c41a';
+var chart=echarts.init(cell,null,{width:120,height:30});
+chart.setOption({grid:{top:2,bottom:2,left:2,right:2},xAxis:{show:false,type:'category',data:data.map(function(_,i){return i})},yAxis:{show:false,type:'value',min:'dataMin',max:'dataMax'},series:[{type:'line',smooth:true,symbol:'none',lineStyle:{width:1.5,color:color},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:color+'33'},{offset:1,color:color+'05'}]}},data:data}]});
+});
+},100);
+}
+function showScoreAttribution(stock){
+if(typeof stock==='string'){try{stock=JSON.parse(stock)}catch(e){return}}
+var modal=document.getElementById('taskModal');
+modal.style.display='flex';
+var today=stock.today||{};
+var yesterday=stock.yesterday||{};
+var dims=[
+{label:'\u6280\u672f\u9762',key:'technical'},
+{label:'\u8d8b\u52bf\u9762',key:'trend'},
+{label:'\u57fa\u672c\u9762',key:'fundamental'},
+{label:'\u91cf\u80fd',key:'volume'}
+];
+var maxAbsChange=0,maxKey='';
+dims.forEach(function(d){
+var chg=(stock.dimensions&&stock.dimensions[d.key+'_change'])||0;
+if(Math.abs(chg)>maxAbsChange){maxAbsChange=Math.abs(chg);maxKey=d.key}
+});
+var html='<div class="card" style="max-width:500px;width:100%;max-height:85vh;overflow-y:auto">';
+html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
+html+='<h3 style="margin:0">\u{1f4ca} \u8bc4\u5206\u5f52\u56e0 - '+esc(stock.stock_name||stock.stock_code)+'</h3>';
+html+='<button onclick="closeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&times;</button></div>';
+html+='<div style="text-align:center;margin-bottom:20px">';
+var scoreColor=(today.total_score||0)>=70?'#52c41a':(today.total_score||0)>=40?'#faad14':'#ff4d4f';
+var chg=stock.change||0;
+var chgCls=chg>0?'change-up':chg<0?'change-down':'change-zero';
+var chgTxt=chg>0?'+'+chg+'\u2191':chg<0?chg+'\u2193':'0';
+html+='<div style="font-size:36px;font-weight:700;color:'+scoreColor+'">'+(today.total_score||'-')+'</div>';
+html+='<div class="'+chgCls+'" style="font-size:14px;margin-top:4px">\u8f83\u6628\u65e5 '+chgTxt+'</div>';
+html+='</div>';
+dims.forEach(function(d){
+var todayVal=today[d.key+'_score']||today[d.key]||'-';
+var yestVal=yesterday[d.key+'_score']||yesterday[d.key]||'-';
+var dimChg=(stock.dimensions&&stock.dimensions[d.key+'_change'])||0;
+var isMain=d.key===maxKey&&maxAbsChange>0;
+var dimChgCls=dimChg>0?'change-up':dimChg<0?'change-down':'change-zero';
+var dimChgTxt=dimChg>0?'+'+dimChg:''+dimChg;
+html+='<div class="attr-modal-dim'+(isMain?' main-factor':'')+'">';
+html+='<span class="dim-label">'+d.label+'</span>';
+html+='<span class="dim-values">'+yestVal+' \u2192 '+todayVal+'</span>';
+html+='<span class="dim-change '+dimChgCls+'">('+dimChgTxt+')</span>';
+html+='</div>';
+});
+html+='<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px">';
+html+='<button class="btn-ghost" onclick="closeModal()">\u5173\u95ed</button>';
+html+='<button class="btn" onclick="closeModal();showStockDetail(\''+stock.stock_code+'\')">\u67e5\u770b\u8be6\u7ec6\u5206\u6790</button>';
+html+='</div></div>';
+modal.innerHTML=html;
 }
 async function addToWatchlist(){
 const code=document.getElementById('stockInput').value.trim();
@@ -3385,8 +3520,8 @@ api('/api/alerts?page_size=20'),
 api('/api/alert-rules'),
 api('/api/alerts/unread-count')
 ]);
-const alerts=alertsData.items||[];
-const rules=rulesData||[];
+const alerts=alertsData.alerts||alertsData.items||[];
+const rules=rulesData.rules||rulesData||[];
 const uc=unread.count||0;
 const urgentC=(unread.by_severity||{}).urgent||0;
 
@@ -3457,7 +3592,7 @@ return html;
 function alertFilter(type){
 document.querySelectorAll('#alertFilters .fb').forEach(b=>b.classList.toggle('active',b.dataset.t===type));
 const params=type?'?type='+type+'&page_size=20':'?page_size=20';
-api('/api/alerts'+params).then(d=>{document.getElementById('alertList').innerHTML=alertRenderList(d.items||[])});
+api('/api/alerts'+params).then(d=>{document.getElementById('alertList').innerHTML=alertRenderList(d.alerts||d.items||[])});
 }
 async function alertMarkRead(id){await api('/api/alerts/'+id+'/read',{method:'PATCH'});toast('已标记已读');goPage('alert',false);}
 async function alertMarkAllRead(){await api('/api/alerts/read-all',{method:'PATCH'});toast('全部已读');goPage('alert',false);}

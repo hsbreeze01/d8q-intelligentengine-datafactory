@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-06-30 20:43:40",
+  "branch": "junior-assistant",
+  "feature": "P0-自选股日报+评分变化 & 预警中心修复",
+  "summary": "25 passed, 0 failed, 25 total",
+  "pass_rate": "100.0%",
+  "results": [
+    {
+      "name": "GET /api/watchlist/daily-report",
+      "status": "PASS",
+      "detail": "{'items': [{'change': None, 'dimensions': {}, 'sparkline': [45.0], 'stock_code': '603196', 'stock_name': '603196', 'toda"
+    },
+    {
+      "name": "daily-report has items",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "daily-report has summary",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "daily-report item has sparkline",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "daily-report item has dimensions",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "daily-report item has today scores",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "GET /api/watchlist/002594/score-history",
+      "status": "PASS",
+      "detail": "{'history': [{'date': '2026-06-30', 'fundamental_score': None, 'risk_level': '中', 'signal': '中性', 'technical_score': Non"
+    },
+    {
+      "name": "score-history has history array",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "GET /api/alerts/unread-count",
+      "status": "PASS",
+      "detail": "{'by_severity': {}, 'count': 0}"
+    },
+    {
+      "name": "alert-rules returns rules array",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "alerts returns alerts array",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "PATCH toggle rule",
+      "status": "PASS",
+      "detail": "{'enabled': 1}"
+    },
+    {
+      "name": "GET /api/watchlist",
+      "status": "PASS",
+      "detail": "{'success': True, 'watchlist': [{'stock_code': '603196', 'stock_name': '603196'}, {'stock_code': '北特科技', 'stock_name': '"
+    },
+    {
+      "name": "GET /api/news",
+      "status": "PASS",
+      "detail": "{'items': [{'ai_summary': None, 'author': '36氪', 'category': '技术', 'content': '[IT时报](https://36kr.com/user/5467002) _·_"
+    },
+    {
+      "name": "GET /api/proxy/tracks",
+      "status": "PASS",
+      "detail": "[{'color': '#1890ff', 'created_at': '2026-04-29 03:08:49', 'default_sources': None, 'id': 1, 'keywords': '[\"人工智能\", \"AI\","
+    },
+    {
+      "name": "GET /api/proxy/tracks/heat/latest",
+      "status": "PASS",
+      "detail": "[{'change': 60.0, 'color': '#1890ff', 'date': '2026-06-30', 'funding_count': 0, 'id': 1, 'name': '人工智能', 'news_count': 1"
+    },
+    {
+      "name": "GET /api/investment/events",
+      "status": "PASS",
+      "detail": "{'items': [{'amount_cny_est': None, 'amount_text': None, 'company_brief': '数字相控阵芯片设计研发商', 'company_id': 43246191, 'compa"
+    },
+    {
+      "name": "GET /api/investment/stats",
+      "status": "PASS",
+      "detail": "{'by_industry': [{'count': 27, 'name': '先进制造'}, {'count': 4, 'name': '医疗健康'}, {'count': 3, 'name': '新材料'}, {'count': 3, "
+    },
+    {
+      "name": "renderDailyReport",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "renderSparklines",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "showScoreAttribution",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "loadAlert",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "alertBadge",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "pollUnreadCount",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "DB tables + score_history data",
+      "status": "PASS",
+      "detail": "score_history=3 rows, all tables present"
+    }
+  ]
+}
