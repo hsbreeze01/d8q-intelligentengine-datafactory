@@ -283,12 +283,39 @@ def _init_portfolio_tables():
         """)
         conn.commit()
 
+
+def _init_rec_history_table():
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS recommendation_history ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "rec_date TEXT NOT NULL, "
+            "stock_code TEXT NOT NULL, "
+            "stock_name TEXT, "
+            "rec_score REAL, "
+            "technical_score REAL, "
+            "trend_score REAL, "
+            "fundamental_score REAL, "
+            "volume_score REAL, "
+            "price_at_rec REAL, "
+            "price_t1 REAL, price_t3 REAL, price_t5 REAL, price_t10 REAL, "
+            "return_t1 REAL, return_t3 REAL, return_t5 REAL, return_t10 REAL, "
+            "benchmark_t5 REAL, "
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+            "UNIQUE(rec_date, stock_code)"
+            "); "
+            "CREATE INDEX IF NOT EXISTS idx_rh_date ON recommendation_history(rec_date DESC); "
+            "CREATE INDEX IF NOT EXISTS idx_rh_code ON recommendation_history(stock_code, rec_date DESC);"
+        )
+        conn.commit()
+
 try:
     _init_events_table()
     _init_monitor_tables()
     _init_alert_tables()
     _init_score_history_table()
     _init_portfolio_tables()
+    _init_rec_history_table()
 except Exception:
     pass
 
@@ -2918,6 +2945,87 @@ def portfolio_refresh_price(pid):
         conn.commit()
     return jsonify({"ok": True, "updated": updated, "total": len(positions)})
 
+
+
+
+# === 推荐回溯 API ===
+@app.route("/api/recommendation/history", methods=["GET"])
+def rec_history():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    days = request.args.get("days", 30, type=int)
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 50, type=int)
+    from datetime import date, timedelta
+    start_date = (date.today() - timedelta(days=days)).isoformat()
+    with get_db_ctx() as conn:
+        total = conn.execute("SELECT count(*) FROM recommendation_history WHERE rec_date >= ?", (start_date,)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT * FROM recommendation_history WHERE rec_date >= ? ORDER BY rec_date DESC, rec_score DESC LIMIT ? OFFSET ?",
+            (start_date, page_size, (page-1)*page_size)
+        ).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM recommendation_history LIMIT 0").description] if rows else []
+    items = []
+    for r in rows:
+        item = dict(zip(cols, r))
+        rt5 = item.get("return_t5")
+        item["win"] = True if rt5 and rt5 > 0 else (False if rt5 is not None and rt5 <= 0 else None)
+        items.append(item)
+    return jsonify({"items": items, "total": total})
+
+
+@app.route("/api/recommendation/stats", methods=["GET"])
+def rec_stats():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    days = request.args.get("days", 30, type=int)
+    from datetime import date, timedelta
+    start_date = (date.today() - timedelta(days=days)).isoformat()
+    with get_db_ctx() as conn:
+        total = conn.execute("SELECT count(*) FROM recommendation_history WHERE rec_date >= ?", (start_date,)).fetchone()[0]
+        t5_rows = conn.execute("SELECT return_t5 FROM recommendation_history WHERE rec_date >= ? AND return_t5 IS NOT NULL", (start_date,)).fetchall()
+        t5_vals = [r[0] for r in t5_rows]
+        win_count = sum(1 for v in t5_vals if v > 0)
+        win_rate = (win_count / len(t5_vals) * 100) if t5_vals else 0
+        avg_ret = (sum(t5_vals) / len(t5_vals)) if t5_vals else 0
+        best = conn.execute("SELECT stock_code, stock_name, rec_date, return_t5 FROM recommendation_history WHERE rec_date >= ? AND return_t5 IS NOT NULL ORDER BY return_t5 DESC LIMIT 1", (start_date,)).fetchone()
+    best_pick = {"stock_code": best[0], "stock_name": best[1], "date": best[2], "return_t5": best[3]} if best else None
+    return jsonify({
+        "total_recommendations": total,
+        "win_rate_t5": round(win_rate, 1),
+        "avg_return_t5": round(avg_ret, 2),
+        "best_pick": best_pick,
+        "data_days": days,
+        "evaluated_count": len(t5_vals)
+    })
+
+
+@app.route("/api/recommendation/backfill", methods=["POST"])
+def rec_backfill_trigger():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    from datetime import date, timedelta
+    today = date.today().isoformat()
+    filled = 0
+    with get_db_ctx() as conn:
+        for offset, col_price, col_ret in [(1,"price_t1","return_t1"),(3,"price_t3","return_t3"),(5,"price_t5","return_t5"),(10,"price_t10","return_t10")]:
+            target_date = (date.today() - timedelta(days=offset)).isoformat()
+            rows = conn.execute(f"SELECT id, stock_code, price_at_rec FROM recommendation_history WHERE rec_date=? AND {col_price} IS NULL", (target_date,)).fetchall()
+            for rid, code, par in rows:
+                try:
+                    qdata, qcode = shark_request("GET", f"/api/stock/quote?symbol={code}")
+                    price = qdata.get("close") or qdata.get("current_price") or qdata.get("price")
+                    if price and par:
+                        ret = (float(price) - float(par)) / float(par) * 100
+                        conn.execute(f"UPDATE recommendation_history SET {col_price}=?, {col_ret}=? WHERE id=?", (price, round(ret,2), rid))
+                        filled += 1
+                except Exception:
+                    pass
+        conn.commit()
+    return jsonify({"filled": filled})
 
 @app.route("/<path:path>")
 def spa_fallback(path):

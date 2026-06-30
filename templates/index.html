@@ -3055,7 +3055,7 @@ async function loadHotSectors(){
 
 
 async function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>📊 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnStocks" onclick="loadRecStocks()">📈 每日荐股</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业板块</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHeat" onclick="loadRecTracks()">🔥 赛道热度</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
+  el.innerHTML='<div class="card"><h3>📊 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnStocks" onclick="loadRecStocks()">📈 每日荐股</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业板块</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHeat" onclick="loadRecTracks()">🔥 赛道热度</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnBack" onclick="loadRecBacktrack()">📈 历史回溯</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
   loadRecStocks();
 }
 async function loadRecStocks(){
@@ -3651,5 +3651,28 @@ async function pfDoCreate(){var name=document.getElementById('pcName').value.tri
 async function pfDelete(id){if(!confirm('确定删除此组合？所有持仓和交易记录将被清除。'))return;try{await api('/api/portfolios/'+id,{method:'DELETE'});toast('已删除');goPage('portfolio',false);}catch(e){toast('删除失败',true);}}
 
 async function pfRefresh(id){toast('正在刷新现价...');try{var r=await api('/api/portfolios/'+id+'/refresh-price',{method:'POST'});toast('已刷新 '+(r.refreshed||0)+' 只');pfDetail(id);}catch(e){toast('刷新失败',true);}}
+
+// === 推荐回溯 ===
+async function loadRecBacktrack(){
+var el=document.getElementById('recContent');
+el.innerHTML='<div class="empty">加载中...</div>';
+try{
+var[stats,hist]=await Promise.all([api('/api/recommendation/stats'),api('/api/recommendation/history?page_size=30')]);
+var items=hist.items||[];
+var h='<div class="metrics" style="margin-bottom:16px"><div class="mc"><div class="label">T+5胜率</div><div class="value" style="color:#1890ff">'+(stats.win_rate_t5||0).toFixed(1)+'%</div></div><div class="mc"><div class="label">平均收益</div><div class="value" style="color:'+(stats.avg_return_t5>=0?'#52c41a':'#ff4d4f')+'">'+(stats.avg_return_t5>=0?'+':'')+((stats.avg_return_t5||0).toFixed(2))+'%</div></div><div class="mc"><div class="label">推荐总数</div><div class="value">'+(stats.total_recommendations||0)+'</div></div><div class="mc"><div class="label">已验证</div><div class="value">'+(stats.evaluated_count||0)+'</div></div></div>';
+if(stats.best_pick){h+='<div style="margin-bottom:12px;font-size:13px;color:#666">🏆 最佳推荐: '+esc(stats.best_pick.stock_name||'')+' ('+esc(stats.best_pick.date||'')+') T+5收益 <b style="color:#52c41a">+'+((stats.best_pick.return_t5||0).toFixed(2))+'%</b></div>';}
+if(!items.length){h+='<div class="empty" style="padding:40px">📊 数据积累中...<br><span style="font-size:12px;color:#bbb">系统每日记录推荐并在T+1/3/5/10自动回填实际收益</span></div>';}
+else{
+h+='<table class="et"><thead><tr><th>日期</th><th>股票</th><th>评分</th><th>T+1</th><th>T+3</th><th>T+5</th><th>T+10</th><th>结果</th></tr></thead><tbody>';
+items.forEach(function(r){
+function fmtRet(v){if(v===null||v===undefined)return'<span style="color:#ccc">--</span>';var c=v>=0?'#52c41a':'#ff4d4f';return'<span style="color:'+c+'">'+(v>=0?'+':'')+v.toFixed(2)+'%</span>';}
+var winIcon=r.win===true?'<span style="color:#52c41a">✓</span>':r.win===false?'<span style="color:#ff4d4f">✗</span>':'<span style="color:#ccc">-</span>';
+h+='<tr><td style="font-size:12px;white-space:nowrap">'+esc((r.rec_date||'').slice(0,10))+'</td><td>'+esc(r.stock_name||r.stock_code||'')+'</td><td><b>'+((r.rec_score||0).toFixed(0))+'</b></td><td>'+fmtRet(r.return_t1)+'</td><td>'+fmtRet(r.return_t3)+'</td><td>'+fmtRet(r.return_t5)+'</td><td>'+fmtRet(r.return_t10)+'</td><td>'+winIcon+'</td></tr>';
+});
+h+='</tbody></table>';
+}
+el.innerHTML=h;
+}catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">加载失败: '+esc(e.message)+'</div>';}
+}
 
 </script>
