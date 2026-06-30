@@ -19,7 +19,6 @@ from auth import auth_bp, check_auth
 from export_weekly import export_bp
 from prompts_api import bp as prompts_bp
 from compass_pages import compass_bp
-from investment_api import investment_bp
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,6 @@ def _track_event(response):
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
 app.register_blueprint(compass_bp)
-app.register_blueprint(investment_bp)
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://49.234.48.221:5000"
 COMPASS_API = "http://localhost:8087"
