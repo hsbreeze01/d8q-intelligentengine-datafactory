@@ -265,6 +265,13 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .llm-item{text-align:center;padding:12px;background:#fff;border-radius:6px;border:1px solid #f0f0f0}
 .llm-item .llm-label{font-size:12px;color:#999;margin-bottom:4px}
 .llm-item .llm-value{font-size:14px;font-weight:600}
+
+/* Alert badge */
+.alert-badge{position:absolute;top:8px;right:10px;background:#ff4d4f;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 4px;border-radius:8px;display:none}
+.alert-badge.show{display:inline-block}
+.sev-urgent{border-left:4px solid #ff4d4f !important}
+.sev-important{border-left:4px solid #faad14 !important}
+.sev-normal{border-left:4px solid #d9d9d9 !important}
 </style>
 <body>
 <div class="sidebar">
@@ -332,6 +339,7 @@ const PAGES=[
 {id:'report',icon:'📑',label:'研报',title:'研报分析'},
 {id:'policy',icon:'📜',label:'政策',title:'政策分析'},
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
+{id:'alert',icon:'🔔',label:'预警',title:'智能预警'},
 {id:'investment',icon:'💰',label:'投融资',title:'投融资数据'},
 {id:'_div2'},
 {id:'strategy-discover',icon:'🔍',label:'策略发现',title:'策略发现'},
@@ -353,7 +361,7 @@ if(p.id==='_div'||p.id==='_div2')return'<div class="divider"></div>';
 if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
 if(p.href)return`<a href="${p.href}">${p.icon} <span>${p.label}</span></a>`;
-return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}">${p.icon} <span>${p.label}</span></a>`;
+return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}" style="position:relative">${p.icon} <span>${p.label}</span>${p.id==='alert'?'<span class="alert-badge" id="alertBadge"></span>':''}</a>`;
 }).join('');
 nav.querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();var sb=document.querySelector('.sidebar');if(sb)sb.classList.remove('mobile-open');goPage(a.dataset.p)});
 }
@@ -387,7 +395,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -2143,6 +2151,7 @@ if(!subs.subscriptions||!subs.subscriptions.length){window._showGuide=true;}
 }catch(eg){}
 }catch(e){}
 initNav();
+pollUnreadCount();setInterval(pollUnreadCount,60000);
 loadPage(curPage);
 if(curPage==='monitor'){setInterval(()=>{if(curPage==='monitor')loadMonitor(document.getElementById('contentArea'))},30000)}
 var _mq=window.matchMedia('(max-width:768px)');
@@ -3357,6 +3366,114 @@ async function invCollect(source){
 const labels={kr36:'36氪',pedaily:'投资界'};
 toast('正在触发 '+labels[source]+' 采集...');
 try{await api('/api/investment/collect/'+source,{method:'POST',body:'{}'});toast(labels[source]+' 采集已触发 ✓');setTimeout(()=>invLoadData(),3000);}catch(e){toast('采集失败: '+e.message,true);}
+}
+
+// === 智能预警中心 ===
+function pollUnreadCount(){
+fetch('/api/alerts/unread-count').then(r=>r.json()).then(d=>{
+const badge=document.getElementById('alertBadge');
+if(!badge)return;
+const c=d.count||0;
+if(c>0){badge.textContent=c>99?'99+':c;badge.className='alert-badge show'}
+else{badge.className='alert-badge'}
+}).catch(()=>{});
+}
+
+async function loadAlert(el){
+const[alertsData,rulesData,unread]=await Promise.all([
+api('/api/alerts?page_size=20'),
+api('/api/alert-rules'),
+api('/api/alerts/unread-count')
+]);
+const alerts=alertsData.items||[];
+const rules=rulesData||[];
+const uc=unread.count||0;
+const urgentC=(unread.by_severity||{}).urgent||0;
+
+el.innerHTML=`
+<div class="metrics">
+<div class="mc"><div class="label">今日预警</div><div class="value">${alerts.length}</div><div class="sub">最近20条</div></div>
+<div class="mc"><div class="label">未读</div><div class="value" style="color:#ff4d4f">${uc}</div><div class="sub">待处理</div></div>
+<div class="mc"><div class="label">紧急未读</div><div class="value" style="color:#ff4d4f">${urgentC}</div><div class="sub warn">${urgentC?'需立即关注':'暂无'}</div></div>
+<div class="mc"><div class="label">活跃规则</div><div class="value" style="color:#1890ff">${rules.filter(r=>r.enabled).length}</div><div class="sub">${rules.length}条规则</div></div>
+</div>
+<div class="card">
+<div class="filters" id="alertFilters">
+<span class="fb active" data-t="" onclick="alertFilter('')">全部</span>
+<span class="fb" data-t="stock_score" onclick="alertFilter('stock_score')">个股</span>
+<span class="fb" data-t="track_heat" onclick="alertFilter('track_heat')">赛道</span>
+<span class="fb" data-t="funding_large" onclick="alertFilter('funding_large')">融资</span>
+<span class="fb" data-t="policy_major" onclick="alertFilter('policy_major')">政策</span>
+<span style="flex:1"></span>
+<span class="fb" onclick="alertMarkAllRead()">全部已读</span>
+</div>
+<div id="alertList">${alertRenderList(alerts)}</div>
+</div>
+<div class="card" id="alertRulesPanel">
+<h3>⚙️ 预警规则 <a class="more" onclick="alertShowCreateForm()">+ 新建规则</a></h3>
+<div id="alertRulesBody">${alertRenderRules(rules)}</div>
+</div>
+<div id="alertCreateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:none;align-items:center;justify-content:center">
+<div class="card" style="width:420px;padding:24px">
+<h3 style="margin-bottom:16px">新建预警规则</h3>
+<div style="display:grid;gap:12px">
+<div><label style="font-size:12px;color:#666">规则名称</label><input id="arName" class="search" style="width:100%" placeholder="如：新材料赛道热度预警"></div>
+<div><label style="font-size:12px;color:#666">规则类型</label><select id="arType" class="search" style="width:100%"><option value="track_heat">赛道热度</option><option value="funding_large">大额融资</option><option value="policy_major">重大政策</option><option value="stock_score">个股评分</option></select></div>
+<div><label style="font-size:12px;color:#666">条件(JSON)</label><input id="arCond" class="search" style="width:100%" placeholder='{"threshold":80}'></div>
+<div><label style="font-size:12px;color:#666">紧急程度</label><select id="arSev" class="search" style="width:100%"><option value="normal">一般</option><option value="important">重要</option><option value="urgent">紧急</option></select></div>
+</div>
+<div style="margin-top:16px;text-align:right"><button class="btn-ghost" onclick="alertHideCreateForm()">取消</button> <button class="btn" onclick="alertDoCreate()">创建</button></div>
+</div>
+</div>
+`;
+}
+
+function alertRenderList(items){
+if(!items||!items.length)return'<div class="empty">暂无预警</div>';
+const sevIcon={urgent:'🔴',important:'🟡',normal:'⚪'};
+const typeLabel={stock_score:'个股',track_heat:'赛道',funding_large:'融资',policy_major:'政策'};
+return items.map(a=>{
+const sev=a.severity||'normal';
+const read=a.is_read?'opacity:0.5':'';
+return`<div class="ni sev-${sev}" style="${read}">
+<div class="t">${sevIcon[sev]||'⚪'} <span class="tag tag-${a.alert_type==='funding_large'?'funding':a.alert_type==='policy_major'?'policy':'tech'}">${typeLabel[a.alert_type]||a.alert_type}</span> ${esc(a.title)}</div>
+<div class="m">${(a.created_at||'').slice(0,16)} ${a.is_read?'<span style="color:#52c41a">✓ 已读</span>':''}</div>
+${a.message?'<div class="s">'+esc(a.message)+'</div>':''}
+<div class="acts">${a.is_read?'':'<a onclick="alertMarkRead('+a.id+')">标记已读</a>'}</div>
+</div>`;}).join('');
+}
+
+function alertRenderRules(rules){
+if(!rules||!rules.length)return'<div class="empty">暂无规则</div>';
+const typeLabel={stock_score:'个股评分',track_heat:'赛道热度',funding_large:'大额融资',policy_major:'重大政策'};
+let html='<table class="et"><thead><tr><th>名称</th><th>类型</th><th>级别</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+rules.forEach(r=>{
+html+=`<tr><td>${esc(r.rule_name)}</td><td>${typeLabel[r.rule_type]||r.rule_type}</td><td><span class="badge badge-${r.severity==='urgent'?'err':r.severity==='important'?'info':'ok'}">${r.severity}</span></td><td><span style="cursor:pointer" onclick="alertToggleRule(${r.id})">${r.enabled?'🟢 启用':'🔴 禁用'}</span></td><td><a style="color:#ff4d4f;cursor:pointer" onclick="alertDeleteRule(${r.id})">删除</a></td></tr>`;
+});
+html+='</tbody></table>';
+return html;
+}
+
+function alertFilter(type){
+document.querySelectorAll('#alertFilters .fb').forEach(b=>b.classList.toggle('active',b.dataset.t===type));
+const params=type?'?type='+type+'&page_size=20':'?page_size=20';
+api('/api/alerts'+params).then(d=>{document.getElementById('alertList').innerHTML=alertRenderList(d.items||[])});
+}
+async function alertMarkRead(id){await api('/api/alerts/'+id+'/read',{method:'PATCH'});toast('已标记已读');goPage('alert',false);}
+async function alertMarkAllRead(){await api('/api/alerts/read-all',{method:'PATCH'});toast('全部已读');goPage('alert',false);}
+async function alertToggleRule(id){await api('/api/alert-rules/'+id+'/toggle',{method:'PATCH'});toast('已切换');goPage('alert',false);}
+async function alertDeleteRule(id){if(!confirm('确定删除此规则？'))return;await api('/api/alert-rules/'+id,{method:'DELETE'});toast('已删除');goPage('alert',false);}
+function alertShowCreateForm(){document.getElementById('alertCreateModal').style.display='flex';}
+function alertHideCreateForm(){document.getElementById('alertCreateModal').style.display='none';}
+async function alertDoCreate(){
+const name=document.getElementById('arName').value.trim();
+const type=document.getElementById('arType').value;
+const cond=document.getElementById('arCond').value.trim()||'{}';
+const sev=document.getElementById('arSev').value;
+if(!name){toast('请输入规则名称',true);return}
+try{JSON.parse(cond)}catch(e){toast('条件JSON格式错误',true);return}
+await api('/api/alert-rules',{method:'POST',body:JSON.stringify({rule_name:name,rule_type:type,condition_json:cond,severity:sev})});
+toast('规则创建成功');alertHideCreateForm();goPage('alert',false);
 }
 
 </script>

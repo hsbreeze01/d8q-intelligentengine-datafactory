@@ -9,6 +9,10 @@ import threading
 import time
 from datetime import datetime, timedelta
 
+# 预警扫描
+_alert_scan_last_run = ""
+
+
 logger = logging.getLogger(__name__)
 # 确保调度器日志输出到文件
 _fh = logging.FileHandler("/var/log/d8q/scheduler.log")
@@ -250,6 +254,24 @@ def _run_daily_extras():
         logger.error("每日附加任务失败: %s", e)
 
 
+
+def _run_alert_scan():
+    """每30分钟执行一次预警扫描"""
+    global _alert_scan_last_run
+    now = datetime.now()
+    # 每30分钟执行一次
+    current_slot = now.strftime("%Y-%m-%d %H:") + ("00" if now.minute < 30 else "30")
+    if _alert_scan_last_run == current_slot:
+        return
+    _alert_scan_last_run = current_slot
+    try:
+        from alert_scanner import scan_all_alerts
+        logger.info("执行预警扫描任务")
+        scan_all_alerts()
+    except Exception as e:
+        logger.error("预警扫描任务失败: %s", e)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -266,6 +288,9 @@ def _tick():
 
         # 每日附加任务
         _run_daily_extras()
+
+        # 预警扫描(每30分钟)
+        _run_alert_scan()
 
         # 先轮询已投递的 publish 队列任务
         _poll_pending()

@@ -155,9 +155,60 @@ def _init_events_table():
         )
         conn.commit()
 
+
+def _init_alert_tables():
+    """初始化智能预警中心表"""
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS alert_rules ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id TEXT NOT NULL, "
+            "rule_type TEXT NOT NULL, "
+            "rule_name TEXT NOT NULL, "
+            "condition_json TEXT NOT NULL, "
+            "severity TEXT NOT NULL DEFAULT 'normal', "
+            "enabled INTEGER NOT NULL DEFAULT 1, "
+            "cooldown_hours INTEGER NOT NULL DEFAULT 4, "
+            "created_at DATETIME DEFAULT (datetime('now')), "
+            "last_triggered_at DATETIME"
+            "); "
+            "CREATE TABLE IF NOT EXISTS alerts ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id TEXT NOT NULL, "
+            "rule_id INTEGER, "
+            "alert_type TEXT NOT NULL, "
+            "severity TEXT NOT NULL DEFAULT 'normal', "
+            "title TEXT NOT NULL, "
+            "message TEXT, "
+            "context_json TEXT, "
+            "is_read INTEGER NOT NULL DEFAULT 0, "
+            "created_at DATETIME DEFAULT (datetime('now'))"
+            "); "
+            "CREATE INDEX IF NOT EXISTS idx_alert_rules_user ON alert_rules(user_id, enabled); "
+            "CREATE INDEX IF NOT EXISTS idx_alerts_user_unread ON alerts(user_id, is_read, created_at);"
+        )
+        # 默认规则: 为admin创建4条
+        count = conn.execute("SELECT count(*) FROM alert_rules WHERE user_id='admin'").fetchone()[0]
+        if count == 0:
+            import json as _json
+            default_rules = [
+                ("track_heat", "赛道热度预警", _json.dumps({"metric": "heat_score", "operator": ">", "threshold": 80, "track_name": "全部"}), "normal"),
+                ("funding", "融资金额预警", _json.dumps({"metric": "amount", "operator": ">", "threshold": 10000, "unit": "万元"}), "normal"),
+                ("policy", "重大政策预警", _json.dumps({"keywords": ["重大", "突发", "紧急"], "level": "national"}), "urgent"),
+                ("stock_score", "个股评分变化预警", _json.dumps({"metric": "score_change", "operator": ">", "threshold": 10}), "normal"),
+            ]
+            for rule_type, rule_name, condition, severity in default_rules:
+                conn.execute(
+                    "INSERT INTO alert_rules (user_id, rule_type, rule_name, condition_json, severity) VALUES (?,?,?,?,?)",
+                    ("admin", rule_type, rule_name, condition, severity)
+                )
+            conn.commit()
+
+
 try:
     _init_events_table()
     _init_monitor_tables()
+    _init_alert_tables()
 except Exception:
     pass
 
@@ -2126,6 +2177,205 @@ def proxy_backtest_presets():
 def proxy_backtest_benchmarks():
     data, code = shark_request("GET", "/api/backtest/benchmarks")
     return jsonify(data), code
+
+
+
+# === 智能预警中心 API ===
+
+VALID_RULE_TYPES = ("track_heat", "funding", "policy", "stock_score")
+
+
+@app.route("/api/alert-rules", methods=["GET"])
+def get_alert_rules():
+    """返回当前用户的预警规则列表"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        conn.row_factory = __import__("sqlite3").Row
+        rows = conn.execute(
+            "SELECT * FROM alert_rules WHERE user_id=? ORDER BY created_at DESC", (username,)
+        ).fetchall()
+    return jsonify({"rules": [dict(r) for r in rows]})
+
+
+@app.route("/api/alert-rules", methods=["POST"])
+def create_alert_rule():
+    """创建预警规则"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    body = request.get_json(force=True) or {}
+    rule_type = body.get("rule_type", "")
+    if rule_type not in VALID_RULE_TYPES:
+        return jsonify({"error": f"无效的规则类型，可选: {VALID_RULE_TYPES}"}), 400
+    rule_name = body.get("rule_name", "").strip()
+    if not rule_name:
+        return jsonify({"error": "rule_name 不能为空"}), 400
+    condition_json = json.dumps(body.get("condition", {}), ensure_ascii=False)
+    severity = body.get("severity", "normal")
+    cooldown_hours = body.get("cooldown_hours", 4)
+    with get_db_ctx() as conn:
+        cur = conn.execute(
+            "INSERT INTO alert_rules (user_id, rule_type, rule_name, condition_json, severity, cooldown_hours) "
+            "VALUES (?,?,?,?,?,?)",
+            (username, rule_type, rule_name, condition_json, severity, cooldown_hours)
+        )
+        conn.commit()
+        rule_id = cur.lastrowid
+    return jsonify({"id": rule_id, "message": "创建成功"}), 201
+
+
+@app.route("/api/alert-rules/<int:rule_id>", methods=["PUT"])
+def update_alert_rule(rule_id):
+    """更新预警规则"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT user_id FROM alert_rules WHERE id=?", (rule_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "规则不存在"}), 404
+        if row[0] != username and session.get("role", "viewer") != "admin":
+            return jsonify({"error": "无权限修改此规则"}), 403
+        body = request.get_json(force=True) or {}
+        updates = []
+        params = []
+        if "rule_name" in body:
+            updates.append("rule_name=?")
+            params.append(body["rule_name"])
+        if "condition" in body:
+            updates.append("condition_json=?")
+            params.append(json.dumps(body["condition"], ensure_ascii=False))
+        if "severity" in body:
+            updates.append("severity=?")
+            params.append(body["severity"])
+        if "cooldown_hours" in body:
+            updates.append("cooldown_hours=?")
+            params.append(body["cooldown_hours"])
+        if "enabled" in body:
+            updates.append("enabled=?")
+            params.append(1 if body["enabled"] else 0)
+        if not updates:
+            return jsonify({"error": "无有效更新字段"}), 400
+        params.append(rule_id)
+        conn.execute(f"UPDATE alert_rules SET {','.join(updates)} WHERE id=?", params)
+        conn.commit()
+    return jsonify({"message": "更新成功"})
+
+
+@app.route("/api/alert-rules/<int:rule_id>", methods=["DELETE"])
+def delete_alert_rule(rule_id):
+    """删除预警规则"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT user_id FROM alert_rules WHERE id=?", (rule_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "规则不存在"}), 404
+        if row[0] != username and session.get("role", "viewer") != "admin":
+            return jsonify({"error": "无权限删除此规则"}), 403
+        conn.execute("DELETE FROM alert_rules WHERE id=?", (rule_id,))
+        conn.commit()
+    return jsonify({"message": "删除成功"})
+
+
+@app.route("/api/alert-rules/<int:rule_id>/toggle", methods=["PATCH"])
+def toggle_alert_rule(rule_id):
+    """切换规则启用状态"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT user_id, enabled FROM alert_rules WHERE id=?", (rule_id,)).fetchone()
+        if not row:
+            return jsonify({"error": "规则不存在"}), 404
+        if row[0] != username and session.get("role", "viewer") != "admin":
+            return jsonify({"error": "无权限操作此规则"}), 403
+        new_enabled = 0 if row[1] else 1
+        conn.execute("UPDATE alert_rules SET enabled=? WHERE id=?", (new_enabled, rule_id))
+        conn.commit()
+    return jsonify({"enabled": new_enabled})
+
+
+@app.route("/api/alerts", methods=["GET"])
+def get_alerts():
+    """预警列表(分页+筛选)"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 20, type=int)
+    alert_type = request.args.get("type", "")
+    severity = request.args.get("severity", "")
+    is_read = request.args.get("is_read", "")
+    offset = (page - 1) * page_size
+
+    where = ["user_id=?"]
+    params = [username]
+    if alert_type:
+        where.append("alert_type=?")
+        params.append(alert_type)
+    if severity:
+        where.append("severity=?")
+        params.append(severity)
+    if is_read != "":
+        where.append("is_read=?")
+        params.append(int(is_read))
+
+    where_sql = " AND ".join(where)
+    with get_db_ctx() as conn:
+        conn.row_factory = __import__("sqlite3").Row
+        total = conn.execute(f"SELECT count(*) FROM alerts WHERE {where_sql}", params).fetchone()[0]
+        rows = conn.execute(
+            f"SELECT * FROM alerts WHERE {where_sql} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [page_size, offset]
+        ).fetchall()
+    return jsonify({"alerts": [dict(r) for r in rows], "total": total, "page": page, "page_size": page_size})
+
+
+@app.route("/api/alerts/unread-count", methods=["GET"])
+def get_alerts_unread_count():
+    """返回未读预警数量及按严重程度分组"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        conn.row_factory = __import__("sqlite3").Row
+        total = conn.execute(
+            "SELECT count(*) FROM alerts WHERE user_id=? AND is_read=0", (username,)
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT severity, count(*) as cnt FROM alerts WHERE user_id=? AND is_read=0 GROUP BY severity",
+            (username,)
+        ).fetchall()
+    by_severity = {r["severity"]: r["cnt"] for r in rows}
+    return jsonify({"count": total, "by_severity": by_severity})
+
+
+@app.route("/api/alerts/<int:alert_id>/read", methods=["PATCH"])
+def mark_alert_read(alert_id):
+    """标记单条预警已读"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        conn.execute("UPDATE alerts SET is_read=1 WHERE id=? AND user_id=?", (alert_id, username))
+        conn.commit()
+    return jsonify({"message": "已标记已读"})
+
+
+@app.route("/api/alerts/read-all", methods=["PATCH"])
+def mark_all_alerts_read():
+    """全部标记已读"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    with get_db_ctx() as conn:
+        conn.execute("UPDATE alerts SET is_read=1 WHERE user_id=? AND is_read=0", (username,))
+        conn.commit()
+    return jsonify({"message": "全部已标记已读"})
 
 
 @app.route("/<path:path>")
