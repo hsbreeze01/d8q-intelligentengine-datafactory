@@ -3073,6 +3073,168 @@ def unfollow_investor():
         conn.commit()
     return jsonify({"message": "已取消关注"})
 
+
+# === 改进3: 投融资-赛道热度相关性 ===
+@app.route("/api/investment/track-correlation", methods=["GET"])
+def investment_track_correlation():
+    """融资事件密度与赛道热度的相关性分析"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    days = request.args.get("days", 30, type=int)
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=days)).isoformat()
+    # Get investment events
+    inv_data, inv_code = agent_request("GET", f"/api/itjuzi/events?start_date={start}&page_size=200")
+    if inv_code != 200:
+        return jsonify({"error": "投融资数据不可用"}), 502
+    items = inv_data.get("items", [])
+    # Get track heat
+    heat_data, heat_code = agent_request("GET", "/api/tracks/heat?days=" + str(days))
+    heat_latest, _ = agent_request("GET", "/api/tracks/heat/latest")
+    tracks_info, _ = agent_request("GET", "/api/tracks")
+    # Count investment events per industry
+    from collections import defaultdict
+    ind_count = defaultdict(int)
+    ind_amount = defaultdict(float)
+    for ev in items:
+        ind = ev.get("industry") or "其他"
+        ind_count[ind] += 1
+        ind_amount[ind] += float(ev.get("amount_cny_est") or 0)
+    # Build correlation data: match tracks to industries
+    track_map = {}  # track_name -> latest_score
+    if isinstance(heat_latest, list):
+        for t in heat_latest:
+            track_map[t.get("name", "")] = t.get("score", 0)
+    elif isinstance(tracks_info, list):
+        for t in tracks_info:
+            track_map[t.get("name", "")] = 0
+    # Correlation pairs
+    correlations = []
+    for ind, count in sorted(ind_count.items(), key=lambda x: -x[1]):
+        score = track_map.get(ind, 0)
+        correlations.append({
+            "industry": ind,
+            "event_count": count,
+            "total_amount": ind_amount[ind],
+            "heat_score": score,
+            "density": round(count / max(days, 1) * 7, 1)  # events per week
+        })
+    # Summary insight
+    hot_funded = [c for c in correlations if c["heat_score"] > 60 and c["event_count"] > 3]
+    cold_funded = [c for c in correlations if c["heat_score"] < 40 and c["event_count"] > 3]
+    return jsonify({
+        "correlations": correlations,
+        "summary": {
+            "total_events": len(items),
+            "tracked_industries": len(correlations),
+            "hot_and_funded": [c["industry"] for c in hot_funded],
+            "cold_but_funded": [c["industry"] for c in cold_funded],
+        },
+        "days": days
+    })
+
+
+# === 改进4: 推荐偏好设置 ===
+@app.route("/api/recommendation/preferences", methods=["GET"])
+def get_rec_preferences():
+    """获取用户推荐偏好"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    defaults = {"style": "balanced", "risk_tolerance": "medium", "focus_dimensions": ["technical", "trend", "fundamental", "volume"], "min_score": 60}
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT value FROM user_preferences WHERE user_id=? AND key='rec_preferences'", (username,)).fetchone()
+    if row:
+        import json as _json
+        try:
+            prefs = _json.loads(row[0])
+            if isinstance(prefs, dict):
+                defaults.update(prefs)
+        except Exception:
+            pass
+    return jsonify(defaults)
+
+
+@app.route("/api/recommendation/preferences", methods=["PUT"])
+def set_rec_preferences():
+    """设置用户推荐偏好"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    body = request.get_json(force=True)
+    allowed_styles = ["technical", "fundamental", "momentum", "balanced"]
+    style = body.get("style", "balanced")
+    if style not in allowed_styles:
+        style = "balanced"
+    prefs = {
+        "style": style,
+        "risk_tolerance": body.get("risk_tolerance", "medium"),
+        "focus_dimensions": body.get("focus_dimensions", ["technical", "trend", "fundamental", "volume"]),
+        "min_score": body.get("min_score", 60)
+    }
+    import json as _json
+    prefs_json = _json.dumps(prefs, ensure_ascii=False)
+    with get_db_ctx() as conn:
+        existing = conn.execute("SELECT 1 FROM user_preferences WHERE user_id=? AND key='rec_preferences'", (username,)).fetchone()
+        if existing:
+            conn.execute("UPDATE user_preferences SET value=?, updated_at=datetime('now') WHERE user_id=? AND key='rec_preferences'", (prefs_json, username))
+        else:
+            conn.execute("INSERT INTO user_preferences (user_id, key, value) VALUES (?,'rec_preferences',?)", (username, prefs_json))
+        conn.commit()
+    return jsonify({"message": "偏好已保存", "preferences": prefs})
+
+
+@app.route("/api/recommendation/hit-rate", methods=["GET"])
+def rec_hit_rate_dashboard():
+    """推荐命中率实时看板"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    days = request.args.get("days", 30, type=int)
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=days)).isoformat()
+    with get_db_ctx() as conn:
+        rows = conn.execute(
+            "SELECT rec_date, stock_code, stock_name, rec_score, technical_score, trend_score, fundamental_score, volume_score, return_t1, return_t3, return_t5, return_t10 "
+            "FROM recommendation_history WHERE rec_date >= ? ORDER BY rec_date DESC", (start,)
+        ).fetchall()
+    if not rows:
+        return jsonify({"message": "数据积累中", "days": days, "total": 0, "hit_rates": {}, "dimension_rates": {}, "daily_performance": []})
+    # Calculate hit rates for each T+N
+    from collections import defaultdict
+    hit_rates = {}
+    for col_idx, label in [(8,"t1"),(9,"t3"),(10,"t5"),(11,"t10")]:
+        vals = [r[col_idx] for r in rows if r[col_idx] is not None]
+        if vals:
+            wins = sum(1 for v in vals if v > 0)
+            hit_rates[label] = {"win": wins, "total": len(vals), "rate": round(wins/len(vals)*100, 1), "avg_return": round(sum(vals)/len(vals), 2)}
+    # Dimension analysis (t5 only)
+    dim_rates = {}
+    t5_rows = [(r[4],r[5],r[6],r[7],r[10]) for r in rows if r[10] is not None]  # tech,trend,fund,vol,ret_t5
+    dim_names = ["technical", "trend", "fundamental", "volume"]
+    for i, dname in enumerate(dim_names):
+        # Top quartile by dimension score
+        sorted_by_dim = sorted(t5_rows, key=lambda x: x[i] or 0, reverse=True)
+        top_q = sorted_by_dim[:max(1, len(sorted_by_dim)//4)]
+        if top_q:
+            wins = sum(1 for r in top_q if r[4] and r[4] > 0)
+            dim_rates[dname] = {"rate": round(wins/len(top_q)*100, 1), "count": len(top_q), "avg_return": round(sum(r[4] for r in top_q if r[4])/max(1,len([r for r in top_q if r[4] is not None])), 2)}
+    # Daily performance (grouped by date)
+    daily = defaultdict(list)
+    for r in rows:
+        if r[10] is not None:
+            daily[r[0]].append(r[10])
+    daily_perf = [{"date": d, "avg_return": round(sum(vs)/len(vs), 2), "win_rate": round(sum(1 for v in vs if v>0)/len(vs)*100, 1), "count": len(vs)} for d, vs in sorted(daily.items())]
+    return jsonify({
+        "days": days,
+        "total": len(rows),
+        "evaluated": len([r for r in rows if r[10] is not None]),
+        "hit_rates": hit_rates,
+        "dimension_rates": dim_rates,
+        "daily_performance": daily_perf
+    })
+
 # === 推荐回溯 API ===
 @app.route("/api/recommendation/history", methods=["GET"])
 def rec_history():

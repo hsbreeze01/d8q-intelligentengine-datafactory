@@ -3055,7 +3055,7 @@ async function loadHotSectors(){
 
 
 async function loadRecommend(el){
-  el.innerHTML='<div class="card"><h3>📊 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnStocks" onclick="loadRecStocks()">📈 每日荐股</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业板块</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHeat" onclick="loadRecTracks()">🔥 赛道热度</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnBack" onclick="loadRecBacktrack()">📈 历史回溯</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
+  el.innerHTML='<div class="card"><h3>📊 每日推荐</h3><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnStocks" onclick="loadRecStocks()">📈 每日荐股</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnIndustry" onclick="loadRecIndustry()">🏭 行业板块</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHeat" onclick="loadRecTracks()">🔥 赛道热度</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnBack" onclick="loadRecBacktrack()">📈 历史回溯</button><button class="btn" style="padding:4px 12px;font-size:12px" id="recBtnHitRate" onclick="loadRecHitRate()">🎯 命中率</button></div><div id="recContent" style="min-height:300px"><div class="empty">加载中...</div></div></div>';
   loadRecStocks();
 }
 async function loadRecStocks(){
@@ -3394,6 +3394,10 @@ el.innerHTML=`
     <span style="flex:1"></span>
     <span class="fb" onclick="invCollect('kr36')">📥 采集36氪</span>
     <span class="fb" onclick="invCollect('pedaily')">📥 采集投资界</span>
+    <span style="width:1px;background:#e8e8e8;margin:0 4px"></span>
+    <span class="fb" onclick="invLoadHeatmap()">📊 热力分析</span>
+    <span class="fb" onclick="invLoadInvestors()">🏛️ 机构追踪</span>
+    <span class="fb" onclick="invLoadCorrelation()">🔗 赛道相关性</span>
   </div>
   <div id="invList"><div class="empty">加载中...</div></div>
   <div id="invPager" style="margin-top:12px"></div>
@@ -3723,5 +3727,71 @@ el.innerHTML=h;
 
 async function invFollow(name){try{await api('/api/investment/investors/follow',{method:'POST',body:JSON.stringify({investor_name:name})});toast('已关注 '+name);invLoadInvestors();}catch(e){toast('关注失败',true);}}
 async function invUnfollow(name){try{await api('/api/investment/investors/unfollow',{method:'POST',body:JSON.stringify({investor_name:name})});toast('已取消关注');invLoadInvestors();}catch(e){toast('取消失败',true);}}
+
+// === 改进3: 投融资-赛道热度相关性 ===
+async function invLoadCorrelation(){
+var el=document.getElementById('invList');
+el.innerHTML='<div class="empty">分析相关性...</div>';
+try{
+var data=await api('/api/investment/track-correlation?days=30');
+var corr=data.correlations||[];
+var summary=data.summary||{};
+var h='<div class="card" style="margin-bottom:12px"><h3>📊 融资密度 vs 赛道热度 (近'+data.days+'天)</h3>';
+h+='<div style="font-size:13px;color:#666;margin-bottom:12px">';
+if(summary.hot_and_funded&&summary.hot_and_funded.length)h+='🔥 <b>热度高+融资活跃</b>: '+summary.hot_and_funded.join(', ')+'<br>';
+if(summary.cold_but_funded&&summary.cold_but_funded.length)h+='💎 <b>热度低但融资活跃(潜力赛道)</b>: '+summary.cold_but_funded.join(', ')+'<br>';
+h+='共 '+summary.total_events+' 起融资事件，覆盖 '+summary.tracked_industries+' 个行业</div>';
+h+='<table class="et"><thead><tr><th>行业</th><th>融资事件</th><th>周均密度</th><th>融资金额(万)</th><th>赛道热度</th><th>相关判定</th></tr></thead><tbody>';
+corr.forEach(function(c){
+var heatColor=c.heat_score>=70?'#ff4d4f':c.heat_score>=40?'#faad14':'#999';
+var judge=c.heat_score>=60&&c.event_count>=3?'<span style="color:#52c41a">正相关</span>':c.heat_score<40&&c.event_count>=3?'<span style="color:#722ed1">先行指标</span>':'<span style="color:#999">-</span>';
+h+='<tr><td style="font-weight:500">'+esc(c.industry)+'</td><td>'+c.event_count+'</td><td>'+c.density+'</td><td>'+c.total_amount.toLocaleString("zh-CN",{maximumFractionDigits:0})+'</td><td><span style="color:'+heatColor+';font-weight:600">'+c.heat_score+'</span></td><td>'+judge+'</td></tr>';
+});
+h+='</tbody></table></div>';
+el.innerHTML=h;
+}catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">'+esc(e.message)+'</div>';}
+}
+
+// === 改进4: 推荐偏好设置 + 命中率看板 ===
+async function loadRecHitRate(){
+var el=document.getElementById('recContent');
+el.innerHTML='<div class="empty">加载命中率数据...</div>';
+try{
+var[hitData,prefs]=await Promise.all([api('/api/recommendation/hit-rate?days=30'),api('/api/recommendation/preferences')]);
+var hr=hitData.hit_rates||{};
+var dr=hitData.dimension_rates||{};
+var h='';
+// Preferences panel
+h+='<div class="card" style="margin-bottom:12px;padding:16px"><h3 style="margin-bottom:12px">⚙️ 推荐偏好</h3><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">';
+h+='<div><label style="font-size:12px;color:#666">风格偏好</label><br><select id="prefStyle" style="padding:6px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px" onchange="saveRecPref()"><option value="balanced" '+(prefs.style==="balanced"?"selected":"")+'>均衡</option><option value="technical" '+(prefs.style==="technical"?"selected":"")+'>偏技术面</option><option value="fundamental" '+(prefs.style==="fundamental"?"selected":"")+'>偏基本面</option><option value="momentum" '+(prefs.style==="momentum"?"selected":"")+'>偏动量</option></select></div>';
+h+='<div><label style="font-size:12px;color:#666">风险偏好</label><br><select id="prefRisk" style="padding:6px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px" onchange="saveRecPref()"><option value="low" '+(prefs.risk_tolerance==="low"?"selected":"")+'>保守</option><option value="medium" '+(prefs.risk_tolerance==="medium"?"selected":"")+'>适中</option><option value="high" '+(prefs.risk_tolerance==="high"?"selected":"")+'>激进</option></select></div>';
+h+='<div><label style="font-size:12px;color:#666">最低评分</label><br><input id="prefMinScore" type="number" value="'+(prefs.min_score||60)+'" style="width:60px;padding:6px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px" onchange="saveRecPref()"></div>';
+h+='</div></div>';
+// Hit rate dashboard
+if(!hitData.total||hitData.total===0){h+='<div class="empty" style="padding:40px">📊 数据积累中...<br><span style="font-size:12px;color:#bbb">系统每日记录推荐，T+N天后自动计算命中率</span></div>';el.innerHTML=h;return;}
+h+='<div class="metrics" style="margin-bottom:12px">';
+h+='<div class="mc"><div class="label">T+5 胜率</div><div class="value" style="color:#1890ff">'+(hr.t5?hr.t5.rate:0)+'%</div><div class="sub">'+(hr.t5?hr.t5.win+'/'+hr.t5.total:'0/0')+'</div></div>';
+h+='<div class="mc"><div class="label">T+5 平均收益</div><div class="value" style="color:'+(hr.t5&&hr.t5.avg_return>=0?'#52c41a':'#ff4d4f')+'">'+(hr.t5?(hr.t5.avg_return>=0?'+':'')+hr.t5.avg_return+'%':'--')+'</div></div>';
+h+='<div class="mc"><div class="label">已评估</div><div class="value">'+hitData.evaluated+'</div><div class="sub">共'+hitData.total+'条推荐</div></div>';
+h+='<div class="mc"><div class="label">T+1 胜率</div><div class="value">'+(hr.t1?hr.t1.rate:0)+'%</div></div>';
+h+='</div>';
+// Dimension rates
+if(Object.keys(dr).length){
+h+='<div class="card" style="margin-bottom:12px"><h3>维度胜率拆解 (Top 25%子集)</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+var dimLabels={technical:'技术面',trend:'趋势面',fundamental:'基本面',volume:'量能'};
+var dimColors={technical:'#1890ff',trend:'#52c41a',fundamental:'#faad14',volume:'#722ed1'};
+Object.entries(dr).forEach(function(entry){var k=entry[0],v=entry[1];h+='<div style="text-align:center;padding:12px;border-radius:8px;background:#fafafa"><div style="font-size:12px;color:#999">'+dimLabels[k]+'</div><div style="font-size:24px;font-weight:700;color:'+dimColors[k]+'">'+v.rate+'%</div><div style="font-size:11px;color:#bbb">'+v.count+'样本 | 均收+'+v.avg_return+'%</div></div>';});
+h+='</div></div>';
+}
+el.innerHTML=h;
+}catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">'+esc(e.message)+'</div>';}
+}
+
+async function saveRecPref(){
+var style=document.getElementById('prefStyle').value;
+var risk=document.getElementById('prefRisk').value;
+var minScore=parseInt(document.getElementById('prefMinScore').value)||60;
+try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringify({style:style,risk_tolerance:risk,min_score:minScore})});toast('偏好已保存');}catch(e){toast('保存失败',true);}
+}
 
 </script>
