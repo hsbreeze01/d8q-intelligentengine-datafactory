@@ -1,0 +1,130 @@
+{
+  "timestamp": "2026-06-30 19:57:44",
+  "branch": "junior-assistant",
+  "commit": "1e17fd1",
+  "feature": "P0-智能预警中心",
+  "summary": "24 passed, 0 failed, 24 total",
+  "pass_rate": "100.0%",
+  "results": [
+    {
+      "name": "GET /api/alerts/unread-count",
+      "status": "PASS",
+      "detail": "{'by_severity': {'important': 1, 'normal': 1}, 'count': 2}"
+    },
+    {
+      "name": "GET /api/alerts (list)",
+      "status": "PASS",
+      "detail": "{'alerts': [{'alert_type': 'funding_large', 'context_json': '{\"event_id\": 14699445, \"company\": \"\\\\u5"
+    },
+    {
+      "name": "GET /api/alert-rules",
+      "status": "PASS",
+      "detail": "{'rules': [{'condition_json': '{}', 'cooldown_hours': 4, 'created_at': '2026-06-30 11:56:10', 'enabl"
+    },
+    {
+      "name": "POST /api/alert-rules (create)",
+      "status": "PASS",
+      "detail": "{'id': 7, 'message': '创建成功'}"
+    },
+    {
+      "name": "PATCH /api/alert-rules/toggle",
+      "status": "PASS",
+      "detail": "{'enabled': 1}"
+    },
+    {
+      "name": "PATCH /api/alert-rules/toggle back",
+      "status": "PASS",
+      "detail": "{'enabled': 0}"
+    },
+    {
+      "name": "PATCH /api/alerts/1/read",
+      "status": "PASS",
+      "detail": "{'message': '已标记已读'}"
+    },
+    {
+      "name": "PATCH /api/alerts/read-all",
+      "status": "PASS",
+      "detail": "{'message': '全部已标记已读'}"
+    },
+    {
+      "name": "scan_all_alerts() execution",
+      "status": "PASS",
+      "detail": "scan completed without error"
+    },
+    {
+      "name": "GET / (SPA index)",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "GET /api/news (资讯)",
+      "status": "PASS",
+      "detail": "{'items': [{'ai_summary': None, 'author': '36氪', 'category': '技术', 'content': '[IT时报](https://36kr.c"
+    },
+    {
+      "name": "GET /api/proxy/tracks (赛道)",
+      "status": "PASS",
+      "detail": "[{'color': '#1890ff', 'created_at': '2026-04-29 03:08:49', 'default_sources': None, 'id': 1, 'keywor"
+    },
+    {
+      "name": "GET /api/proxy/tracks/heat/latest",
+      "status": "PASS",
+      "detail": "[{'change': 60.0, 'color': '#1890ff', 'date': '2026-06-30', 'funding_count': 0, 'id': 1, 'name': '人工"
+    },
+    {
+      "name": "GET /api/watchlist (自选股)",
+      "status": "PASS",
+      "detail": "{'success': True, 'watchlist': [{'stock_code': '603196', 'stock_name': '603196'}, {'stock_code': '北特"
+    },
+    {
+      "name": "GET /api/tasks (任务)",
+      "status": "PASS",
+      "detail": "[{'created_at': '2026-04-08T17:23:29.819253', 'cron_expr': '0 6 * * *', 'enabled': True, 'id': 'task"
+    },
+    {
+      "name": "GET /api/investment/events (投融资)",
+      "status": "PASS",
+      "detail": "{'items': [{'amount_cny_est': None, 'amount_text': None, 'company_brief': '数字相控阵芯片设计研发商', 'company_i"
+    },
+    {
+      "name": "GET /api/investment/stats (投融资统计)",
+      "status": "PASS",
+      "detail": "{'by_industry': [{'count': 27, 'name': '先进制造'}, {'count': 4, 'name': '医疗健康'}, {'count': 3, 'name': '"
+    },
+    {
+      "name": "SPA /alert route",
+      "status": "PASS",
+      "detail": "loadAlert found"
+    },
+    {
+      "name": "SPA /investment route",
+      "status": "PASS",
+      "detail": "loadInvestment found"
+    },
+    {
+      "name": "SPA /stock route",
+      "status": "PASS",
+      "detail": "loadStock found"
+    },
+    {
+      "name": "侧边栏预警badge",
+      "status": "PASS",
+      "detail": "alertBadge found"
+    },
+    {
+      "name": "侧边栏红点轮询",
+      "status": "PASS",
+      "detail": "pollUnreadCount found"
+    },
+    {
+      "name": "SQLite tables integrity",
+      "status": "PASS",
+      "detail": "All required tables exist: 20 total"
+    },
+    {
+      "name": "Existing data preserved",
+      "status": "PASS",
+      "detail": "user_events=5810, monitor_rules=8"
+    }
+  ]
+}
