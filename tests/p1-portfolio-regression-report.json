@@ -1,0 +1,129 @@
+{
+  "timestamp": "2026-06-30 20:57:08",
+  "branch": "junior-assistant",
+  "feature": "P1-虚拟组合",
+  "summary": "24 passed, 0 failed",
+  "pass_rate": "100.0%",
+  "results": [
+    {
+      "name": "POST /api/portfolios (create)",
+      "status": "PASS",
+      "detail": "{'cash': 500000.0, 'id': 2, 'initial_capital': 500000.0, 'name': '回归测试组合'}"
+    },
+    {
+      "name": "GET /api/portfolios (list)",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "GET /api/portfolios/{id} (detail)",
+      "status": "PASS",
+      "detail": "{'cash': 500000.0, 'created_at': '2026-06-30 12:57:08', 'id': 2, 'initial_capital': 500000.0, 'name': '回归测试组合', 'positio"
+    },
+    {
+      "name": "PUT /api/portfolios/{id} (rename)",
+      "status": "PASS",
+      "detail": "{'id': 2, 'name': '改名测试'}"
+    },
+    {
+      "name": "POST trade (buy)",
+      "status": "PASS",
+      "detail": "{'amount': 28000.0, 'direction': 'buy', 'ok': True, 'quantity': 100, 'stock_code': '002594'}"
+    },
+    {
+      "name": "POST trade (buy 2nd)",
+      "status": "PASS",
+      "detail": "{'amount': 18000.0, 'direction': 'buy', 'ok': True, 'quantity': 10, 'stock_code': '600519'}"
+    },
+    {
+      "name": "GET trades",
+      "status": "PASS",
+      "detail": "{'page': 1, 'page_size': 20, 'total': 2, 'trades': [{'amount': 28000.0, 'created_at': '2026-06-30 12:57:08', 'direction'"
+    },
+    {
+      "name": "Positions count = 2",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "Cash reduced after buy",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "POST trade (sell partial)",
+      "status": "PASS",
+      "detail": "{'amount': 14500.0, 'direction': 'sell', 'ok': True, 'quantity': 50, 'stock_code': '002594'}"
+    },
+    {
+      "name": "GET performance",
+      "status": "PASS",
+      "detail": "{'cash': 468500.0, 'initial_capital': 500000.0, 'max_drawdown_pct': 0, 'positions': [{'avg_cost': 280.0, 'current_price'"
+    },
+    {
+      "name": "Performance has total_assets",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "Performance has positions",
+      "status": "PASS",
+      "detail": "True"
+    },
+    {
+      "name": "DELETE portfolio",
+      "status": "PASS",
+      "detail": "{'ok': True}"
+    },
+    {
+      "name": "GET /api/alerts/unread-count",
+      "status": "PASS",
+      "detail": "{'by_severity': {}, 'count': 0}"
+    },
+    {
+      "name": "GET /api/alert-rules",
+      "status": "PASS",
+      "detail": "{'rules': [{'condition_json': '{}', 'cooldown_hours': 4, 'created_at': '2026-06-30 11:57:40', 'enabled': 1, 'id': 7, 'la"
+    },
+    {
+      "name": "GET /api/watchlist/daily-report",
+      "status": "PASS",
+      "detail": "{'items': [{'change': None, 'dimensions': {}, 'sparkline': [45.0], 'stock_code': '603196', 'stock_name': '603196', 'toda"
+    },
+    {
+      "name": "GET /api/news",
+      "status": "PASS",
+      "detail": "{'items': [{'ai_summary': None, 'author': '36氪', 'category': '技术', 'content': '[IT时报](https://36kr.com/user/5467002) _·_"
+    },
+    {
+      "name": "GET /api/proxy/tracks",
+      "status": "PASS",
+      "detail": "[{'color': '#1890ff', 'created_at': '2026-04-29 03:08:49', 'default_sources': None, 'id': 1, 'keywords': '[\"人工智能\", \"AI\","
+    },
+    {
+      "name": "GET /api/investment/events",
+      "status": "PASS",
+      "detail": "{'items': [{'amount_cny_est': None, 'amount_text': None, 'company_brief': '数字相控阵芯片设计研发商', 'company_id': 43246191, 'compa"
+    },
+    {
+      "name": "loadPortfolio in SPA",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "pfDetail in SPA",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "pfTrade in SPA",
+      "status": "PASS",
+      "detail": "found"
+    },
+    {
+      "name": "All V2 tables exist",
+      "status": "PASS",
+      "detail": "all 7 new tables present"
+    }
+  ]
+}

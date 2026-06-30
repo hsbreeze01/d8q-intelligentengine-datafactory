@@ -230,11 +230,65 @@ def _init_score_history_table():
         )
         conn.commit()
 
+
+def _init_portfolio_tables():
+    with get_db_ctx() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS portfolios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                initial_capital REAL DEFAULT 1000000,
+                cash REAL DEFAULT 1000000,
+                created_at DATETIME DEFAULT (datetime('now')),
+                updated_at DATETIME DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL,
+                stock_code TEXT NOT NULL,
+                stock_name TEXT NOT NULL DEFAULT '',
+                quantity INTEGER DEFAULT 0,
+                avg_cost REAL DEFAULT 0,
+                current_price REAL DEFAULT 0,
+                updated_at DATETIME DEFAULT (datetime('now')),
+                UNIQUE(portfolio_id, stock_code)
+            );
+            CREATE TABLE IF NOT EXISTS trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL,
+                stock_code TEXT NOT NULL,
+                stock_name TEXT NOT NULL DEFAULT '',
+                direction TEXT NOT NULL,
+                price REAL NOT NULL,
+                quantity INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                trade_date TEXT NOT NULL,
+                note TEXT DEFAULT '',
+                created_at DATETIME DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS net_value_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                portfolio_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                net_value REAL NOT NULL DEFAULT 1.0,
+                total_assets REAL NOT NULL DEFAULT 0,
+                UNIQUE(portfolio_id, date)
+            );
+            CREATE INDEX IF NOT EXISTS idx_portfolios_user ON portfolios(user_id);
+            CREATE INDEX IF NOT EXISTS idx_positions_portfolio ON positions(portfolio_id);
+            CREATE INDEX IF NOT EXISTS idx_trades_portfolio ON trades(portfolio_id);
+            CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(trade_date);
+            CREATE INDEX IF NOT EXISTS idx_net_value_portfolio_date ON net_value_history(portfolio_id, date);
+        """)
+        conn.commit()
+
 try:
     _init_events_table()
     _init_monitor_tables()
     _init_alert_tables()
     _init_score_history_table()
+    _init_portfolio_tables()
 except Exception:
     pass
 
@@ -2584,6 +2638,285 @@ def watchlist_recalculate():
             logger.error("recalculate: %s 失败: %s", code, e)
 
     return jsonify({"calculated": calculated, "failed": failed, "date": today})
+
+
+
+# === 虚拟组合 API ===
+from datetime import date as _dt_date, datetime as _dt_datetime
+
+@app.route("/api/portfolios", methods=["GET"])
+def list_portfolios():
+    user_id = session.get("username", "")
+    with get_db_ctx() as conn:
+        rows = conn.execute(
+            "SELECT * FROM portfolios WHERE user_id=? ORDER BY created_at DESC", (user_id,)
+        ).fetchall()
+        result = []
+        for r in rows:
+            pid = r["id"]
+            positions = conn.execute(
+                "SELECT quantity, current_price, avg_cost FROM positions WHERE portfolio_id=? AND quantity>0", (pid,)
+            ).fetchall()
+            total_market_value = sum(p["quantity"] * p["current_price"] for p in positions)
+            total_assets = r["cash"] + total_market_value
+            total_return_pct = ((total_assets - r["initial_capital"]) / r["initial_capital"] * 100) if r["initial_capital"] else 0
+            result.append({
+                "id": pid, "name": r["name"], "initial_capital": r["initial_capital"],
+                "cash": r["cash"], "total_market_value": round(total_market_value, 2),
+                "total_assets": round(total_assets, 2),
+                "total_return_pct": round(total_return_pct, 2),
+                "created_at": r["created_at"], "updated_at": r["updated_at"]
+            })
+    return jsonify(result)
+
+
+@app.route("/api/portfolios", methods=["POST"])
+def create_portfolio():
+    user_id = session.get("username", "")
+    data = request.get_json(force=True)
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    initial_capital = float(data.get("initial_capital", 1000000))
+    with get_db_ctx() as conn:
+        cur = conn.execute(
+            "INSERT INTO portfolios (user_id, name, initial_capital, cash) VALUES (?,?,?,?)",
+            (user_id, name, initial_capital, initial_capital)
+        )
+        conn.commit()
+        pid = cur.lastrowid
+    return jsonify({"id": pid, "name": name, "initial_capital": initial_capital, "cash": initial_capital}), 201
+
+
+@app.route("/api/portfolios/<int:pid>", methods=["GET"])
+def get_portfolio(pid):
+    user_id = session.get("username", "")
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT * FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        positions = conn.execute(
+            "SELECT * FROM positions WHERE portfolio_id=? AND quantity>0 ORDER BY stock_code", (pid,)
+        ).fetchall()
+        pos_list = []
+        total_market_value = 0
+        for pos in positions:
+            mv = pos["quantity"] * pos["current_price"]
+            total_market_value += mv
+            profit = (pos["current_price"] - pos["avg_cost"]) * pos["quantity"]
+            profit_pct = ((pos["current_price"] / pos["avg_cost"] - 1) * 100) if pos["avg_cost"] else 0
+            pos_list.append({
+                "stock_code": pos["stock_code"], "stock_name": pos["stock_name"],
+                "quantity": pos["quantity"], "avg_cost": round(pos["avg_cost"], 4),
+                "current_price": pos["current_price"],
+                "market_value": round(mv, 2), "profit": round(profit, 2),
+                "profit_pct": round(profit_pct, 2)
+            })
+        total_assets = p["cash"] + total_market_value
+        return jsonify({
+            "id": pid, "name": p["name"], "initial_capital": p["initial_capital"],
+            "cash": round(p["cash"], 2), "total_market_value": round(total_market_value, 2),
+            "total_assets": round(total_assets, 2),
+            "total_return_pct": round((total_assets / p["initial_capital"] - 1) * 100, 2) if p["initial_capital"] else 0,
+            "positions": pos_list, "created_at": p["created_at"], "updated_at": p["updated_at"]
+        })
+
+
+@app.route("/api/portfolios/<int:pid>", methods=["PUT"])
+def update_portfolio(pid):
+    user_id = session.get("username", "")
+    data = request.get_json(force=True)
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT id FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        conn.execute("UPDATE portfolios SET name=?, updated_at=datetime('now') WHERE id=?", (name, pid))
+        conn.commit()
+    return jsonify({"id": pid, "name": name})
+
+
+@app.route("/api/portfolios/<int:pid>", methods=["DELETE"])
+def delete_portfolio(pid):
+    user_id = session.get("username", "")
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT id FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        conn.execute("DELETE FROM positions WHERE portfolio_id=?", (pid,))
+        conn.execute("DELETE FROM trades WHERE portfolio_id=?", (pid,))
+        conn.execute("DELETE FROM net_value_history WHERE portfolio_id=?", (pid,))
+        conn.execute("DELETE FROM portfolios WHERE id=?", (pid,))
+        conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/portfolios/<int:pid>/trade", methods=["POST"])
+def portfolio_trade(pid):
+    user_id = session.get("username", "")
+    data = request.get_json(force=True)
+    stock_code = (data.get("stock_code") or "").strip()
+    stock_name = (data.get("stock_name") or "").strip()
+    direction = (data.get("direction") or "").strip().lower()
+    price = float(data.get("price", 0))
+    quantity = int(data.get("quantity", 0))
+    note = data.get("note", "")
+    if not stock_code or direction not in ("buy", "sell") or price <= 0 or quantity <= 0:
+        return jsonify({"error": "invalid params: need stock_code, direction(buy/sell), price>0, quantity>0"}), 400
+    amount = round(price * quantity, 2)
+    trade_date = data.get("trade_date") or str(_dt_date.today())
+
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT * FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "portfolio not found"}), 404
+
+        if direction == "buy":
+            if p["cash"] < amount:
+                return jsonify({"error": f"insufficient cash: need {amount}, have {round(p['cash'],2)}"}), 400
+            # update cash
+            conn.execute("UPDATE portfolios SET cash=cash-?, updated_at=datetime('now') WHERE id=?", (amount, pid))
+            # update position with weighted avg cost
+            existing = conn.execute(
+                "SELECT quantity, avg_cost FROM positions WHERE portfolio_id=? AND stock_code=?", (pid, stock_code)
+            ).fetchone()
+            if existing and existing["quantity"] > 0:
+                new_qty = existing["quantity"] + quantity
+                new_avg = (existing["avg_cost"] * existing["quantity"] + price * quantity) / new_qty
+                conn.execute(
+                    "UPDATE positions SET quantity=?, avg_cost=?, current_price=?, stock_name=?, updated_at=datetime('now') WHERE portfolio_id=? AND stock_code=?",
+                    (new_qty, round(new_avg, 4), price, stock_name or existing.get("stock_name", ""), pid, stock_code)
+                )
+            else:
+                conn.execute(
+                    "INSERT OR REPLACE INTO positions (portfolio_id, stock_code, stock_name, quantity, avg_cost, current_price, updated_at) VALUES (?,?,?,?,?,?,datetime('now'))",
+                    (pid, stock_code, stock_name, quantity, price, price)
+                )
+        else:  # sell
+            existing = conn.execute(
+                "SELECT quantity FROM positions WHERE portfolio_id=? AND stock_code=?", (pid, stock_code)
+            ).fetchone()
+            if not existing or existing["quantity"] < quantity:
+                avail = existing["quantity"] if existing else 0
+                return jsonify({"error": f"insufficient shares: need {quantity}, have {avail}"}), 400
+            conn.execute("UPDATE portfolios SET cash=cash+?, updated_at=datetime('now') WHERE id=?", (amount, pid))
+            new_qty = existing["quantity"] - quantity
+            if new_qty == 0:
+                conn.execute("UPDATE positions SET quantity=0, updated_at=datetime('now') WHERE portfolio_id=? AND stock_code=?", (pid, stock_code))
+            else:
+                conn.execute("UPDATE positions SET quantity=?, current_price=?, updated_at=datetime('now') WHERE portfolio_id=? AND stock_code=?",
+                             (new_qty, price, pid, stock_code))
+
+        # record trade
+        conn.execute(
+            "INSERT INTO trades (portfolio_id, stock_code, stock_name, direction, price, quantity, amount, trade_date, note) VALUES (?,?,?,?,?,?,?,?,?)",
+            (pid, stock_code, stock_name, direction, price, quantity, amount, trade_date, note)
+        )
+        conn.commit()
+
+    return jsonify({"ok": True, "direction": direction, "stock_code": stock_code, "quantity": quantity, "amount": amount})
+
+
+@app.route("/api/portfolios/<int:pid>/trades", methods=["GET"])
+def portfolio_trades(pid):
+    user_id = session.get("username", "")
+    page = int(request.args.get("page", 1))
+    page_size = int(request.args.get("page_size", 20))
+    offset = (page - 1) * page_size
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT id FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        total = conn.execute("SELECT count(*) FROM trades WHERE portfolio_id=?", (pid,)).fetchone()[0]
+        rows = conn.execute(
+            "SELECT * FROM trades WHERE portfolio_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (pid, page_size, offset)
+        ).fetchall()
+        trades_list = [{
+            "id": r["id"], "stock_code": r["stock_code"], "stock_name": r["stock_name"],
+            "direction": r["direction"], "price": r["price"], "quantity": r["quantity"],
+            "amount": r["amount"], "trade_date": r["trade_date"], "note": r["note"],
+            "created_at": r["created_at"]
+        } for r in rows]
+    return jsonify({"total": total, "page": page, "page_size": page_size, "trades": trades_list})
+
+
+@app.route("/api/portfolios/<int:pid>/performance", methods=["GET"])
+def portfolio_performance(pid):
+    user_id = session.get("username", "")
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT * FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        positions = conn.execute(
+            "SELECT * FROM positions WHERE portfolio_id=? AND quantity>0", (pid,)
+        ).fetchall()
+        total_market_value = sum(pos["quantity"] * pos["current_price"] for pos in positions)
+        total_assets = p["cash"] + total_market_value
+        total_return_pct = ((total_assets / p["initial_capital"]) - 1) * 100 if p["initial_capital"] else 0
+        # max drawdown from net_value_history
+        nv_rows = conn.execute(
+            "SELECT net_value FROM net_value_history WHERE portfolio_id=? ORDER BY date", (pid,)
+        ).fetchall()
+        max_drawdown = 0
+        peak = 0
+        for row in nv_rows:
+            nv = row["net_value"]
+            if nv > peak:
+                peak = nv
+            if peak > 0:
+                dd = (peak - nv) / peak * 100
+                if dd > max_drawdown:
+                    max_drawdown = dd
+        pos_detail = [{
+            "stock_code": pos["stock_code"], "stock_name": pos["stock_name"],
+            "quantity": pos["quantity"], "avg_cost": round(pos["avg_cost"], 4),
+            "current_price": pos["current_price"],
+            "market_value": round(pos["quantity"] * pos["current_price"], 2),
+            "profit": round((pos["current_price"] - pos["avg_cost"]) * pos["quantity"], 2),
+            "profit_pct": round((pos["current_price"] / pos["avg_cost"] - 1) * 100, 2) if pos["avg_cost"] else 0,
+            "weight_pct": round(pos["quantity"] * pos["current_price"] / total_assets * 100, 2) if total_assets else 0
+        } for pos in positions]
+    return jsonify({
+        "initial_capital": p["initial_capital"], "cash": round(p["cash"], 2),
+        "total_market_value": round(total_market_value, 2),
+        "total_assets": round(total_assets, 2),
+        "total_return_pct": round(total_return_pct, 2),
+        "max_drawdown_pct": round(max_drawdown, 2),
+        "positions": pos_detail
+    })
+
+
+@app.route("/api/portfolios/<int:pid>/refresh-price", methods=["POST"])
+def portfolio_refresh_price(pid):
+    user_id = session.get("username", "")
+    with get_db_ctx() as conn:
+        p = conn.execute("SELECT id FROM portfolios WHERE id=? AND user_id=?", (pid, user_id)).fetchone()
+        if not p:
+            return jsonify({"error": "not found"}), 404
+        positions = conn.execute(
+            "SELECT stock_code FROM positions WHERE portfolio_id=? AND quantity>0", (pid,)
+        ).fetchall()
+        updated = 0
+        for pos in positions:
+            code = pos["stock_code"]
+            try:
+                data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + code)
+                if status == 200 and data:
+                    price = float(data.get("current_price") or data.get("price") or data.get("close") or 0)
+                    if price > 0:
+                        conn.execute(
+                            "UPDATE positions SET current_price=?, updated_at=datetime('now') WHERE portfolio_id=? AND stock_code=?",
+                            (price, pid, code)
+                        )
+                        updated += 1
+            except Exception:
+                pass
+        conn.execute("UPDATE portfolios SET updated_at=datetime('now') WHERE id=?", (pid,))
+        conn.commit()
+    return jsonify({"ok": True, "updated": updated, "total": len(positions)})
 
 
 @app.route("/<path:path>")
