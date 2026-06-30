@@ -3675,4 +3675,53 @@ el.innerHTML=h;
 }catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">加载失败: '+esc(e.message)+'</div>';}
 }
 
+// === 投融资增强 ===
+async function invLoadHeatmap(){
+var el=document.getElementById('invList');
+el.innerHTML='<div class="empty">加载热力分析...</div>';
+try{
+var data=await api('/api/investment/heatmap?months=6');
+var h='<div class="metrics" style="margin-bottom:16px"><div class="mc"><div class="label">事件总数</div><div class="value">'+data.total+'</div></div><div class="mc"><div class="label">覆盖月份</div><div class="value">'+(data.months||[]).length+'</div></div><div class="mc"><div class="label">活跃行业</div><div class="value">'+(data.industries||[]).length+'</div></div><div class="mc"><div class="label">轮次类型</div><div class="value">'+(data.rounds||[]).length+'</div></div></div>';
+// Trend chart
+h+='<div class="card" style="margin-bottom:12px"><h3>月度融资趋势</h3><div id="invTrendChart" style="height:200px"></div></div>';
+// Round distribution
+h+='<div class="card"><h3>轮次分布</h3><div id="invRoundChart" style="height:200px"></div></div>';
+el.innerHTML=h;
+// Render charts
+setTimeout(function(){
+var trend=data.trend||[];
+if(trend.length&&document.getElementById('invTrendChart')){
+var c=_echInit(document.getElementById('invTrendChart'));
+c.setOption({tooltip:{trigger:'axis'},xAxis:{type:'category',data:trend.map(function(t){return t.month})},yAxis:[{type:'value',name:'事件数'},{type:'value',name:'金额(万)'}],series:[{name:'事件数',type:'bar',data:trend.map(function(t){return t.count}),itemStyle:{color:'#1890ff'}},{name:'金额',type:'line',yAxisIndex:1,data:trend.map(function(t){return t.amount}),itemStyle:{color:'#52c41a'}}]});
+}
+var rounds=data.rounds||[];
+if(rounds.length&&document.getElementById('invRoundChart')){
+var c2=_echInit(document.getElementById('invRoundChart'));
+c2.setOption({tooltip:{trigger:'item'},series:[{type:'pie',radius:['40%','70%'],data:rounds.map(function(r){return{name:r.name,value:r.count}})}]});
+}
+},100);
+}catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">'+esc(e.message)+'</div>';}
+}
+
+async function invLoadInvestors(){
+var el=document.getElementById('invList');
+el.innerHTML='<div class="empty">加载机构数据...</div>';
+try{
+var data=await api('/api/investment/investors/top?days=90&limit=20');
+var investors=data.investors||[];
+if(!investors.length){el.innerHTML='<div class="empty">暂无机构数据</div>';return;}
+var h='<table class="et"><thead><tr><th>机构名称</th><th>出手次数</th><th>领投次数</th><th>总金额(万)</th><th>最近项目</th><th>操作</th></tr></thead><tbody>';
+investors.forEach(function(inv){
+var deals=(inv.recent_deals||[]).slice(0,2).map(function(d){return esc(d.company||'')}).join(', ');
+var followBtn=inv.followed?'<a style="color:#999;cursor:pointer" onclick="invUnfollow(\x27'+esc(inv.name)+'\x27)">已关注</a>':'<a style="color:#1890ff;cursor:pointer" onclick="invFollow(\x27'+esc(inv.name)+'\x27)">+关注</a>';
+h+='<tr><td style="font-weight:500">'+esc(inv.name)+'</td><td>'+inv.deal_count+'</td><td>'+inv.lead_count+'</td><td>'+(inv.total_amount||0).toLocaleString("zh-CN",{maximumFractionDigits:0})+'</td><td style="font-size:12px;color:#666">'+deals+'</td><td>'+followBtn+'</td></tr>';
+});
+h+='</tbody></table>';
+el.innerHTML=h;
+}catch(e){el.innerHTML='<div class="empty" style="color:#ff4d4f">'+esc(e.message)+'</div>';}
+}
+
+async function invFollow(name){try{await api('/api/investment/investors/follow',{method:'POST',body:JSON.stringify({investor_name:name})});toast('已关注 '+name);invLoadInvestors();}catch(e){toast('关注失败',true);}}
+async function invUnfollow(name){try{await api('/api/investment/investors/unfollow',{method:'POST',body:JSON.stringify({investor_name:name})});toast('已取消关注');invLoadInvestors();}catch(e){toast('取消失败',true);}}
+
 </script>

@@ -284,6 +284,21 @@ def _init_portfolio_tables():
         conn.commit()
 
 
+
+def _init_followed_investors_table():
+    with get_db_ctx() as conn:
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS followed_investors ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id TEXT NOT NULL, "
+            "investor_name TEXT NOT NULL, "
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+            "UNIQUE(user_id, investor_name)"
+            "); "
+            "CREATE INDEX IF NOT EXISTS idx_fi_user ON followed_investors(user_id);"
+        )
+        conn.commit()
+
 def _init_rec_history_table():
     with get_db_ctx() as conn:
         conn.executescript(
@@ -316,6 +331,7 @@ try:
     _init_score_history_table()
     _init_portfolio_tables()
     _init_rec_history_table()
+    _init_followed_investors_table()
 except Exception:
     pass
 
@@ -2947,6 +2963,115 @@ def portfolio_refresh_price(pid):
 
 
 
+
+
+# === 投融资增强 API ===
+@app.route("/api/investment/heatmap", methods=["GET"])
+def investment_heatmap():
+    """融资热力图: 按月x行业聚合"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    months = request.args.get("months", 6, type=int)
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=months*30)).isoformat()
+    # Get all events from agent
+    data, code = agent_request("GET", f"/api/itjuzi/events?start_date={start}&page_size=200")
+    if code != 200:
+        return jsonify(data), code
+    items = data.get("items", [])
+    # Aggregate by month x industry
+    from collections import defaultdict
+    month_ind = defaultdict(lambda: defaultdict(int))
+    month_amount = defaultdict(float)
+    round_dist = defaultdict(int)
+    for ev in items:
+        d = (ev.get("event_date") or "")[:7]  # YYYY-MM
+        ind = ev.get("industry") or "其他"
+        month_ind[d][ind] += 1
+        month_amount[d] += float(ev.get("amount_cny_est") or 0)
+        round_dist[ev.get("round") or "未知"] += 1
+    # Build matrix
+    all_months = sorted(month_ind.keys())
+    all_industries = list(set(ind for m in month_ind.values() for ind in m))[:10]
+    matrix = []
+    for mi, m in enumerate(all_months):
+        for ii, ind in enumerate(all_industries):
+            matrix.append([mi, ii, month_ind[m].get(ind, 0)])
+    trend = [{"month": m, "count": sum(month_ind[m].values()), "amount": round(month_amount[m], 0)} for m in all_months]
+    rounds = [{"name": k, "count": v} for k, v in sorted(round_dist.items(), key=lambda x: -x[1])]
+    return jsonify({"months": all_months, "industries": all_industries, "matrix": matrix, "trend": trend, "rounds": rounds, "total": len(items)})
+
+
+@app.route("/api/investment/investors/top", methods=["GET"])
+def investment_top_investors():
+    """活跃机构排行"""
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    days = request.args.get("days", 90, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    from datetime import date, timedelta
+    from collections import defaultdict
+    start = (date.today() - timedelta(days=days)).isoformat()
+    data, code = agent_request("GET", f"/api/itjuzi/events?start_date={start}&page_size=200")
+    if code != 200:
+        return jsonify(data), code
+    items = data.get("items", [])
+    # Aggregate investors
+    inv_stats = defaultdict(lambda: {"deal_count": 0, "lead_count": 0, "total_amount": 0, "deals": []})
+    for ev in items:
+        investors = ev.get("investors") or []
+        if not isinstance(investors, list):
+            continue
+        for inv in investors:
+            name = inv.get("name", "") if isinstance(inv, dict) else str(inv)
+            if not name:
+                continue
+            s = inv_stats[name]
+            s["deal_count"] += 1
+            if isinstance(inv, dict) and inv.get("is_lead"):
+                s["lead_count"] += 1
+            s["total_amount"] += float(ev.get("amount_cny_est") or 0)
+            if len(s["deals"]) < 5:
+                s["deals"].append({"company": ev.get("company_name"), "round": ev.get("round"), "date": ev.get("event_date", "")[:10]})
+    # Sort and limit
+    ranked = sorted(inv_stats.items(), key=lambda x: -x[1]["deal_count"])[:limit]
+    # Check followed
+    with get_db_ctx() as conn:
+        followed = set(r[0] for r in conn.execute("SELECT investor_name FROM followed_investors WHERE user_id=?", (username,)).fetchall())
+    result = []
+    for name, s in ranked:
+        result.append({"name": name, "deal_count": s["deal_count"], "lead_count": s["lead_count"], "total_amount": s["total_amount"], "recent_deals": s["deals"], "followed": name in followed})
+    return jsonify({"investors": result, "total": len(inv_stats)})
+
+
+@app.route("/api/investment/investors/follow", methods=["POST"])
+def follow_investor():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    body = request.get_json(force=True)
+    name = body.get("investor_name", "").strip()
+    if not name:
+        return jsonify({"error": "investor_name required"}), 400
+    with get_db_ctx() as conn:
+        conn.execute("INSERT OR IGNORE INTO followed_investors (user_id, investor_name) VALUES (?,?)", (username, name))
+        conn.commit()
+    return jsonify({"message": "已关注", "investor_name": name})
+
+
+@app.route("/api/investment/investors/unfollow", methods=["POST"])
+def unfollow_investor():
+    username = session.get("username", "")
+    if not username:
+        return jsonify({"error": "未登录"}), 401
+    body = request.get_json(force=True)
+    name = body.get("investor_name", "").strip()
+    with get_db_ctx() as conn:
+        conn.execute("DELETE FROM followed_investors WHERE user_id=? AND investor_name=?", (username, name))
+        conn.commit()
+    return jsonify({"message": "已取消关注"})
 
 # === 推荐回溯 API ===
 @app.route("/api/recommendation/history", methods=["GET"])
