@@ -414,6 +414,39 @@ def _run_chanlun_scan():
         logger.error("缠论信号推送失败: %s", e)
 
 
+
+# === 纪律化策略扫描（独立入口）===
+_disciplined_scan_last_run = ""
+
+def _run_disciplined_scan():
+    """每日15:37执行：纪律化策略独立扫描+推送（晚于原chanlun_scan 2分钟）"""
+    global _disciplined_scan_last_run
+    import subprocess
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    if _disciplined_scan_last_run == today:
+        return
+    if now.weekday() > 4:
+        return
+    if now.hour != 15 or now.minute < 37 or now.minute > 42:
+        return
+    _disciplined_scan_last_run = today
+    logger.info("开始纪律化策略扫描任务")
+    try:
+        result = subprocess.run(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/disciplined_scan.py"],
+            capture_output=True, text=True, timeout=120,
+            cwd="/home/ecs-assist-user/d8q-intelligentengine-stockcompass"
+        )
+        if result.returncode == 0:
+            logger.info("纪律化策略扫描完成")
+        else:
+            logger.error("纪律化策略扫描失败: %s", result.stderr[:300])
+    except Exception as e:
+        logger.error("纪律化策略扫描异常: %s", e)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -436,6 +469,9 @@ def _tick():
 
         # 缠论每日扫描(15:35)
         _run_chanlun_scan()
+
+        # 纪律化策略扫描(15:37, 独立入口)
+        _run_disciplined_scan()
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()
