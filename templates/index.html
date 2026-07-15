@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>D8Q 智能资讯平台</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;background:#f0f2f5;color:#333;display:flex;height:100vh;overflow:hidden}
@@ -325,7 +325,8 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
   </div>
   <div class="drawer-body" id="drawerBody"><div class="empty">加载中...</div></div>
 </div>
-
+</body>
+</html>
 <script>
 // === 导航与路由 ===
 var _drawerStack=[];
@@ -376,8 +377,7 @@ const PAGES=[
 {id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心'},
 {id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
-{id:'chanlun',icon:'📐',label:'缠论',title:'缠论策略'},
-{id:'chanlun-beta',icon:'🧪',label:'缠论Beta',title:'缠论全量扫描(Beta)',role:'admin'},
+{id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
@@ -1166,7 +1166,6 @@ if(!confirm('确认删除此策略组？'))return;
 await api('/api/strategy/groups/'+gid,{method:'DELETE'});toast('已删除');loadStrategyAdmin(document.getElementById('contentArea'));
 }
 </script>
-
 <script>
 // === 周报工作台 ===
 async function loadWeekly(el){
@@ -3797,169 +3796,101 @@ try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringif
 }
 
 </script>
-
 <script>
-// === 缠论策略页面（价值优先） ===
+// === 缠论纪律化策略页面 ===
 async function loadChanlun(el){
   var dData = await apiV("/api/chanlun/disciplined");
   var signals = (dData && dData.signals) || [];
   var holdings = (dData && dData.holdings) || [];
   var config = (dData && dData.config) || {};
   var date = (dData && dData.date) || "-";
-
   var gradeMap = {high:"\ud83d\udd34 \u9ad8\u786e\u4fe1",medium:"\ud83d\udfe1 \u4e2d\u786e\u4fe1"};
   var typeMap = {buy1:"\u4e00\u4e70",buy2:"\u4e8c\u4e70",buy3:"\u4e09\u4e70"};
-
   var sigHtml = "";
   if(signals.length){
     for(var i=0;i<signals.length;i++){
       var s = signals[i];
       var bc = s.grade==="high" ? "#ff4d4f" : "#faad14";
-      sigHtml += '<div style="border:1px solid #e8e8e8;border-radius:10px;padding:16px;margin-bottom:12px;border-left:4px solid '+bc+'">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-        + '<span style="font-size:16px;font-weight:700">'+(gradeMap[s.grade]||"")+' | '+(typeMap[s.signal_type]||s.signal_type)+' | '+s.stock_code+'</span>'
-        + '<span style="font-size:13px;color:#999">\u8bc4\u5206'+s.score+'</span></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;margin-bottom:8px">'
-        + '<div><span style="color:#999">\u4ed3\u4f4d</span><br><b>'+s.position_shares+'\u80a1 \u2248 '+s.position_amount+'\u5143</b></div>'
-        + '<div><span style="color:#999">\u6b62\u635f\u4ef7</span><br><b style="color:#ff4d4f">'+s.stop_loss+'</b></div>'
-        + '<div><span style="color:#999">\u4fe1\u53f7\u4ef7</span><br><b>'+s.signal_price+'</b></div></div>'
-        + '<div style="font-size:12px;color:#666;background:#f8f9fa;border-radius:6px;padding:8px">'
-        + '\u6b62\u76c8: \u76c8\u5229'+s.trailing_trigger_pct+'%\u540e\u56de\u64a4'+s.trailing_drawdown_pct+'%\u79bb\u573a | \u8d85\u65f6: '+s.max_hold_days+'\u5929 | \u6709\u6548: '+(s.valid_range?s.valid_range[0]+'~'+s.valid_range[1]:'')
-        + '</div>';
-      if(s.reason_chain && s.reason_chain.length){
-        sigHtml += '<div style="font-size:12px;color:#888;margin-top:6px">';
-        for(var r=0;r<s.reason_chain.length;r++) sigHtml += '\u2022 '+s.reason_chain[r]+'<br>';
-        sigHtml += '</div>';
-      }
-      sigHtml += '</div>';
+      sigHtml += "<div style=\"border:1px solid #e8e8e8;border-radius:10px;padding:16px;margin-bottom:12px;border-left:4px solid "+bc+"\">"
+        + "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:8px\">"
+        + "<span style=\"font-size:16px;font-weight:700\">"+(gradeMap[s.grade]||"")+" | "+(typeMap[s.signal_type]||s.signal_type)+" | "+s.stock_code+"</span>"
+        + "<span style=\"font-size:13px;color:#999\">\u8bc4\u5206"+s.score+"</span></div>"
+        + "<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;margin-bottom:8px\">"
+        + "<div><span style=\"color:#999\">\u4ed3\u4f4d</span><br><b>"+s.position_shares+"\u80a1 \u2248 "+s.position_amount+"\u5143</b></div>"
+        + "<div><span style=\"color:#999\">\u6b62\u635f</span><br><b style=\"color:#ff4d4f\">"+s.stop_loss+"</b></div>"
+        + "<div><span style=\"color:#999\">\u4fe1\u53f7\u4ef7</span><br><b>"+s.signal_price+"</b></div></div>"
+        + "<div style=\"font-size:12px;color:#666;background:#f8f9fa;border-radius:6px;padding:8px\">"
+        + "\u6b62\u76c8:"+s.trailing_trigger_pct+"%\u540e\u56de\u64a4"+s.trailing_drawdown_pct+"% | \u8d85\u65f6:"+s.max_hold_days+"\u5929 | \u6709\u6548:"+(s.valid_range?s.valid_range[0]+"~"+s.valid_range[1]:"")
+        + "</div></div>";
     }
   } else {
-    sigHtml = '<div class="empty" style="padding:20px">\u4eca\u65e5\u65e0\u53ef\u64cd\u4f5c\u4fe1\u53f7\uff08\u7b49\u5f85\u4e00\u4e70/\u4e8c\u4e70\u673a\u4f1a\uff09</div>';
+    sigHtml = "<div class=\"empty\" style=\"padding:20px\">\u4eca\u65e5\u65e0\u53ef\u64cd\u4f5c\u4fe1\u53f7\uff08\u7b49\u5f85\u4e00\u4e70/\u4e8c\u4e70\u673a\u4f1a\uff09</div>";
   }
-
   var holdHtml = "";
   if(holdings.length){
     for(var j=0;j<holdings.length;j++){
       var h = holdings[j];
       var pc = (h.pnl_pct||0) >= 0 ? "#52c41a" : "#ff4d4f";
       var st = "\u7ee7\u7eed\u6301\u6709";
-      if(h.exit_signal) st = '<span style="color:#ff4d4f;font-weight:600">\u26a0\ufe0f \u660e\u65e5\u5356\u51fa: '+(h.exit_reason||"")+'</span>';
-      else if(h.trailing_active) st = '\ud83d\udd12 \u79fb\u52a8\u6b62\u76c8\u5df2\u6fc0\u6d3b';
-      holdHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5">'
-        + '<div><b>'+h.stock_code+'</b> '+(h.stock_name||'')+' <span style="color:#999;font-size:12px">\u7b2c'+(h.hold_days||0)+'\u5929</span></div>'
-        + '<div style="text-align:right"><span style="color:'+pc+';font-weight:600">'+((h.pnl_pct||0)>0?"+":"")+(h.pnl_pct||0)+'% ('+(h.pnl_amount||0)+'\u5143)</span>'
-        + '<br><span style="font-size:11px;color:#888">'+st+'</span></div></div>';
+      if(h.exit_signal) st = "<span style=\"color:#ff4d4f\">\u26a0\ufe0f "+h.exit_reason+"</span>";
+      else if(h.trailing_active) st = "\ud83d\udd12 \u79fb\u52a8\u6b62\u76c8\u5df2\u6fc0\u6d3b";
+      holdHtml += "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f5f5f5\">"
+        + "<div><b>"+h.stock_code+"</b> "+(h.stock_name||"")+"</div>"
+        + "<div style=\"text-align:right\"><span style=\"color:"+pc+";font-weight:600\">"+((h.pnl_pct||0)>0?"+":"")+(h.pnl_pct||0)+"%</span>"
+        + "<br><span style=\"font-size:11px;color:#888\">"+st+"</span></div></div>";
     }
   }
-
-  var cfgLine = config.stop_loss_pct
-    ? '\u6b62\u635f'+(config.stop_loss_pct*100)+'% | \u6b62\u76c8'+(config.trailing_trigger*100)+'%/'+(config.trailing_drawdown*100)+'% | \u8d85\u65f6'+config.max_hold_days+'\u5929 | \u4ed3\u4f4d'+config.full_position+'\u5143/\u7b14'
-    : '';
-
-  el.innerHTML = '<div class="card">'
-    + '<h3>\ud83d\udcd0 \u7f20\u8bba\u7eaa\u5f8b\u5316\u7b56\u7565 <span style="font-size:12px;color:#999;font-weight:400;margin-left:8px">'+date+'</span>'
-    + '<span style="display:flex;gap:8px;align-items:center">'
-    + '<a class="more" onclick="goPage(\'chanlun-beta\')">\u5168\u91cf\u626b\u63cf(Beta) \u2192</a>'
-    + '<button class="btn btn-sm btn-ghost" onclick="chanlunRefresh()">\ud83d\udd04</button></span></h3>'
-    + '<div style="font-size:11px;color:#999;margin-bottom:12px">'+cfgLine+'</div>'
-    + '<div style="margin-bottom:16px"><h4 style="font-size:14px;margin-bottom:10px">\ud83d\udce1 \u4eca\u65e5\u4fe1\u53f7</h4>'+sigHtml+'</div>'
-    + (holdings.length ? '<div><h4 style="font-size:14px;margin-bottom:8px">\ud83d\udcca \u5f53\u524d\u6301\u4ed3 ('+holdings.length+'/'+(config.max_holdings||3)+')</h4>'+holdHtml+'</div>' : '<div style="font-size:13px;color:#999;margin-top:12px">\u5f53\u524d\u65e0\u6301\u4ed3\uff0c\u7a7a\u4f4d '+(config.max_holdings||3)+'/'+(config.max_holdings||3)+'</div>')
-    + '</div>'
-    + '<div style="margin-top:12px;padding:12px 16px;background:#f8f9fa;border-radius:8px;font-size:12px;color:#666">'
-    + '<b>\u7b56\u7565\u8bf4\u660e</b>: \u4ec5\u8ddf\u8e2a\u4e00\u4e70/\u4e8c\u4e70\u4fe1\u53f7(\u56de\u6d4b\u80dc\u732853%+, \u671f\u671b\u503c+1.83%/\u7b14) | \u6bcf\u65e515:37\u81ea\u52a8\u626b\u63cf | '
-    + '<a style="color:#1890ff;cursor:pointer" onclick="goPage(\'chanlun-beta\')">\u67e5\u770b\u5168\u91cf\u626b\u63cf(Beta)</a></div>';
+  var cfgLine = config.stop_loss_pct ? "\u6b62\u635f"+(config.stop_loss_pct*100)+"% | \u6b62\u76c8"+(config.trailing_trigger*100)+"%/"+(config.trailing_drawdown*100)+"% | \u8d85\u65f6"+config.max_hold_days+"\u5929" : "";
+  el.innerHTML = "<div class=\"card\">"
+    + "<h3>\ud83d\udcd0 \u7f20\u8bba\u7eaa\u5f8b\u5316\u7b56\u7565 <span style=\"font-size:12px;color:#999;font-weight:400\">"+date+"</span>"
+    + "<span style=\"display:flex;gap:8px\"><a class=\"more\" onclick=\"goPage(\x27chanlun-beta\x27)\">\u5168\u91cf\u626b\u63cf(Beta) \u2192</a>"
+    + "<button class=\"btn btn-sm btn-ghost\" onclick=\"loadChanlun(document.getElementById(\x27contentArea\x27))\">\ud83d\udd04</button></span></h3>"
+    + "<div style=\"font-size:11px;color:#999;margin-bottom:12px\">"+cfgLine+"</div>"
+    + "<h4 style=\"font-size:14px;margin-bottom:10px\">\ud83d\udce1 \u4eca\u65e5\u4fe1\u53f7</h4>"+sigHtml
+    + (holdings.length ? "<h4 style=\"font-size:14px;margin:16px 0 8px\">\ud83d\udcca \u6301\u4ed3</h4>"+holdHtml : "<div style=\"font-size:13px;color:#999;margin-top:12px\">\u65e0\u6301\u4ed3</div>")
+    + "</div>"
+    + "<div style=\"margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;font-size:12px;color:#666\">"
+    + "\u7b56\u7565: \u4ec5\u4e00\u4e70/\u4e8c\u4e70(\u80dc\u732853%+) | 15:37\u626b\u63cf | <a style=\"color:#1890ff;cursor:pointer\" onclick=\"goPage(\x27chanlun-beta\x27)\">Beta\u2192</a></div>";
 }
-
-function chanlunRefresh(){ loadChanlun(document.getElementById("contentArea")); }
-
-// === 缠论Beta页面（全量扫描，未验证）===
+// === Beta页 ===
 async function loadChanlunBeta(el){
   var data = await apiV("/api/chanlun/signals?min_score=60");
   var signals = (data && data.signals) || [];
   var date = (data && data.date) || "-";
   var typeMap = {buy1:"\ud83d\udd34 \u4e00\u4e70",buy2:"\ud83d\udfe0 \u4e8c\u4e70",buy3:"\ud83d\udfe2 \u4e09\u4e70"};
-
   var rows = "";
   for(var i=0;i<signals.length;i++){
     var s = signals[i];
     var tn = typeMap[s.signal_type] || s.signal_type;
     var sc = s.score >= 75 ? "#ff4d4f" : s.score >= 70 ? "#fa8c16" : "#1890ff";
-    rows += '<tr><td><b>'+s.stock_code+'</b></td><td>'+tn+'</td>'
-      + '<td><span style="color:'+sc+';font-weight:700">'+s.score+'</span></td>'
-      + '<td>'+s.signal_price+'</td><td style="color:#ff4d4f">'+s.stop_loss+'</td>'
-      + '<td style="color:#52c41a">'+s.target_price+'</td><td><b>1:'+(s.risk_reward||"-")+'</b></td><td><a style="color:#1890ff;cursor:pointer;font-size:12px" onclick="chanlunDetail('"+s.stock_code+"')">详情</a></td></tr>';
+    rows += "<tr><td><b>"+s.stock_code+"</b></td><td>"+tn+"</td>"
+      + "<td><span style=\"color:"+sc+";font-weight:700\">"+s.score+"</span></td>"
+      + "<td>"+s.signal_price+"</td><td style=\"color:#ff4d4f\">"+s.stop_loss+"</td>"
+      + "<td style=\"color:#52c41a\">"+s.target_price+"</td><td>1:"+(s.risk_reward||"-")+"</td>"
+      + "<td><a style=\"color:#1890ff;cursor:pointer\" onclick=\"chanlunDetail(\x27"+s.stock_code+"\x27)\">\u8be6\u60c5</a></td></tr>";
   }
-
-  el.innerHTML = '<div class="card">'
-    + '<h3>\ud83e\uddea \u5168\u91cf\u626b\u63cf <span style="background:#fff7e6;color:#fa8c16;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:8px">Beta \u672a\u9a8c\u8bc1</span>'
-    + '<span style="font-size:12px;color:#999;font-weight:400;margin-left:8px">'+date+' | '+signals.length+'\u4e2a</span>'
-    + '<span style="display:flex;gap:8px"><a class="more" onclick="goPage(\'chanlun\')">\u2190 \u8fd4\u56de\u7b56\u7565\u9875</a></span></h3>'
-    + '<div style="background:#fff7e6;border:1px solid #ffe58f;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#d48806">'
-    + '\u26a0\ufe0f \u539f\u59cb\u5f15\u64ce\u5168\u91cf\u626b\u63cf\u7ed3\u679c\uff0c\u56de\u6d4b\u80dc\u7387~49%\uff0c\u672a\u7ecf\u7eaa\u5f8b\u5316\u7b56\u7565\u8fc7\u6ee4\u3002\u4e09\u4e70\u5360\u591a\u6570\u4f46\u80dc\u7387<47%\uff0c\u4ec5\u4f9b\u89c2\u5bdf\u3002</div>'
-    + (signals.length ? '<table class="et"><thead><tr><th>\u80a1\u7968</th><th>\u7c7b\u578b</th><th>\u8bc4\u5206</th><th>\u4fe1\u53f7\u4ef7</th><th>\u6b62\u635f</th><th>\u76ee\u6807</th><th>\u76c8\u4e8f\u6bd4</th><th>\u64cd\u4f5c</th></tr></thead><tbody>'+rows+'</tbody></table>' : '<div class="empty">\u4eca\u65e5\u65e0\u4fe1\u53f7</div>')
-    + '</div>';
+  el.innerHTML = "<div class=\"card\">"
+    + "<h3>\ud83e\uddea \u5168\u91cf\u626b\u63cf <span style=\"background:#fff7e6;color:#fa8c16;padding:2px 8px;border-radius:4px;font-size:11px\">Beta</span>"
+    + " <span style=\"font-size:12px;color:#999;font-weight:400\">"+date+" | "+signals.length+"\u4e2a</span>"
+    + "<span style=\"display:flex;gap:8px\"><a class=\"more\" onclick=\"goPage(\x27chanlun\x27)\">\u2190 \u7b56\u7565\u9875</a></span></h3>"
+    + "<div style=\"background:#fff7e6;border:1px solid #ffe58f;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#d48806\">"
+    + "\u26a0\ufe0f \u539f\u59cb\u5f15\u64ce\u5168\u91cf\u7ed3\u679c\uff0c\u56de\u6d4b\u80dc\u7387~49%\uff0c\u4ec5\u4f9b\u89c2\u5bdf\u3002</div>"
+    + (signals.length ? "<table class=\"et\"><thead><tr><th>\u80a1\u7968</th><th>\u7c7b\u578b</th><th>\u8bc4\u5206</th><th>\u4fe1\u53f7\u4ef7</th><th>\u6b62\u635f</th><th>\u76ee\u6807</th><th>\u76c8\u4e8f\u6bd4</th><th>\u64cd\u4f5c</th></tr></thead><tbody>"+rows+"</tbody></table>" : "<div class=\"empty\">\u65e0\u4fe1\u53f7</div>")
+    + "</div><div id=\"chanlunDetailPanel\"></div>";
 }
-
-
-// === 缠论详情（K线+笔+中枢） ===
 async function chanlunDetail(code){
-  var title = code + " 缠论结构";
-  var html = '<div class="empty">加载中...</div>';
-  openDrawer(title, html);
-  var data = await apiV("/api/chanlun/signals/" + code);
-  if(!data || data.error){
-    document.getElementById("drawerBody").innerHTML = '<div class="empty">加载失败</div>';
-    return;
-  }
-  var sigs = data.signals || [];
-  var pivots = data.pivots || [];
-  var klines = data.klines || [];
-  var typeMap2 = {buy1:"\u4e00\u4e70",buy2:"\u4e8c\u4e70",buy3:"\u4e09\u4e70"};
-
-  var sigHtml = "";
-  for(var i=0;i<sigs.length;i++){
-    var s=sigs[i];
-    var reasons=(s.reason_chain||[]).map(function(r){return "<li>"+r+"</li>"}).join("");
-    sigHtml += '<div style="margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:6px">'
-      + "<b>"+(typeMap2[s.type]||s.type)+"</b> \u8bc4\u5206"+s.score+" | "+s.date
-      + '<ul style="margin:6px 0 0 16px;font-size:12px;color:#666">'+reasons+"</ul></div>";
-  }
-
-  var pivotHtml = "";
-  for(var j=0;j<pivots.length;j++){
-    var p=pivots[j];
-    pivotHtml += '<span class="tag" style="background:#e6f7ff;color:#1890ff;margin:2px">\u4e2d\u67a2['+p.zd.toFixed(2)+"-"+p.zg.toFixed(2)+"] "+p.status+"</span>";
-  }
-
-  var body = '<div style="margin-bottom:12px">'+(pivotHtml||'<span style="color:#999;font-size:12px">\u65e0\u6d3b\u8dc3\u4e2d\u67a2</span>')+"</div>"
-    + '<div id="chanlunChartDrawer" style="height:280px;margin-bottom:16px"></div>'
-    + (sigHtml||'<div class="empty">\u65e0\u5386\u53f2\u4fe1\u53f7</div>')
-    + '<div style="margin-top:12px"><a href="http://47.99.57.152:8087/chanlun/detail?code='+code+'" target="_blank" style="color:#1890ff">\u5728\u65b0\u7a97\u53e3\u6253\u5f00\u5b8c\u6574\u56fe\u8868 \u2192</a></div>';
-
-  document.getElementById("drawerBody").innerHTML = body;
-
-  if(klines.length && typeof echarts !== "undefined"){
-    var chart = echarts.init(document.getElementById("chanlunChartDrawer"));
-    window._echartsInstances = window._echartsInstances || [];
-    window._echartsInstances.push(chart);
-    var dates = klines.map(function(k){return k.dt.slice(5)});
-    var ohlc = klines.map(function(k){return [k.open,k.close,k.low,k.high]});
-    var strokes = data.strokes || [];
-    var markLines = [];
-    for(var si=0;si<strokes.length;si++){
-      var st=strokes[si];
-      markLines.push([{coord:[dates[st.start_idx]||"",st.start_value]},{coord:[dates[st.end_idx]||"",st.end_value]}]);
-    }
-    chart.setOption({
-      tooltip:{trigger:"axis",axisPointer:{type:"cross"}},
-      grid:{left:"8%",right:"4%",top:"8%",bottom:"15%"},
-      xAxis:{type:"category",data:dates,axisLabel:{fontSize:10}},
-      yAxis:{type:"value",scale:true},
-      series:[{type:"candlestick",data:ohlc,itemStyle:{color:"#ff4d4f",color0:"#52c41a",borderColor:"#ff4d4f",borderColor0:"#52c41a"},
-        markLine:{symbol:"none",lineStyle:{color:"#1890ff",width:2},data:markLines}}]
-    });
+  openDrawer(code+" \u7f20\u8bba\u7ed3\u6784","<div class=\"empty\">\u52a0\u8f7d\u4e2d...</div>");
+  var data = await apiV("/api/chanlun/signals/"+code);
+  if(!data||data.error){document.getElementById("drawerBody").innerHTML="<div class=\"empty\">\u52a0\u8f7d\u5931\u8d25</div>";return;}
+  var sigs=data.signals||[];var klines=data.klines||[];var pivots=data.pivots||[];
+  var sh="";for(var i=0;i<sigs.length;i++){var s=sigs[i];sh+="<div style=\"padding:8px;background:#f8f9fa;border-radius:6px;margin-bottom:8px\"><b>"+(s.type||"")+"</b> \u8bc4\u5206"+s.score+" | "+s.date+"</div>";}
+  var ph="";for(var j=0;j<pivots.length;j++){var p=pivots[j];ph+="<span style=\"display:inline-block;background:#e6f7ff;color:#1890ff;padding:2px 8px;border-radius:4px;font-size:12px;margin:2px\">\u4e2d\u67a2["+p.zd.toFixed(2)+"-"+p.zg.toFixed(2)+"]</span>";}
+  document.getElementById("drawerBody").innerHTML=(ph||"")+"<div id=\"chanlunChartD\" style=\"height:260px;margin:12px 0\"></div>"+(sh||"<div class=\"empty\">\u65e0\u4fe1\u53f7</div>")+"<a href=\"http://47.99.57.152:8087/chanlun/detail?code="+code+"\" target=\"_blank\" style=\"color:#1890ff;font-size:13px\">\u5b8c\u6574\u56fe\u8868 \u2192</a>";
+  if(klines.length&&typeof echarts!=="undefined"){
+    var ch=echarts.init(document.getElementById("chanlunChartD"));window._echartsInstances=window._echartsInstances||[];window._echartsInstances.push(ch);
+    var ds=klines.map(function(k){return k.dt.slice(5)});var ohlc=klines.map(function(k){return[k.open,k.close,k.low,k.high]});
+    var strokes=data.strokes||[];var ml=[];for(var si=0;si<strokes.length;si++){var st=strokes[si];ml.push([{coord:[ds[st.start_idx]||"",st.start_value]},{coord:[ds[st.end_idx]||"",st.end_value]}]);}
+    ch.setOption({tooltip:{trigger:"axis"},grid:{left:"8%",right:"4%",top:"8%",bottom:"15%"},xAxis:{type:"category",data:ds,axisLabel:{fontSize:10}},yAxis:{type:"value",scale:true},series:[{type:"candlestick",data:ohlc,itemStyle:{color:"#ff4d4f",color0:"#52c41a",borderColor:"#ff4d4f",borderColor0:"#52c41a"},markLine:{symbol:"none",lineStyle:{color:"#1890ff",width:2},data:ml}}]});
   }
 }
 </script>
-</body>
-</html>
