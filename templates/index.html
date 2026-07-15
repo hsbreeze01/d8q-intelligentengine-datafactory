@@ -1166,6 +1166,7 @@ async function deleteStrategyGroup(gid){
 if(!confirm('确认删除此策略组？'))return;
 await api('/api/strategy/groups/'+gid,{method:'DELETE'});toast('已删除');loadStrategyAdmin(document.getElementById('contentArea'));
 }
+</script>
 
 <script>
 // === 周报工作台 ===
@@ -3796,6 +3797,7 @@ var minScore=parseInt(document.getElementById('prefMinScore').value)||60;
 try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringify({style:style,risk_tolerance:risk,min_score:minScore})});toast('偏好已保存');}catch(e){toast('保存失败',true);}
 }
 
+</script>
 
 <script>
 // === 缠论策略页面（价值优先） ===
