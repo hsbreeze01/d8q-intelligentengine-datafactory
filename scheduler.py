@@ -345,6 +345,75 @@ def daily_score_calculation():
     logger.info("每日评分计算完成: calculated=%d, failed=%d", calculated, failed)
 
 
+
+# === 缠论每日扫描+推送 ===
+_chanlun_scan_last_run = ""
+
+def _run_chanlun_scan():
+    """每日15:35执行：触发compass缠论扫描 -> 高分信号推送企微"""
+    global _chanlun_scan_last_run
+    import urllib.request
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    if _chanlun_scan_last_run == today:
+        return
+    # 工作日 15:35 触发（A股收盘后5分钟）
+    if now.weekday() > 4:  # 周末跳过
+        return
+    if now.hour != 15 or now.minute < 35 or now.minute > 40:
+        return
+    _chanlun_scan_last_run = today
+    logger.info("开始缠论每日扫描任务")
+
+    # Step 1: 触发compass扫描
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8087/chanlun/scan", method="POST",
+                                    data=b"{}", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            scan_result = json.loads(resp.read())
+        logger.info("缠论扫描完成: %s", scan_result)
+    except Exception as e:
+        logger.error("缠论扫描失败: %s", e)
+        return
+
+    # Step 2: 获取高分信号
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8087/chanlun/signals?min_score=70&date=" + today)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        signals = data.get("signals", [])
+        if not signals:
+            logger.info("缠论扫描无高分信号，跳过推送")
+            return
+    except Exception as e:
+        logger.error("获取缠论信号失败: %s", e)
+        return
+
+    # Step 3: 构建markdown并推送企微
+    type_map = {"buy1": "一买", "buy2": "二买", "buy3": "三买", "sell1": "一卖", "sell2": "二卖", "sell3": "三卖"}
+    lines = ["## \U0001f4d0 缠论信号 (%s)" % today, ""]
+    for s in signals[:10]:  # 最多推送10个
+        tn = type_map.get(s.get("signal_type", ""), s.get("signal_type", ""))
+        rr = s.get("risk_reward", "-")
+        lines.append("**%s** | %s | 评分<font color=\"warning\">%s</font> | 盈亏比1:%s" % (
+            s.get("stock_code", ""), tn, s.get("score", ""), rr))
+        lines.append("> 信号价:%s 止损:%s 目标:%s" % (
+            s.get("signal_price", ""), s.get("stop_loss", ""), s.get("target_price", "")))
+        lines.append("")
+    lines.append("共 %d 个信号(评分≥70)" % len(signals))
+    md_content = "\n".join(lines)
+
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8088/api/chanlun/notify",
+                                    data=json.dumps({"content": md_content, "msgtype": "markdown"}).encode("utf-8"),
+                                    method="POST", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            push_result = json.loads(resp.read())
+        logger.info("缠论信号推送结果: %s", push_result)
+    except Exception as e:
+        logger.error("缠论信号推送失败: %s", e)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -364,6 +433,9 @@ def _tick():
 
         # 预警扫描(每30分钟)
         _run_alert_scan()
+
+        # 缠论每日扫描(15:35)
+        _run_chanlun_scan()
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()

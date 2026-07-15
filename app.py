@@ -3321,3 +3321,69 @@ def spa_fallback(path):
         return jsonify({"error": "Not found"}), 404
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()
+
+
+# === 企微推送（Webhook群机器人）===
+WECOM_WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=7c097c2e-d664-46e4-bbdc-39ff5bc1b537"
+
+
+def _send_wecom_webhook(content, msgtype="markdown"):
+    """Send message via WeCom group bot webhook"""
+    body = {"msgtype": msgtype}
+    if msgtype == "markdown":
+        body["markdown"] = {"content": content}
+    else:
+        body["text"] = {"content": content}
+    req = urllib.request.Request(
+        WECOM_WEBHOOK_URL,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())
+
+
+# === 缠论信号代理路由 ===
+@app.route("/api/chanlun/signals", methods=["GET"])
+def chanlun_signals():
+    qs = request.query_string.decode()
+    path = "/chanlun/signals" + ("?" + qs if qs else "")
+    data, code = compass_request("GET", path)
+    return jsonify(data), code
+
+
+@app.route("/api/chanlun/signals/<stock_code>", methods=["GET"])
+def chanlun_signal_detail(stock_code):
+    data, code = compass_request("GET", "/chanlun/signals/%s" % stock_code)
+    return jsonify(data), code
+
+
+@app.route("/api/chanlun/backtest", methods=["GET"])
+def chanlun_backtest():
+    data, code = compass_request("GET", "/chanlun/backtest")
+    return jsonify(data), code
+
+
+@app.route("/api/chanlun/scan", methods=["POST"])
+def chanlun_scan():
+    data, code = compass_request("POST", "/chanlun/scan")
+    return jsonify(data), code
+
+
+@app.route("/api/chanlun/notify", methods=["POST"])
+def chanlun_notify():
+    """企微群机器人推送缠论信号"""
+    body = request.json or {}
+    content = body.get("content", "")
+    if not content:
+        return jsonify({"status": "error", "message": "content required"}), 400
+    msgtype = body.get("msgtype", "markdown")
+    try:
+        result = _send_wecom_webhook(content=content, msgtype=msgtype)
+        if result.get("errcode") == 0:
+            return jsonify({"status": "ok", "message": "pushed"}), 200
+        else:
+            return jsonify({"status": "error", "message": result.get("errmsg", ""), "errcode": result.get("errcode")}), 502
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

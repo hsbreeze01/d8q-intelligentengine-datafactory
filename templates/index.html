@@ -377,6 +377,7 @@ const PAGES=[
 {id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心'},
 {id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
+{id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
@@ -426,7 +427,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,chanlun:loadChanlun};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -3794,4 +3795,121 @@ var minScore=parseInt(document.getElementById('prefMinScore').value)||60;
 try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringify({style:style,risk_tolerance:risk,min_score:minScore})});toast('偏好已保存');}catch(e){toast('保存失败',true);}
 }
 
+</script>
+<script>
+// === 缠论信号页面 ===
+async function loadChanlun(el){
+  const minScore = 60;
+  const data = await apiV('/api/chanlun/signals?min_score=' + minScore);
+  const signals = (data && data.signals) || [];
+  const date = (data && data.date) || "-";
+  
+  const typeMap = {buy1:'\ud83d\udd34 \u4e00\u4e70',buy2:'\ud83d\udfe0 \u4e8c\u4e70',buy3:'\ud83d\udfe2 \u4e09\u4e70',sell1:'\ud83d\udd35 \u4e00\u5356',sell2:'\u26aa \u4e8c\u5356',sell3:'\u26ab \u4e09\u5356'};
+  
+  let rows = '';
+  for(let i=0; i<signals.length; i++){
+    const s = signals[i];
+    const typeName = typeMap[s.signal_type] || s.signal_type;
+    const scoreColor = s.score >= 80 ? '#ff4d4f' : s.score >= 70 ? '#fa8c16' : '#1890ff';
+    const rr = s.risk_reward || '-';
+    rows += '<tr data-type="'+s.signal_type+'" data-score="'+s.score+'">'
+      + '<td><b>'+s.stock_code+'</b><br><span style="font-size:11px;color:#999">'+(s.stock_name||'')+'</span></td>'
+      + '<td>'+typeName+'</td>'
+      + '<td><span style="color:'+scoreColor+';font-weight:700;font-size:16px">'+s.score+'</span>'
+      + '<br><span style="font-size:10px;color:#999">\u5f62'+s.morphology_score+' \u52a8'+s.dynamics_score+' \u73af'+s.environment_score+'</span></td>'
+      + '<td>'+s.signal_price+'</td>'
+      + '<td style="color:#ff4d4f">'+s.stop_loss+'</td>'
+      + '<td style="color:#52c41a">'+s.target_price+'</td>'
+      + '<td><b>1:'+rr+'</b></td>'
+      + '<td><a style="color:#1890ff;cursor:pointer;font-size:12px" onclick="chanlunDetail(\''+s.stock_code+'\')">\u8be6\u60c5</a></td>'
+      + '</tr>';
+  }
+  
+  el.innerHTML = '<div class="card">'
+    + '<h3>\ud83d\udcd0 \u7f20\u8bba\u4fe1\u53f7 <span style="font-size:12px;color:#999;font-weight:400;margin-left:12px">'+date+' | \u8bc4\u5206\u2265'+minScore+' | \u5171'+signals.length+'\u4e2a</span>'
+    + '<span style="display:flex;gap:8px"><button class="btn btn-sm btn-ghost" onclick="chanlunRefresh()">\ud83d\udd04 \u5237\u65b0</button></span></h3>'
+    + '<div id="chanlunFilters" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">'
+    + '<span class="fb active" onclick="chanlunFilter(\'all\')">\u5168\u90e8</span>'
+    + '<span class="fb" onclick="chanlunFilter(\'buy1\')">\u4e00\u4e70</span>'
+    + '<span class="fb" onclick="chanlunFilter(\'buy2\')">\u4e8c\u4e70</span>'
+    + '<span class="fb" onclick="chanlunFilter(\'buy3\')">\u4e09\u4e70</span>'
+    + '<span class="fb" onclick="chanlunFilter(\'high\')">\u9ad8\u5206(\u226575)</span></div>'
+    + (signals.length ? '<table class="et"><thead><tr><th>\u80a1\u7968</th><th>\u4fe1\u53f7\u7c7b\u578b</th><th>\u8bc4\u5206</th><th>\u4fe1\u53f7\u4ef7</th><th>\u6b62\u635f</th><th>\u76ee\u6807</th><th>\u76c8\u4e8f\u6bd4</th><th>\u64cd\u4f5c</th></tr></thead><tbody id="chanlunBody">'+rows+'</tbody></table>' : '<div class="empty">\u4eca\u65e5\u6682\u65e0\u4fe1\u53f7\uff08\u8bc4\u5206\u226560\uff09</div>')
+    + '</div><div id="chanlunDetailPanel"></div>';
+  window._chanlunSignals = signals;
+}
+
+function chanlunFilter(type){
+  document.querySelectorAll('#chanlunFilters .fb').forEach(function(f){f.classList.remove('active')});
+  event.target.classList.add('active');
+  document.querySelectorAll('#chanlunBody tr').forEach(function(tr){
+    var t=tr.dataset.type, sc=parseInt(tr.dataset.score);
+    if(type==='all') tr.style.display='';
+    else if(type==='high') tr.style.display=sc>=75?'':'none';
+    else tr.style.display=t===type?'':'none';
+  });
+}
+
+function chanlunRefresh(){
+  loadChanlun(document.getElementById('contentArea'));
+}
+
+async function chanlunDetail(code){
+  var panel = document.getElementById('chanlunDetailPanel');
+  panel.innerHTML = '<div class="card"><div class="empty">\u52a0\u8f7d\u4e2d...</div></div>';
+  var data = await apiV('/api/chanlun/signals/' + code);
+  if(!data || data.error){
+    panel.innerHTML = '<div class="card"><div class="empty">\u52a0\u8f7d\u5931\u8d25</div></div>';
+    return;
+  }
+  var sigs = data.signals || [];
+  var pivots = data.pivots || [];
+  var klines = data.klines || [];
+  var typeMap2 = {buy1:'\u4e00\u4e70',buy2:'\u4e8c\u4e70',buy3:'\u4e09\u4e70'};
+  
+  var sigHtml = '';
+  for(var i=0;i<sigs.length;i++){
+    var s = sigs[i];
+    var reasons = (s.reason_chain||[]).map(function(r){return '<li>'+r+'</li>'}).join('');
+    sigHtml += '<div style="margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:6px">'
+      + '<b>'+(typeMap2[s.type]||s.type)+'</b> \u8bc4\u5206'+s.score+' | \u4ef7\u683c'+s.price+' | '+s.date
+      + '<ul style="margin:6px 0 0 16px;font-size:12px;color:#666">'+reasons+'</ul></div>';
+  }
+  
+  var pivotHtml = '';
+  for(var j=0;j<pivots.length;j++){
+    var p = pivots[j];
+    pivotHtml += '<span class="tag" style="background:#e6f7ff;color:#1890ff;margin:2px">\u4e2d\u67a2['+p.zd.toFixed(2)+'-'+p.zg.toFixed(2)+'] '+p.status+'</span>';
+  }
+  
+  panel.innerHTML = '<div class="card">'
+    + '<h3>'+code+' \u7f20\u8bba\u7ed3\u6784\u5206\u6790 <span style="font-size:12px;color:#999;font-weight:400">'+klines.length+'\u6839K\u7ebf</span>'
+    + '<a class="more" href="http://47.99.57.152:8087/chanlun/detail?code='+code+'" target="_blank">\u56fe\u8868\u89c6\u56fe \u2192</a></h3>'
+    + '<div style="margin-bottom:12px">'+(pivotHtml||'<span style="color:#999;font-size:12px">\u65e0\u6d3b\u8dc3\u4e2d\u67a2</span>')+'</div>'
+    + '<div id="chanlunChart" style="height:300px;margin-bottom:16px"></div>'
+    + (sigHtml||'<div class="empty">\u65e0\u5386\u53f2\u4fe1\u53f7</div>')
+    + '</div>';
+  
+  if(klines.length && typeof echarts !== 'undefined'){
+    var chart = echarts.init(document.getElementById('chanlunChart'));
+    window._echartsInstances = window._echartsInstances || [];
+    window._echartsInstances.push(chart);
+    var dates = klines.map(function(k){return k.dt.slice(5)});
+    var ohlc = klines.map(function(k){return [k.open,k.close,k.low,k.high]});
+    var strokes = data.strokes || [];
+    var markLines = [];
+    for(var si=0;si<strokes.length;si++){
+      var st = strokes[si];
+      markLines.push([{coord:[dates[st.start_idx]||'',st.start_value]},{coord:[dates[st.end_idx]||'',st.end_value]}]);
+    }
+    chart.setOption({
+      tooltip:{trigger:'axis',axisPointer:{type:'cross'}},
+      grid:{left:'8%',right:'4%',top:'8%',bottom:'15%'},
+      xAxis:{type:'category',data:dates,axisLabel:{fontSize:10}},
+      yAxis:{type:'value',scale:true},
+      series:[{type:'candlestick',data:ohlc,itemStyle:{color:'#ff4d4f',color0:'#52c41a',borderColor:'#ff4d4f',borderColor0:'#52c41a'},
+        markLine:{symbol:'none',lineStyle:{color:'#1890ff',width:2},data:markLines}}]
+    });
+  }
+}
 </script>
