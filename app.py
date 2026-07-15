@@ -3373,12 +3373,19 @@ def chanlun_scan():
 
 @app.route("/api/chanlun/disciplined", methods=["GET"])
 def chanlun_disciplined():
-    """纪律化策略数据（主页面展示）"""
-    import subprocess
+    """纪律化策略数据（读取缓存，每日15:37更新）"""
     from datetime import datetime as _dt
     
-    # 读取holdings文件
+    signals_path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache.json"
     holdings_path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/holdings.json"
+    
+    signals = []
+    try:
+        with open(signals_path, "r") as f:
+            signals = json.load(f)
+    except Exception:
+        pass
+    
     holdings = []
     try:
         with open(holdings_path, "r") as f:
@@ -3386,26 +3393,6 @@ def chanlun_disciplined():
     except Exception:
         pass
     
-    # 运行扫描获取今日信号（轻量模式，不推送）
-    signals = []
-    try:
-        result = subprocess.run(
-            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12", "-c",
-             "import json,sys;sys.path.insert(0,'/home/ecs-assist-user/d8q-intelligentengine-stockcompass');"
-             "from chanlun.strategy.disciplined_scan import scan_signals;"
-             "from chanlun.strategy.disciplined import DEFAULT_PROFILE, get_strategy_params, asdict;"
-             "from dataclasses import asdict;"
-             "sigs=scan_signals(DEFAULT_PROFILE);"
-             "print(json.dumps([asdict(s) for s in sigs],default=str))"],
-            capture_output=True, text=True, timeout=60,
-            cwd="/home/ecs-assist-user/d8q-intelligentengine-stockcompass"
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            signals = json.loads(result.stdout.strip())
-    except Exception:
-        pass
-    
-    # 配置信息
     config = {
         "risk_preference": "balanced",
         "stop_loss_pct": 0.05,
