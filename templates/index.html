@@ -3985,13 +3985,33 @@ async function loadChanlunCzsc(el){
       h += '<div style="font-size:40px;margin-bottom:8px">\ud83d\udd0d</div>';
       h += '\u65e0\u5339\u914d\u4fe1\u53f7\uff0c\u8bf7\u8c03\u6574\u7b5b\u9009\u6761\u4ef6</div>';
     } else {
-      sigs.forEach(function(s,i){
+      // 按状态分组排序: new > warning > active > profit
+    sigs.sort(function(a,b){
+      var order={new:0,warning:1,active:2,profit:3};
+      return (order[a.status]||9)-(order[b.status]||9);
+    });
+    var newCount=sigs.filter(function(x){return x.status==='new'}).length;
+    var warnCount=sigs.filter(function(x){return x.status==='warning'}).length;
+    var profitCount=sigs.filter(function(x){return x.status==='profit'}).length;
+    h+='<div style="display:flex;gap:12px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">';
+    if(newCount) h+='<span style="background:#fff0f0;color:#f5222d;padding:3px 10px;border-radius:12px;font-weight:500">\u65b0\u4fe1\u53f7 '+newCount+'</span>';
+    if(warnCount) h+='<span style="background:#fff7e6;color:#fa8c16;padding:3px 10px;border-radius:12px;font-weight:500">\u98ce\u9669\u63d0\u9192 '+warnCount+'</span>';
+    if(profitCount) h+='<span style="background:#f6ffed;color:#52c41a;padding:3px 10px;border-radius:12px;font-weight:500">\u6d6e\u76c8\u4e2d '+profitCount+'</span>';
+    h+='</div>';
+    sigs.forEach(function(s,i){
         var isBuy=s.type.startsWith('buy');var accent=isBuy?'#52c41a':'#f5222d';var bgLight=isBuy?'#fcfff8':'#fffbfb';
         var slPct=s.stop_loss_pct||0;var slColor=slPct>10?'#f5222d':slPct>5?'#fa8c16':'#52c41a';
         var pnl=s.last_close&&s.price?((s.last_close-s.price)/s.price*100).toFixed(1):'0';
         var pnlColor=pnl>0?'#f5222d':pnl<0?'#52c41a':'#999';
         var days=daysBetween(s.dt);
-        var freshTag=days<=1?'<span style="background:#ff4d4f;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">NEW</span>':days<=5?'<span style="background:#fa8c16;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">'+days+'\u5929\u524d</span>':'<span style="color:#bbb;font-size:11px">'+days+'\u5929\u524d</span>';
+        var statusTag='';
+      var st=s.status||'active';
+      if(st==='new') statusTag='<span style="background:#ff4d4f;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:500">\u65b0\u4fe1\u53f7</span>';
+      else if(st==='profit') statusTag='<span style="background:#52c41a;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">\u6d6e\u76c8\u2191\u6ce8\u610f\u6b62\u76c8</span>';
+      else if(st==='warning') statusTag='<span style="background:#fa8c16;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">\u26a0\ufe0f\u63a5\u8fd1\u6b62\u635f</span>';
+      else if(st==='invalid') statusTag='<span style="background:#999;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;text-decoration:line-through">\u5df2\u5931\u6548</span>';
+      else statusTag='<span style="color:#bbb;font-size:11px">'+(s.days||0)+'\u5929\u524d</span>';
+      var freshTag=statusTag;
 
         h += '<div style="border:1px solid #f0f0f0;border-left:4px solid '+accent+';border-radius:10px;padding:14px 18px;margin-bottom:10px;background:'+bgLight+';transition:box-shadow 0.2s" onmouseover="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,0.06)\'" onmouseout="this.style.boxShadow=\'none\'">';
         // Row1
@@ -4019,6 +4039,8 @@ async function loadChanlunCzsc(el){
         h += '<span style="color:#999">\ud83d\udcdd</span> '+(reasonMap[s.reason]||s.reason||'');
         if(slPct>=10) h += ' <span style="color:#fa8c16">\xb7 \u6b62\u635f\u504f\u5927\uff0c\u5efa\u8bae\u63a7\u4ed3</span>';
         if(!mkt.bullish&&isBuy) h += ' <span style="color:#888">\xb7 \u5927\u76d8\u504f\u7a7a\uff0c\u8c28\u614e</span>';
+      if(st==='profit') h += '<br><span style="color:#52c41a">\ud83d\udcb0 \u5efa\u8bae: \u6d6e\u76c8\u8f83\u5927\uff0c\u53ef\u8003\u8651\u5206\u6279\u6b62\u76c8\u6216\u8bbe\u79fb\u52a8\u6b62\u635f</span>';
+      if(st==='warning') h += '<br><span style="color:#fa8c16">\u26a0\ufe0f \u5efa\u8bae: \u63a5\u8fd1\u6b62\u635f\u4f4d\uff0c\u5173\u6ce8\u660e\u65e5\u8d70\u52bf\uff0c\u8dcc\u7834\u5219\u79bb\u573a</span>';
         h += '</div>';
         h += '</div>';
       });
