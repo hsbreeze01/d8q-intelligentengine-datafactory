@@ -3411,6 +3411,21 @@ def chanlun_disciplined():
     }), 200
 
 
+
+@app.route("/api/chanlun/czsc", methods=["GET"])
+def chanlun_czsc():
+    import json as _json, os as _os
+    path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache_czsc.json"
+    try:
+        if _os.path.exists(path):
+            with open(path) as f:
+                d = _json.load(f)
+            return jsonify(d)
+        return jsonify({"signals": [], "engine": "czsc", "signal_count": 0})
+    except Exception as e:
+        return jsonify({"error": str(e), "signals": []})
+
+
 @app.route("/api/chanlun/notify", methods=["POST"])
 def chanlun_notify():
     """企微群机器人推送缠论信号"""

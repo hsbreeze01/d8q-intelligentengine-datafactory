@@ -447,6 +447,38 @@ def _run_disciplined_scan():
         logger.error("纪律化策略扫描异常: %s", e)
 
 
+
+_czsc_scan_last_run = ""
+
+def _run_czsc_scan():
+    """每日15:40执行：czsc新引擎扫描(灰度，与旧引擎并行)"""
+    global _czsc_scan_last_run
+    from datetime import datetime
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    if _czsc_scan_last_run == today:
+        return
+    # 工作日 15:40 触发
+    if now.weekday() >= 5:
+        return
+    if now.hour != 15 or now.minute < 40 or now.minute > 45:
+        return
+    _czsc_scan_last_run = today
+    import subprocess
+    try:
+        logger.info("czsc扫描开始...")
+        result = subprocess.run(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py"],
+            capture_output=True, text=True, timeout=300
+        )
+        logger.info("czsc扫描完成: %s", result.stdout.strip())
+        if result.returncode != 0:
+            logger.error("czsc扫描异常: %s", result.stderr[:500])
+    except Exception as e:
+        logger.error("czsc扫描异常: %s", e)
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -472,6 +504,9 @@ def _tick():
 
         # 纪律化策略扫描(15:37, 独立入口)
         _run_disciplined_scan()
+
+        # czsc新引擎扫描(15:40, 灰度并行)
+        _run_czsc_scan()
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()
