@@ -469,7 +469,7 @@ def _run_czsc_scan():
         logger.info("czsc扫描开始...")
         result = subprocess.run(
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
-             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py"],
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py", "--push"],
             capture_output=True, text=True, timeout=300
         )
         logger.info("czsc扫描完成: %s", result.stdout.strip())
