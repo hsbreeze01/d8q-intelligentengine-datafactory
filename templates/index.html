@@ -3996,7 +3996,7 @@ async function loadChanlunCzsc(el){
         h += '<div style="border:1px solid #f0f0f0;border-left:4px solid '+accent+';border-radius:10px;padding:14px 18px;margin-bottom:10px;background:'+bgLight+';transition:box-shadow 0.2s" onmouseover="this.style.boxShadow=\'0 4px 12px rgba(0,0,0,0.06)\'" onmouseout="this.style.boxShadow=\'none\'">';
         // Row1
         h += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
-        h += '<span style="font-size:15px;font-weight:700">'+s.code+'</span>';
+        h += '<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer;text-decoration:underline" onclick="czscShowDetail(\''+s.code+'\',\''+(s.name||'')+'\')">' + s.code + '</span>';
         h += '<span style="font-size:14px;color:#333">'+(s.name||'')+'</span>';
         h += '<span style="background:'+accent+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+(typeMap[s.type]||s.type)+'</span>';
         h += '<span style="font-size:11px;color:#999">'+(typeDesc[s.type]||'')+'</span>';
@@ -4061,6 +4061,85 @@ async function loadChanlunCzsc(el){
   };
 
   renderAll();
+}
+
+
+// czsc 信号详情（K线+笔+中枢 ECharts 可视化）
+async function czscShowDetail(code, name){
+  var panel = document.getElementById('drawerPanel');
+  var overlay = document.getElementById('drawerOverlay');
+  var title = document.getElementById('drawerTitle');
+  var body = document.getElementById('drawerBody');
+  if(!panel||!body) return;
+
+  panel.classList.add('open');
+  if(overlay) overlay.classList.add('open');
+  title.textContent = (name||code) + ' \u7f20\u8bba\u7ed3\u6784';
+  body.innerHTML = '<div style="padding:40px;text-align:center;color:#999">\u52a0\u8f7d\u4e2d...</div>';
+
+  var data = await apiV('/api/chanlun/czsc/' + code);
+  if(!data||data.error||!data.klines||!data.klines.length){
+    body.innerHTML='<div style="padding:20px;color:#f5222d">\u52a0\u8f7d\u5931\u8d25: '+(data&&data.error?data.error:'\u65e0\u6570\u636e')+'</div>';
+    return;
+  }
+
+  var trendMap={up_trend:'\u4e0a\u6da8\u8d8b\u52bf',down_trend:'\u4e0b\u8dcc\u8d8b\u52bf',consolidation:'\u9707\u8361\u6574\u7406'};
+  var h='<div style="padding:12px">';
+  h+='<div style="display:flex;gap:16px;font-size:13px;margin-bottom:10px;color:#555;flex-wrap:wrap">';
+  h+='<span>\u7b14: <b>'+data.bi_count+'</b></span>';
+  h+='<span>\u4e2d\u67a2: <b>'+data.zs_count+'</b></span>';
+  h+='<span>\u8d8b\u52bf: <b>'+(trendMap[data.trend]||data.trend||'-')+'</b></span>';
+  h+='<span>\u80cc\u9a70: '+(data.divergence&&data.divergence.is_divergence?'<b style="color:#f5222d">\u6709</b>':'<b>\u65e0</b>')+'</span>';
+  h+='<span>K\u7ebf: <b>'+data.klines.length+'</b>\u6839</span>';
+  h+='</div>';
+  h+='<div id="czscDetailChart" style="height:360px;width:100%;border:1px solid #eee;border-radius:8px"></div>';
+
+  var signals=(data.buys||[]).concat(data.sells||[]);
+  if(signals.length){
+    h+='<div style="margin-top:10px;font-size:12px"><b>\u5f53\u524d\u4fe1\u53f7:</b> ';
+    signals.forEach(function(sig){
+      var c=sig.type.startsWith('buy')?'#52c41a':'#f5222d';
+      h+='<span style="color:'+c+';margin-right:10px;font-weight:500">'+sig.type+' '+(sig.price?sig.price.toFixed(2):'')+' ('+sig.reason+')</span>';
+    });
+    h+='</div>';
+  }
+  if(data.zs&&data.zs.length){
+    h+='<div style="margin-top:8px;font-size:12px;color:#666"><b>\u4e2d\u67a2:</b> ';
+    data.zs.forEach(function(z,i){
+      h+='<span style="margin-right:10px;background:#e6f7ff;padding:2px 8px;border-radius:4px;font-size:11px">ZS'+(i+1)+' ['+z.zd+'~'+z.zg+'] '+z.sdt.substring(5)+'\u2192'+z.edt.substring(5)+'</span>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
+  body.innerHTML=h;
+
+  setTimeout(function(){
+    var dom=document.getElementById('czscDetailChart');
+    if(!dom)return;
+    var chart=echarts.init(dom);_registerChart(chart);
+    var dates=data.klines.map(function(k){return k.dt.substring(0,10);});
+    var ohlc=data.klines.map(function(k){return[k.open,k.close,k.low,k.high];});
+    var vols=data.klines.map(function(k){return k.volume/10000;});
+    var zsAreas=(data.zs||[]).map(function(z){return[{xAxis:z.sdt.substring(0,10),yAxis:z.zd},{xAxis:z.edt.substring(0,10),yAxis:z.zg}];});
+    var biLines=(data.bis||[]).map(function(b){var sv=b.dir==='up'?b.low:b.high;var ev=b.dir==='up'?b.high:b.low;return[{coord:[b.sdt.substring(0,10),sv]},{coord:[b.edt.substring(0,10),ev]}];});
+    var marks=signals.map(function(sig){var ib=sig.type.startsWith('buy');return{name:sig.type,coord:[sig.dt.substring(0,10),sig.price],value:sig.type,symbolRotate:ib?0:180,itemStyle:{color:ib?'#52c41a':'#f5222d'}};});
+    chart.setOption({
+      animation:false,tooltip:{trigger:'axis',axisPointer:{type:'cross'}},
+      grid:[{left:55,right:15,top:25,height:'60%'},{left:55,right:15,top:'76%',height:'16%'}],
+      xAxis:[{type:'category',data:dates,gridIndex:0,axisLabel:{fontSize:9,rotate:45}},{type:'category',data:dates,gridIndex:1,show:false}],
+      yAxis:[{type:'value',gridIndex:0,scale:true,splitLine:{lineStyle:{type:'dashed',color:'#f0f0f0'}}},{type:'value',gridIndex:1,scale:true,show:false}],
+      dataZoom:[{type:'inside',xAxisIndex:[0,1],start:50,end:100}],
+      series:[
+        {name:'K\u7ebf',type:'candlestick',data:ohlc,xAxisIndex:0,yAxisIndex:0,
+         itemStyle:{color:'#f5222d',color0:'#52c41a',borderColor:'#f5222d',borderColor0:'#52c41a'},
+         markArea:{silent:true,itemStyle:{color:'rgba(24,144,255,0.08)',borderWidth:1,borderColor:'rgba(24,144,255,0.3)',borderType:'dashed'},data:zsAreas,label:{show:true,position:'insideTop',formatter:'\u4e2d\u67a2',fontSize:10,color:'#1890ff'}},
+         markLine:{silent:true,symbol:['circle','arrow'],symbolSize:[3,5],lineStyle:{color:'#fa8c16',width:1.5},data:biLines,label:{show:false}},
+         markPoint:{symbol:'pin',symbolSize:28,data:marks,label:{show:true,formatter:function(p){return p.data.value;},fontSize:9,color:'#fff'}}
+        },
+        {name:'\u6210\u4ea4\u91cf(\u4e07)',type:'bar',data:vols,xAxisIndex:1,yAxisIndex:1,itemStyle:{color:'rgba(0,0,0,0.1)'},barMaxWidth:3}
+      ]
+    });
+  },200);
 }
 
 </script>

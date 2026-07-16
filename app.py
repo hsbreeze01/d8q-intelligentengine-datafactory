@@ -3426,6 +3426,21 @@ def chanlun_czsc():
         return jsonify({"error": str(e), "signals": []})
 
 
+
+@app.route("/api/chanlun/czsc/<stock_code>", methods=["GET"])
+def chanlun_czsc_detail(stock_code):
+    import subprocess, json as _json
+    try:
+        cmd = ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
+               "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/czsc_detail_cli.py",
+               stock_code]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            return jsonify(_json.loads(r.stdout))
+        return jsonify({"error": r.stderr[:500]})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/api/chanlun/notify", methods=["POST"])
 def chanlun_notify():
     """企微群机器人推送缠论信号"""
