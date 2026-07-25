@@ -524,6 +524,56 @@ def _run_signal_review():
         logger.error("信号复盘异常: %s", e)
 
 
+
+# === 周五复盘周报(16:30) ===
+def _run_weekly_review():
+    """每周五16:30执行：生成周报+参数建议+推送"""
+    from datetime import datetime
+    now = datetime.now()
+    if now.weekday() != 4:  # 只在周五执行
+        return
+    if now.hour != 16 or now.minute < 30 or now.minute > 35:
+        return
+    if _already_ran_today("weekly_review"):
+        return
+    import subprocess
+    try:
+        logger.info("周报生成开始...")
+        result = subprocess.run(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/weekly_review.py",
+             "--push"],
+            capture_output=True, text=True, timeout=60
+        )
+        logger.info("周报完成: %s", result.stdout.strip()[:200])
+    except Exception as e:
+        logger.error("周报异常: %s", e)
+
+
+# === 实验组扫描(15:42, 与default并行) ===
+def _run_experimental_scan():
+    """每日15:42执行：experimental profile灰度扫描"""
+    from datetime import datetime
+    now = datetime.now()
+    if now.weekday() >= 5:
+        return
+    if now.hour != 15 or now.minute < 42 or now.minute > 47:
+        return
+    if _already_ran_today("experimental_scan"):
+        return
+    import subprocess
+    try:
+        logger.info("实验组扫描开始...")
+        result = subprocess.run(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py",
+             "--profile", "experimental"],
+            capture_output=True, text=True, timeout=300
+        )
+        logger.info("实验组扫描完成: %s", result.stdout.strip()[:200])
+    except Exception as e:
+        logger.error("实验组扫描异常: %s", e)
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -555,6 +605,12 @@ def _tick():
 
         # 信号复盘回填(16:00)
         _run_signal_review()
+
+        # 周五复盘周报(16:30)
+        _run_weekly_review()
+
+        # 实验组灰度扫描(15:42)
+        _run_experimental_scan()
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()
