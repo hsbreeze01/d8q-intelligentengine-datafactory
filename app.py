@@ -3441,6 +3441,21 @@ def chanlun_czsc_detail(stock_code):
     except Exception as e:
         return jsonify({"error": str(e)})
 
+
+@app.route("/api/chanlun/review", methods=["GET"])
+def chanlun_review():
+    """复盘统计API"""
+    import json as _json, os as _os
+    path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/review_stats.json"
+    try:
+        if _os.path.exists(path):
+            with open(path) as f:
+                d = _json.load(f)
+            return jsonify(d)
+        return jsonify({"total": 0, "message": "暂无复盘数据"})
+    except Exception as e:
+        return jsonify({"error": str(e), "total": 0})
+
 @app.route("/api/chanlun/notify", methods=["POST"])
 def chanlun_notify():
     """企微群机器人推送缠论信号"""

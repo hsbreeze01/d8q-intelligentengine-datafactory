@@ -3918,6 +3918,7 @@ async function loadChanlunCzsc(el){
       if(s.stop_loss_pct > F.maxSl) return false;
       if(F.hideWeak && !s.weekly_allow) return false;
       if(F.hideWeak && !mkt.bullish && s.type.startsWith('buy')) return false;
+      if(F.board && F.board!=='all' && s.board!==F.board) return false;
       return true;
     });
     return filtered;
@@ -3934,7 +3935,10 @@ async function loadChanlunCzsc(el){
     h += '<span style="font-size:11px;color:#fff;background:linear-gradient(135deg,#667eea,#764ba2);padding:3px 10px;border-radius:12px">czsc v'+(data.version||'2.0')+'</span>';
     h += '<span style="font-size:11px;color:#fa8c16;border:1px solid #fa8c16;padding:2px 8px;border-radius:12px">\u7070\u5ea6</span>';
     h += '</div>';
-    h += '<div style="font-size:12px;color:#aaa">\u66f4\u65b0 '+(data.generated_at||'-')+' \xb7 \u6807\u7684\u6c60 '+(data.pool_size||'-')+' \u53ea \xb7 \u6bcf\u65e5 15:40</div>';
+    h += '<div style="font-size:12px;color:#aaa">更新 '+(data.generated_at||'-')+' · 标的池 '+(data.pool_size||'-')+' 只';
+    if(data.pool_tiers){var pt=data.pool_tiers;h+=' (<span style="color:#f5222d">A:'+pt.A+'</span> <span style="color:#fa8c16">B:'+pt.B+'</span> <span style="color:#faad14">C:'+pt.C+'</span> <span style="color:#52c41a">D:'+pt.D+'</span>)';}
+    if(data.signal_window&&data.signal_window.length){h+=' · 信号窗口: '+data.signal_window.join('~');}
+    h += ' · 每日 15:40</div>';
     h += '</div>';
 
     // 大盘卡片
@@ -3976,26 +3980,51 @@ async function loadChanlunCzsc(el){
     h += '<input type="checkbox" '+(F.hideWeak?'checked':'')+' onchange="window._czscHideWeak(this)" style="accent-color:#1890ff">';
     h += '<span style="color:#555">\u53ea\u770b\u987a\u52bf</span></label>';
     h += '<span style="font-size:10px;color:#bbb" title="\u9690\u85cf\u5468\u7ebf\u4e0d\u5141\u8bb8\u7684 + \u5927\u76d8\u770b\u7a7a\u65f6\u7684\u4e70\u70b9">(?)</span>';
+    // 板块筛选
+    h += '<div style="width:1px;height:20px;background:#e0e0e0;margin:0 4px"></div>';
+    h += '<div style="font-size:12px;color:#666;font-weight:500">板块:</div>';
+    var boardOpts=[{k:'all',l:'全部'},{k:'main',l:'主板'},{k:'gem',l:'创业板'},{k:'star',l:'科创板'},{k:'bse',l:'北交所'}];
+    if(!window._czscFilter.board) window._czscFilter.board='all';
+    boardOpts.forEach(function(b){
+      var sel=F.board===b.k;
+      h+='<span class="fb'+(sel?' active':'')+'" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;'+(sel?'background:#1890ff;color:#fff':'background:#f0f0f0;color:#555')+'" onclick="window._czscBoardFilter(\x27'+b.k+'\x27)">'+b.l+'</span>';
+    });
     // 结果计数
-    h += '<div style="margin-left:auto;font-size:12px;color:#999">\u663e\u793a '+sigs.length+'/'+allSigs.length+' \u00b7 \u6807\u7684\u6c60'+(data.pool_size||'-')+'\u53ea</div>';
+    h += '<div style="margin-left:auto;font-size:12px;color:#999">显示 '+sigs.length+'/'+allSigs.length;
+    if(data.pool_tiers){var _pt=data.pool_tiers;h+=' · 覆盖 '+(data.pool_size||'-')+'只 (A'+_pt.A+'/B'+_pt.B+'/C'+_pt.C+'/D'+_pt.D+')';}else{h+=' · 标的池'+(data.pool_size||'-')+'只';}
+    h += '</div>';
     h += '</div>';
 
     // === 信号列表 ===
     // === SECTION 1: 今日信号(可操作) ===
     h += '<div style="margin-bottom:24px">';
     h += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #52c41a;padding-bottom:6px">\ud83c\udfaf \u4eca\u65e5\u4fe1\u53f7 <span style="font-size:12px;color:#999;font-weight:400">\u660e\u65e5\u5f00\u76d8\u53ef\u64cd\u4f5c</span></h4>';
-    var todaySigs = (data.today_signals||[]).filter(function(s){return F.types.indexOf(s.type)>=0;});
+    var todaySigs = (data.today_signals||[]).filter(function(s){if(F.types.indexOf(s.type)<0)return false;if(F.board&&F.board!=='all'&&s.board!==F.board)return false;if(s.stop_loss_pct>F.maxSl)return false;if(F.hideWeak&&!s.weekly_allow)return false;return true;});
     if(!todaySigs.length){
-      h += '<div style="text-align:center;padding:30px 20px;color:#bbb;background:#fafafa;border-radius:8px">';
-      h += '<div style="font-size:28px;margin-bottom:6px">\ud83d\udca4</div>';
-      h += '\u4eca\u65e5\u65e0\u65b0\u4fe1\u53f7\uff0c\u4f11\u606f\u65e5\u6216\u65e0\u7b26\u5408\u6761\u4ef6\u7684\u6807\u7684</div>';
+      h += '<div style="text-align:center;padding:30px 20px;color:#666;background:#fafafa;border-radius:8px">';
+      h += '<div style="font-size:28px;margin-bottom:6px">📊</div>';
+      h += '<div style="font-size:14px;font-weight:500;margin-bottom:8px">当前无新信号</div>';
+      h += '<div style="font-size:12px;color:#999;max-width:400px;margin:0 auto;line-height:1.8">';
+      var reason = '';
+      if(mkt.in_pivot) reason = '大盘处于中枢内震荡('+mkt.zd+'~'+mkt.zg+')，多数标的结构未确认新买卖点';
+      else if(!mkt.bullish) reason = '大盘趋势偏空，不主动寻找做多机会';
+      else reason = '市场活跃但各级别结构尚未到达转折点';
+      h += reason + '<br>';
+      h += '标的池覆盖 '+(data.pool_size||'-')+' 只A股(日均成交额≥2亿)';
+      if(data.pool_tiers) h += '，分布: 🔴龙头'+data.pool_tiers.A+' 🟠主力'+data.pool_tiers.B+' 🟡活跃'+data.pool_tiers.C+' 🟢机会'+data.pool_tiers.D;
+      h += '<br><span style="color:#1890ff">下一个交易日收盘后自动扫描，有信号时推送通知</span>';
+      h += '</div></div>';
     } else {
       todaySigs.forEach(function(s){
         var isBuy=s.type.startsWith('buy');var accent=isBuy?'#52c41a':'#f5222d';
         var pnl=s.pnl_pct||0;var pnlColor=pnl>0?'#f5222d':pnl<0?'#52c41a':'#999';
         h += '<div style="border:1px solid #f0f0f0;border-left:4px solid '+accent+';border-radius:10px;padding:14px 18px;margin-bottom:10px;background:#fcfff8">';
         h += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
-        h += '<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer" onclick="czscShowDetail(\x27'+s.code+'\x27,\x27'+(s.name||'')+'\x27)">'+s.code+'</span>';
+        var tierColors={A:'#f5222d',B:'#fa8c16',C:'#faad14',D:'#52c41a'};var tierLabels={A:'龙头',B:'主力',C:'活跃',D:'机会'};
+        var tBadge=s.tier?'<span style="font-size:10px;color:#fff;background:'+(tierColors[s.tier]||'#999')+';padding:1px 5px;border-radius:3px;margin-right:4px">'+(tierLabels[s.tier]||s.tier)+'</span>':'';
+        var freshBadge=s.freshness==='fresh'?'<span style="font-size:10px;color:#52c41a;border:1px solid #52c41a;padding:0 4px;border-radius:3px">今日</span>':'<span style="font-size:10px;color:#fa8c16;border:1px solid #fa8c16;padding:0 4px;border-radius:3px">可操作</span>';
+        h += '<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer" onclick="czscShowDetail(\x27'+s.code+'\x27,\x27'+(s.name||'')+'\x27)">'+tBadge+s.code+'</span>';
+        h += ' '+freshBadge;
         h += '<span style="font-size:14px;color:#333">'+(s.name||'')+'</span>';
         h += '<span style="background:'+accent+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+(typeMap[s.type]||s.type)+'</span>';
         if(s.grade_label) h += '<span style="font-size:12px;margin-left:3px">'+s.grade_label+'</span>';
@@ -4050,13 +4079,60 @@ async function loadChanlunCzsc(el){
     h += '</div>';
 
     // === SECTION 3: 信号回顾(复盘) ===
-    h += '<details style="margin-bottom:20px">';
-    h += '<summary style="cursor:pointer;font-size:16px;font-weight:600;color:#333;border-bottom:2px solid #722ed1;padding-bottom:6px;margin-bottom:12px">\ud83d\udcca \u4fe1\u53f7\u56de\u987e <span style="font-size:12px;color:#999;font-weight:400">\u5c55\u5f00\u67e5\u770b\u5386\u53f2\u4fe1\u53f7\u8868\u73b0</span></summary>';
-    h += '<div style="padding:12px;background:#fafafa;border-radius:8px;font-size:12px;color:#666">';
-    h += '<p>\u5386\u53f2\u4fe1\u53f7\u5df2\u5f52\u6863\u5230\u6570\u636e\u5e93\uff0c\u6bcf\u5468\u590d\u76d8\u65f6\u56de\u586b\u7ed3\u679c\u3002</p>';
-    h += '<p>\u590d\u76d8\u6307\u6807: \u80dc\u7387 / \u76c8\u4e8f\u6bd4 / \u5e73\u5747\u6301\u4ed3\u5929\u6570 / \u6700\u5927\u56de\u64a4</p>';
-    h += '<p style="color:#999">\u6570\u636e\u7d2f\u79ef\u4e2d\uff0c\u9996\u6b21\u590d\u76d8\u5c06\u5728\u4e0b\u5468\u4e94\u8fdb\u884c...</p>';
-    h += '</div></details>';
+    // 异步加载复盘数据
+    h += '<div id="czscReviewSection" style="margin-bottom:20px"><div style="text-align:center;padding:20px;color:#bbb">加载复盘数据...</div></div>';
+    setTimeout(async function(){
+      var rv = await apiV("/api/chanlun/review");
+      var rEl = document.getElementById("czscReviewSection");
+      if(!rEl) return;
+      var rh = '';
+      rh += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #722ed1;padding-bottom:6px">📊 信号复盘 <span style="font-size:12px;color:#999;font-weight:400">历史信号表现统计</span></h4>';
+      if(!rv || !rv.total){
+        rh += '<div style="padding:20px;background:#fafafa;border-radius:8px;text-align:center;color:#999">暂无已完成信号，数据累积中...</div>';
+      } else {
+        // 总览指标
+        rh += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">';
+        rh += '<div style="background:#f6ffed;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">总信号</div><b style="font-size:18px">'+rv.total+'</b></div>';
+        rh += '<div style="background:'+(rv.win_rate>=50?'#f6ffed':'#fff2f0')+';padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">胜率</div><b style="font-size:18px;color:'+(rv.win_rate>=50?'#52c41a':'#f5222d')+'">'+rv.win_rate+'%</b></div>';
+        rh += '<div style="background:#e6f7ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">盈亏比</div><b style="font-size:18px">'+rv.profit_loss_ratio+'</b></div>';
+        rh += '<div style="background:#fff7e6;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">平均持仓</div><b style="font-size:18px">'+rv.avg_hold_days+'天</b></div>';
+        rh += '<div style="background:#f9f0ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">出场分布</div><b style="font-size:12px">止损'+(rv.exit_reasons?rv.exit_reasons.stop_loss:0)+'/达标'+(rv.exit_reasons?rv.exit_reasons.target_hit:0)+'/过期'+(rv.exit_reasons?rv.exit_reasons.expired:0)+'</b></div>';
+        rh += '</div>';
+        // 分类型表现
+        if(rv.by_type){
+          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按信号类型:</b></div>';
+          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+          var typeNames={buy1:'一买',buy2:'二买',buy3:'三买',sell1:'一卖',sell2:'二卖',sell3:'三卖'};
+          Object.keys(rv.by_type).forEach(function(t){var d=rv.by_type[t];
+            var color=d.avg_pnl>=0?'#52c41a':'#f5222d';
+            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(typeNames[t]||t)+'</b> 共'+d.total+'笔 胜率<span style="color:'+color+'">'+d.win_rate+'%</span> 均盈<span style="color:'+color+'">'+d.avg_pnl+'%</span></div>';
+          });
+          rh += '</div>';
+        }
+        // 分Tier表现
+        if(rv.by_tier){
+          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按流动性层级:</b></div>';
+          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+          var tierIcons={A:'🔴',B:'🟠',C:'🟡',D:'🟢'};
+          Object.keys(rv.by_tier).forEach(function(t){var d=rv.by_tier[t];
+            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px">'+(tierIcons[t]||'')+'<b>'+t+'层</b> '+d.total+'笔 胜率'+d.win_rate+'% 均盈'+d.avg_pnl+'%</div>';
+          });
+          rh += '</div>';
+        }
+        // 分板块表现
+        if(rv.by_board){
+          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按板块:</b></div>';
+          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+          var boardNames={main:'主板',gem:'创业板',star:'科创板',bse:'北交所'};
+          Object.keys(rv.by_board).forEach(function(b){var d=rv.by_board[b];
+            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(boardNames[b]||b)+'</b> '+d.total+'笔 胜率'+d.win_rate+'% 均盈'+d.avg_pnl+'%</div>';
+          });
+          rh += '</div>';
+        }
+        rh += '<div style="font-size:11px;color:#bbb;margin-top:8px">更新: '+(rv.generated_at||'-')+' · 每日16:00自动回填 · 持仓上限10天</div>';
+      }
+      rEl.innerHTML = rh;
+    }, 100);
 
 
 
@@ -4166,6 +4242,10 @@ async function loadChanlunCzsc(el){
   };
   window._czscHideWeak = function(cb){
     F.hideWeak=cb.checked;
+    renderAll();
+  };
+  window._czscBoardFilter = function(b){
+    F.board=b;
     renderAll();
   };
 

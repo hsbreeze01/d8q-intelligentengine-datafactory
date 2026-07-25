@@ -1,5 +1,6 @@
 """任务调度器 - 根据freq字段和run_at时间定时执行创作和发布任务"""
 import fcntl
+import glob
 import json
 import logging
 import os
@@ -10,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 
 # 预警扫描
-_alert_scan_last_run = ""
+# _alert_scan_last_run replaced by file-based dedup
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,29 @@ logger.setLevel(logging.INFO)
 TASKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "content_tasks.json")
 EXEC_LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "exec_log.json")
 LOCK_PATH = "/tmp/d8q_scheduler.lock"
+
+_RUN_MARKER_DIR = "/tmp/d8q_scheduler_markers"
+os.makedirs(_RUN_MARKER_DIR, exist_ok=True)
+
+def _already_ran_today(task_name):
+    """File-based dedup: prevents same task running twice across multiple workers."""
+    from datetime import datetime
+    marker = os.path.join(_RUN_MARKER_DIR, f"{task_name}_{datetime.now().strftime('%Y-%m-%d')}")
+    if os.path.exists(marker):
+        return True
+    # Create marker
+    with open(marker, 'w') as f:
+        f.write(datetime.now().isoformat())
+    # Clean old markers (>2 days)
+    import glob
+    for old in glob.glob(os.path.join(_RUN_MARKER_DIR, f"{task_name}_*")):
+        if old != marker:
+            try:
+                os.remove(old)
+            except:
+                pass
+    return False
+
 
 # 热度聚合脚本路径
 sys.path.insert(0, "/home/ecs-assist-user/d8q-data-agent/scripts")
@@ -257,13 +281,13 @@ def _run_daily_extras():
 
 def _run_alert_scan():
     """每30分钟执行一次预警扫描"""
-    global _alert_scan_last_run
+    # file-based dedup
     now = datetime.now()
     # 每30分钟执行一次
     current_slot = now.strftime("%Y-%m-%d %H:") + ("00" if now.minute < 30 else "30")
-    if _alert_scan_last_run == current_slot:
+    if _already_ran_today(f"alert_scan_{current_slot}"):
         return
-    _alert_scan_last_run = current_slot
+
     try:
         from alert_scanner import scan_all_alerts
         logger.info("执行预警扫描任务")
@@ -347,22 +371,20 @@ def daily_score_calculation():
 
 
 # === 缠论每日扫描+推送 ===
-_chanlun_scan_last_run = ""
+# _chanlun_scan_last_run replaced by file-based _already_ran_today
 
 def _run_chanlun_scan():
     """每日15:35执行：触发compass缠论扫描 -> 高分信号推送企微"""
-    global _chanlun_scan_last_run
     import urllib.request
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    if _chanlun_scan_last_run == today:
+    if _already_ran_today("chanlun_scan"):
         return
     # 工作日 15:35 触发（A股收盘后5分钟）
     if now.weekday() > 4:  # 周末跳过
         return
     if now.hour != 15 or now.minute < 35 or now.minute > 40:
         return
-    _chanlun_scan_last_run = today
     logger.info("开始缠论每日扫描任务")
 
     # Step 1: 触发compass扫描
@@ -416,21 +438,19 @@ def _run_chanlun_scan():
 
 
 # === 纪律化策略扫描（独立入口）===
-_disciplined_scan_last_run = ""
+# _disciplined_scan_last_run replaced by file-based _already_ran_today
 
 def _run_disciplined_scan():
     """每日15:37执行：纪律化策略独立扫描+推送（晚于原chanlun_scan 2分钟）"""
-    global _disciplined_scan_last_run
     import subprocess
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    if _disciplined_scan_last_run == today:
+    if _already_ran_today("disciplined_scan"):
         return
     if now.weekday() > 4:
         return
     if now.hour != 15 or now.minute < 37 or now.minute > 42:
         return
-    _disciplined_scan_last_run = today
     logger.info("开始纪律化策略扫描任务")
     try:
         result = subprocess.run(
@@ -448,22 +468,20 @@ def _run_disciplined_scan():
 
 
 
-_czsc_scan_last_run = ""
+# _czsc_scan_last_run replaced by file-based _already_ran_today
 
 def _run_czsc_scan():
     """每日15:40执行：czsc新引擎扫描(灰度，与旧引擎并行)"""
-    global _czsc_scan_last_run
     from datetime import datetime
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    if _czsc_scan_last_run == today:
+    if _already_ran_today("czsc_scan"):
         return
     # 工作日 15:40 触发
     if now.weekday() >= 5:
         return
     if now.hour != 15 or now.minute < 40 or now.minute > 45:
         return
-    _czsc_scan_last_run = today
     import subprocess
     try:
         logger.info("czsc扫描开始...")
@@ -477,6 +495,33 @@ def _run_czsc_scan():
             logger.error("czsc扫描异常: %s", result.stderr[:500])
     except Exception as e:
         logger.error("czsc扫描异常: %s", e)
+
+
+
+# === 信号复盘回填(16:00) ===
+def _run_signal_review():
+    """每日16:00执行：回填已产出信号的后续走势结果"""
+    from datetime import datetime
+    now = datetime.now()
+    if now.weekday() >= 5:
+        return
+    if now.hour != 16 or now.minute > 5:
+        return
+    if _already_ran_today("signal_review"):
+        return
+    import subprocess
+    try:
+        logger.info("信号复盘开始...")
+        result = subprocess.run(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signal_review.py"],
+            capture_output=True, text=True, timeout=60
+        )
+        logger.info("信号复盘完成: %s", result.stdout.strip())
+        if result.returncode != 0:
+            logger.error("信号复盘异常: %s", result.stderr[:300])
+    except Exception as e:
+        logger.error("信号复盘异常: %s", e)
 
 
 def _tick():
@@ -507,6 +552,9 @@ def _tick():
 
         # czsc新引擎扫描(15:40, 灰度并行)
         _run_czsc_scan()
+
+        # 信号复盘回填(16:00)
+        _run_signal_review()
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()

@@ -222,10 +222,10 @@ def scan_stock_alerts(rules):
                     continue
                 # 获取最近有较大变化的股票
                 rows = conn.execute(
-                    "SELECT stock_code, stock_name, score, prev_score "
-                    "FROM score_history "
-                    "WHERE abs(score - prev_score) > ? "
-                    "AND created_at > datetime('now', '-30 minutes') "
+                    "SELECT s1.stock_code, s1.stock_name, s1.total_score as score, COALESCE(s2.total_score, s1.total_score) as prev_score "
+                    "FROM score_history s1 LEFT JOIN score_history s2 ON s1.stock_code = s2.stock_code AND s2.date = (SELECT MAX(date) FROM score_history s3 WHERE s3.stock_code = s1.stock_code AND s3.date < s1.date) "
+                    "WHERE abs(s1.total_score - COALESCE(s2.total_score, s1.total_score)) > ? "
+                    "AND s1.created_at > datetime('now', '-30 minutes') "
                     "LIMIT 5",
                     (threshold,)
                 ).fetchall()
