@@ -4040,7 +4040,7 @@ async function loadChanlunCzsc(el){
         h += '</div>';
         h += '<div style="font-size:13px;color:#333;padding:8px 12px;background:#f6ffed;border-radius:6px;border:1px solid #b7eb8f">';
         var _eLo=(s.entry_zone_low||(s.price*0.97).toFixed(2));var _eHi=(s.entry_zone_high||(s.price*1.03).toFixed(2));
-        h += '<b>\ud83c\udfaf \u64cd\u4f5c:</b> '+(s.action||('\u6b21\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+_eLo+'~'+_eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%'));
+        h += '<b>\ud83c\udfaf \u64cd\u4f5c:</b> '+(s.action||('\u4e0b\u4e00\u4ea4\u6613\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+_eLo+'~'+_eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%'));
         if(s.resonance) h += '<br>\ud83d\udd25 <b style="color:#722ed1">\u9898\u6750\u5171\u632f:</b> <span style="color:#722ed1">'+s.resonance+'</span>';
         h += '</div>';
         h += '</div>';
@@ -4409,7 +4409,7 @@ async function loadCzscHistory() {
       html+='<div>\u8d8b\u52bf '+(trendMap[s.trend_type]||s.trend_type||'-')+'</div>';
       html+='</div>';
       html+='<div style="font-size:13px;color:#333;padding:8px 12px;background:#f6ffed;border-radius:6px;border:1px solid #b7eb8f">';
-      html+='<b>\ud83c\udfaf \u64cd\u4f5c:</b> \u6b21\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+eLo+'~'+eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%';
+      html+='<b>\ud83c\udfaf \u64cd\u4f5c:</b> \u4e0b\u4e00\u4ea4\u6613\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+eLo+'~'+eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%';
       if(rt) html+='<br><b style="color:#666">\u4fe1\u53f7\u7406\u7531:</b> '+rt;
       html+='</div>';
       html+='</div>';
