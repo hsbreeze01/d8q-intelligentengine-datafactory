@@ -471,30 +471,82 @@ def _run_disciplined_scan():
 # _czsc_scan_last_run replaced by file-based _already_ran_today
 
 def _run_czsc_scan():
-    """每日15:40执行：czsc新引擎扫描(灰度，与旧引擎并行)"""
+    """每日18:00开始，数据未就绪时每小时重试，直到21:00放弃"""
     from datetime import datetime
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-    if _already_ran_today("czsc_scan"):
-        return
-    # 工作日 15:40 触发
     if now.weekday() >= 5:
         return
-    if now.hour != 15 or now.minute < 40 or now.minute > 45:
+    # 时间窗口: 18:00 - 21:00
+    if now.hour < 18 or now.hour >= 21:
         return
+
+    # 检查今日是否已成功完成
+    if _already_ran_today("czsc_scan_done"):
+        return
+
+    # 读取重试状态
+    status_file = "/var/log/d8q/czsc_scan_status.json"
+    retry_count = 0
+    last_result = None
+    try:
+        with open(status_file, "r") as f:
+            status = json.load(f)
+            if status.get("last_run", "").startswith(today):
+                retry_count = status.get("retry_count", 0)
+                last_result = status.get("reason", "")
+    except Exception:
+        pass
+
     import subprocess
     try:
-        logger.info("czsc扫描开始...")
+        logger.info("czsc扫描开始 (第%d次尝试)...", retry_count + 1)
         result = subprocess.run(
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
              "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py", "--push"],
             capture_output=True, text=True, timeout=300
         )
-        logger.info("czsc扫描完成: %s", result.stdout.strip())
+        output = result.stdout.strip()[:500]
+
+        if 'data_not_ready' in output:
+            retry_count += 1
+            logger.info("czsc扫描: 数据未就绪 (第%d次重试)", retry_count)
+            # 保存状态
+            try:
+                with open(status_file, "w") as f:
+                    json.dump({"last_run": now.strftime("%Y-%m-%d %H:%M:%S"),
+                               "skipped": True, "reason": "data_not_ready",
+                               "retry_count": retry_count}, f)
+            except Exception:
+                pass
+            _log_event("scan_retry", "czsc_scan", "warn",
+                       f"数据未就绪，第 {retry_count} 次重试 (将在1小时后重试)")
+            return
+
+        # 扫描成功
+        logger.info("czsc扫描完成: %s", output)
         if result.returncode != 0:
             logger.error("czsc扫描异常: %s", result.stderr[:500])
+            _log_event("scan_error", "czsc_scan", "error", f"扫描异常: {result.stderr[:200]}")
+        else:
+            # 标记今日完成
+            try:
+                with open(status_file, "w") as f:
+                    json.dump({"last_run": now.strftime("%Y-%m-%d %H:%M:%S"),
+                               "skipped": False, "reason": "success",
+                               "retry_count": retry_count}, f)
+            except Exception:
+                pass
+            _log_event("scan_success", "czsc_scan", "info",
+                       f"扫描完成，第 {retry_count + 1} 次尝试成功")
+            # 标记今日已完成，后续不再重试
+            marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{today}")
+            with open(marker, "w") as f:
+                f.write(now.isoformat())
+
     except Exception as e:
         logger.error("czsc扫描异常: %s", e)
+        _log_event("scan_exception", "czsc_scan", "error", f"扫描异常: {str(e)[:200]}")
 
 
 
@@ -527,7 +579,12 @@ def _run_signal_review():
 
 # === 周五复盘周报(16:30) ===
 def _run_weekly_review():
-    """每周五16:30执行：生成周报+参数建议+推送"""
+    """每周五16:30执行：czsc信号周复盘(可操作性验证+盈亏统计)+推送
+
+    P2-2 注: 函数名沿用历史命名, 但实际执行的是 review_weekly.py(买卖分开评估、
+    5日观察窗口完整性校验)。旧的 weekly_review.py 已无调用方,
+    已归档为 weekly_review.py.deprecated。
+    """
     from datetime import datetime
     now = datetime.now()
     if now.weekday() != 4:  # 只在周五执行
@@ -538,16 +595,17 @@ def _run_weekly_review():
         return
     import subprocess
     try:
-        logger.info("周报生成开始...")
+        logger.info("czsc周复盘开始...")
         result = subprocess.run(
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
-             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/weekly_review.py",
-             "--push"],
-            capture_output=True, text=True, timeout=60
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/review_weekly.py"],
+            capture_output=True, text=True, timeout=120
         )
-        logger.info("周报完成: %s", result.stdout.strip()[:200])
+        logger.info("czsc周复盘完成: %s", result.stdout.strip()[:200])
+        if result.returncode != 0:
+            logger.error("czsc周复盘stderr: %s", result.stderr[:500])
     except Exception as e:
-        logger.error("周报异常: %s", e)
+        logger.error("czsc周复盘异常: %s", e)
 
 
 # === 实验组扫描(15:42, 与default并行) ===
@@ -574,6 +632,95 @@ def _run_experimental_scan():
     except Exception as e:
         logger.error("实验组扫描异常: %s", e)
 
+
+# === Pipeline 健康检查与自动恢复 ===
+_PIPELINE_FAIL_COUNT = 0
+_PIPELINE_MAX_FAILS = 3
+
+def _check_pipeline_health():
+    """Check if pipeline daily process is alive; restart if dead during trading hours."""
+    global _PIPELINE_FAIL_COUNT
+    now = datetime.now()
+    # Only check during trading hours + pipeline window (9:00 - 18:00)
+    if now.hour < 9 or now.hour >= 18:
+        return
+    # Weekend skip
+    if now.weekday() >= 5:
+        return
+
+    import subprocess
+    pipeline_alive = False
+    try:
+        ps_result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
+        for line in ps_result.stdout.split("\n"):
+            if "pipeline.py" in line and "--mode daily" in line and "grep" not in line:
+                pipeline_alive = True
+                break
+    except Exception:
+        pass
+
+    if pipeline_alive:
+        _PIPELINE_FAIL_COUNT = 0
+        return
+
+    _PIPELINE_FAIL_COUNT += 1
+    if _PIPELINE_FAIL_COUNT > _PIPELINE_MAX_FAILS:
+        logger.warning("Pipeline 连续失败 %d 次，停止自动恢复", _PIPELINE_FAIL_COUNT)
+        _log_event("pipeline_max_retries", "pipeline", "critical",
+                   f"Pipeline 连续失败 {_PIPELINE_FAIL_COUNT} 次，需人工介入")
+        return
+
+    logger.warning("Pipeline 进程不存在，尝试自动恢复 (第%d次)", _PIPELINE_FAIL_COUNT)
+    _log_event("pipeline_failure", "pipeline", "error",
+               f"Pipeline 进程不存在，第 {_PIPELINE_FAIL_COUNT} 次自动恢复尝试")
+
+    try:
+        subprocess.Popen(
+            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
+             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/scripts/pipeline.py",
+             "--mode", "daily"],
+            stdout=open("/var/log/d8q/datapipeline.log", "a"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            cwd="/home/ecs-assist-user/d8q-intelligentengine-stockcompass"
+        )
+        logger.info("Pipeline 自动恢复启动成功")
+        _log_event("pipeline_recovery", "pipeline", "info",
+                   f"Pipeline 自动恢复成功 (第 {_PIPELINE_FAIL_COUNT} 次)")
+    except Exception as e:
+        logger.error("Pipeline 自动恢复失败: %s", e)
+        _log_event("pipeline_recovery_failed", "pipeline", "error",
+                   f"Pipeline 自动恢复失败: {str(e)[:200]}")
+
+
+def _log_event(event_type, component, severity, message, detail=None):
+    """Write event to system_events table via datafactory API or direct DB."""
+    try:
+        import urllib.request
+        body = json.dumps({"event_type": event_type, "component": component,
+                           "severity": severity, "message": message,
+                           "detail": detail}).encode()
+        req = urllib.request.Request("http://127.0.0.1:8088/api/monitor/events",
+                                    data=body, method="POST",
+                                    headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            pass
+    except Exception:
+        # Fallback: write directly to SQLite
+        try:
+            import sqlite3
+            db_path = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
+            conn = sqlite3.connect(db_path)
+            conn.execute(
+                "INSERT INTO system_events (event_type, component, severity, message, detail_json) VALUES (?,?,?,?,?)",
+                (event_type, component, severity, message, json.dumps(detail) if detail else None)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -587,6 +734,9 @@ def _tick():
         now = datetime.now()
         tasks = _load_tasks()
         changed = False
+
+        # Pipeline 健康检查
+        _check_pipeline_health()
 
         # 每日附加任务
         _run_daily_extras()

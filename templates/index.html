@@ -4031,13 +4031,16 @@ async function loadChanlunCzsc(el){
         if(s.score) h += '<span style="font-size:11px;color:#fa8c16;font-weight:600;border:1px solid #fa8c16;padding:1px 6px;border-radius:8px;margin-left:4px">'+s.score+'\u5206</span>';
         h += '</div>';
         h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px 12px;font-size:12px;color:#555;padding:8px 10px;background:rgba(255,255,255,0.8);border-radius:6px;margin-bottom:8px">';
+        h += '<div>\u5efa\u8bae\u4e70\u5165 <b>'+(s.entry_price||s.price).toFixed(2)+'</b></div>';
+        h += '<div>\u53ef\u4e70\u533a\u95f4 <b>'+(s.entry_zone_low||(s.price*0.97).toFixed(2))+'~'+(s.entry_zone_high||(s.price*1.03).toFixed(2))+'</b></div>';
         h += '<div>\u4fe1\u53f7\u4ef7 <b>'+s.price.toFixed(2)+'</b></div>';
-        h += '<div>\u6b62\u635f <b>'+s.stop_loss.toFixed(2)+'</b> (5%)</div>';
+        h += '<div>\u6b62\u635f <b>'+s.stop_loss.toFixed(2)+'</b> ('+(s.stop_loss_pct||5)+'%)</div>';
         h += '<div>\u73b0\u4ef7 <b>'+(s.last_close||'-')+'</b></div>';
         h += '<div>\u5468\u7ebf '+(s.weekly_allow?'\u2713':'\u2717')+' '+(trendMap[s.weekly_trend]||'')+'</div>';
         h += '</div>';
         h += '<div style="font-size:13px;color:#333;padding:8px 12px;background:#f6ffed;border-radius:6px;border:1px solid #b7eb8f">';
-        h += '<b>\ud83c\udfaf \u64cd\u4f5c:</b> '+(s.action||'\u660e\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u540e\u6267\u884c');
+        var _eLo=(s.entry_zone_low||(s.price*0.97).toFixed(2));var _eHi=(s.entry_zone_high||(s.price*1.03).toFixed(2));
+        h += '<b>\ud83c\udfaf \u64cd\u4f5c:</b> '+(s.action||('\u6b21\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+_eLo+'~'+_eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%'));
         if(s.resonance) h += '<br>\ud83d\udd25 <b style="color:#722ed1">\u9898\u6750\u5171\u632f:</b> <span style="color:#722ed1">'+s.resonance+'</span>';
         h += '</div>';
         h += '</div>';
@@ -4225,6 +4228,21 @@ async function loadChanlunCzsc(el){
 
     h += '<div style="margin-top:12px;text-align:center;font-size:11px;color:#ccc">\u26a0\ufe0f \u7070\u5ea6\u5bf9\u6bd4\u4e2d\uff0c\u4ec5\u4f9b\u7814\u7a76\u53c2\u8003\uff0c\u4e0d\u6784\u6210\u6295\u8d44\u5efa\u8bae</div>';
     h += '</div>';
+    // === 历史信号查询板块 ===
+    h += '<div style="margin-top:32px;border-top:2px solid #f0f0f0;padding-top:20px">';
+    h += '<h4 style="margin:0 0 16px;font-size:18px;color:#333;border-left:4px solid #1890ff;padding-left:12px">\ud83d\udcdc \u5386\u53f2\u4fe1\u53f7\u67e5\u8be2</h4>';
+    h += '<div style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:16px">';
+    h += '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
+    h += '<div><label style="font-size:13px;color:#666;display:block;margin-bottom:4px">\u5f00\u59cb\u65e5\u671f:</label>';
+    h += '<input type="date" id="czscHistoryStartDate" style="padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px"></div>';
+    h += '<div><label style="font-size:13px;color:#666;display:block;margin-bottom:4px">\u7ed3\u675f\u65e5\u671f:</label>';
+    h += '<input type="date" id="czscHistoryEndDate" style="padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px"></div>';
+    h += '<button onclick="loadCzscHistory()" style="margin-top:18px;padding:8px 16px;background:#1890ff;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">\u67e5\u8be2</button>';
+    h += '<button onclick="resetCzscHistoryDates()" style="margin-top:18px;padding:8px 16px;background:#f0f0f0;color:#333;border:none;border-radius:6px;cursor:pointer;font-size:14px">\u91cd\u7f6e(\u8fd1\u4e24\u5929)</button>';
+    h += '</div></div>';
+    h += '<div id="czscHistoryStatus" style="background:#e6f7ff;border:1px solid #91d5ff;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#666">\ud83d\udcc5 \u9009\u62e9\u65e5\u671f\u8303\u56f4\u540e\u70b9\u51fb\u300c\u67e5\u8be2\u300d\u6309\u94ae</div>';
+    h += '<div id="czscHistoryResults"><div style="text-align:center;padding:30px;color:#999">\u6682\u65e0\u67e5\u8be2\u7ed3\u679c</div></div>';
+    h += '</div>';
     el.innerHTML = h;
   }
 
@@ -4330,5 +4348,83 @@ async function czscShowDetail(code, name){
     });
   },200);
 }
+
+
+function resetCzscHistoryDates() {
+  var end = new Date();
+  var start = new Date();
+  start.setDate(start.getDate() - 1);
+  var s = document.getElementById('czscHistoryStartDate');
+  var e = document.getElementById('czscHistoryEndDate');
+  if(s) s.value = fmtDate(start);
+  if(e) e.value = fmtDate(end);
+  loadCzscHistory();
+}
+
+function fmtDate(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+async function loadCzscHistory() {
+  var sd = document.getElementById('czscHistoryStartDate').value;
+  var ed = document.getElementById('czscHistoryEndDate').value;
+  var st = document.getElementById('czscHistoryStatus');
+  var rs = document.getElementById('czscHistoryResults');
+  if(!sd||!ed){st.innerHTML='<span style="color:#f5222d">\u8bf7\u9009\u62e9\u65e5\u671f</span>';return;}
+  st.innerHTML='\u52a0\u8f7d\u4e2d...';
+  rs.innerHTML='<div style="text-align:center;padding:40px;color:#999">\u52a0\u8f7d\u4e2d...</div>';
+  try {
+    var resp = await fetch('/api/chanlun/czsc/history?start_date='+sd+'&end_date='+ed+'&limit=500');
+    var data = await resp.json();
+    if(data.error){st.innerHTML='<span style="color:#f5222d">\u67e5\u8be2\u5931\u8d25</span>';return;}
+    st.innerHTML='\u627e\u5230 '+data.count+' \u6761\u4fe1\u53f7';
+    if(!data.signals||!data.signals.length){rs.innerHTML='<div style="text-align:center;padding:40px;color:#666">\u65e0\u4fe1\u53f7\u6570\u636e</div>';return;}
+    var typeMap={buy1:'\u4e00\u4e70',buy2:'\u4e8c\u4e70',buy3:'\u4e09\u4e70',sell1:'\u4e00\u5356',sell2:'\u4e8c\u5356',sell3:'\u4e09\u5356'};
+    var reasonMap={'trend_bottom_divergence':'\u4e0b\u8dcc\u8d8b\u52bf\u5e95\u90e8\u80cc\u9a70\uff0c\u52a8\u80fd\u8870\u7aed\u53cd\u8f6c\u4fe1\u53f7','trend_top_divergence':'\u4e0a\u6da8\u8d8b\u52bf\u9876\u90e8\u80cc\u9a70\uff0c\u52a8\u80fd\u8870\u7aed\u89c1\u9876\u4fe1\u53f7','consolidation_bottom_divergence':'\u9707\u8361\u533a\u95f4\u5e95\u90e8\u80cc\u9a70\uff0c\u53cd\u5f39\u6982\u7387\u5927','consolidation_top_divergence':'\u9707\u8361\u533a\u95f4\u9876\u90e8\u80cc\u9a70\uff0c\u56de\u843d\u6982\u7387\u5927','pullback_not_break_low':'\u56de\u8c03\u672a\u521b\u65b0\u4f4e\uff0c\u5e95\u90e8\u7ed3\u6784\u786e\u8ba4','breakout_pullback_above_zg':'\u7a81\u7834\u4e2d\u67a2\u540e\u56de\u8e29\uff0c\u7ad9\u7a33\u4e0a\u6cbf','rebound_not_break_high':'\u53cd\u5f39\u65e0\u529b\uff0c\u672a\u80fd\u7a81\u7834\u524d\u9ad8','breakdown_rebound_below_zd':'\u8dcc\u7834\u4e0b\u6cbf\u540e\u53cd\u62bd\u65e0\u529b'};
+    var trendMap={up_trend:'\u4e0a\u6da8\u8d8b\u52bf',down_trend:'\u4e0b\u8dcc\u8d8b\u52bf',consolidation:'\u9707\u8361\u6574\u7406'};
+    var html='';
+    data.signals.forEach(function(s){
+      var sc=s.score||0;
+      var isBuy=s.type&&s.type.indexOf('buy')===0;
+      var accent=isBuy?'#52c41a':'#f5222d';
+      var tn=typeMap[s.type]||s.type||'-';
+      var dt=s.signal_date;if(typeof dt==='string'&&dt.includes(','))dt=dt.substring(5,16).replace(',','');
+      var slp=s.price&&s.stop_loss?((parseFloat(s.price)-parseFloat(s.stop_loss))/parseFloat(s.price)*100).toFixed(1):'5';
+      var eLo=s.entry_price?(parseFloat(s.entry_price)*0.97).toFixed(2):(parseFloat(s.price)*0.97).toFixed(2);
+      var eHi=s.entry_price?(parseFloat(s.entry_price)*1.03).toFixed(2):(parseFloat(s.price)*1.03).toFixed(2);
+      var rt=reasonMap[s.reason]||s.reason||'';
+      html+='<div style="border:1px solid #f0f0f0;border-left:4px solid '+accent+';border-radius:10px;padding:14px 18px;margin-bottom:10px;background:#fcfff8">';
+      html+='<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
+      html+='<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer" onclick="czscShowDetail(\''+s.code+'\',\''+(s.name||'')+'\')">'+s.code+'</span>';
+      html+='<span style="font-size:11px;color:#52c41a;border:1px solid #52c41a;padding:0 4px;border-radius:3px">'+dt+'</span>';
+      html+='<span style="font-size:14px;color:#333">'+(s.name||'')+'</span>';
+      html+='<span style="background:'+accent+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+tn+'</span>';
+      html+='<span style="font-size:11px;color:#fa8c16;font-weight:600;border:1px solid #fa8c16;padding:1px 6px;border-radius:8px;margin-left:4px">'+sc+'\u5206</span>';
+      html+='</div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px 12px;font-size:12px;color:#555;padding:8px 10px;background:rgba(255,255,255,0.8);border-radius:6px;margin-bottom:8px">';
+      html+='<div>\u5efa\u8bae\u4e70\u5165 <b>'+eLo+'</b></div>';
+      html+='<div>\u53ef\u4e70\u533a\u95f4 <b>'+eLo+'~'+eHi+'</b></div>';
+      html+='<div>\u4fe1\u53f7\u4ef7 <b>'+s.price+'</b></div>';
+      html+='<div>\u6b62\u635f <b>'+s.stop_loss+'</b> ('+slp+'%)</div>';
+      html+='<div>\u8d8b\u52bf '+(trendMap[s.trend_type]||s.trend_type||'-')+'</div>';
+      html+='</div>';
+      html+='<div style="font-size:13px;color:#333;padding:8px 12px;background:#f6ffed;border-radius:6px;border:1px solid #b7eb8f">';
+      html+='<b>\ud83c\udfaf \u64cd\u4f5c:</b> \u6b21\u65e5\u5f00\u76d8\u786e\u8ba4\u4ef7\u683c\u5728'+eLo+'~'+eHi+'\u533a\u95f4\u5185\u4e70\u5165\uff0c\u4ed3\u4f4d20%';
+      if(rt) html+='<br><b style="color:#666">\u4fe1\u53f7\u7406\u7531:</b> '+rt;
+      html+='</div>';
+      html+='</div>';
+    });
+    rs.innerHTML=html;
+    if(!document.getElementById('czscHistoryStartDate').value)resetCzscHistoryDates();
+  } catch(e) {
+    st.innerHTML='<span style="color:#f5222d">\u7f51\u7edc\u9519\u8bef</span>';
+  }
+}
+
+window.addEventListener('DOMContentLoaded',function(){
+  setTimeout(function(){
+    if(document.getElementById('czscHistoryStartDate'))resetCzscHistoryDates();
+  },1000);
+});
 
 </script>

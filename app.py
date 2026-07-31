@@ -3314,6 +3314,47 @@ def rec_backfill_trigger():
         conn.commit()
     return jsonify({"filled": filled})
 
+
+
+@app.route("/api/chanlun/czsc/history", methods=["GET"])
+def chanlun_czsc_history():
+    import pymysql
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    code = request.args.get("code", "")
+    limit = request.args.get("limit", 200, type=int)
+
+    DB = {"host":"127.0.0.1","port":3306,"user":"root","password":"password","database":"stock_analysis_system","charset":"utf8mb4"}
+    try:
+        conn = pymysql.connect(**DB)
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+
+        query = "SELECT signal_date, code, name, type, price, stop_loss, score, grade, reason, trend_type, weekly_trend, divergence, div_ratio, market_attitude, market_env_score, seg_zg, seg_zd, entry_price, profile FROM czsc_signal_history WHERE 1=1"
+        params = []
+
+        if start_date:
+            query += " AND signal_date >= %s"
+            params.append(start_date)
+        if end_date:
+            query += " AND signal_date <= %s"
+            params.append(end_date)
+        if code:
+            query += " AND code = %s"
+            params.append(code)
+
+        query += " ORDER BY signal_date DESC, score DESC LIMIT %s"
+        params.append(limit)
+
+        cur.execute(query, params)
+        signals = cur.fetchall()
+
+        cur.execute("SELECT DISTINCT signal_date FROM czsc_signal_history ORDER BY signal_date DESC LIMIT 30")
+        available_dates = [str(r["signal_date"]) for r in cur.fetchall()]
+
+        conn.close()
+        return jsonify({"signals": signals, "available_dates": available_dates, "count": len(signals)})
+    except Exception as e:
+        return jsonify({"error": str(e), "signals": [], "available_dates": []})
 @app.route("/<path:path>")
 def spa_fallback(path):
     """SPA 路由 fallback — 所有非 API/static 路由返回 index.html"""

@@ -5,6 +5,296 @@
     "subject": "人工智能",
     "trigger": "scheduler",
     "success": true,
+    "result_summary": "🤖国家出手AI！这波操作炸了🔥",
+    "duration": 4.6,
+    "time": "2026-07-31T08:48:56.974080"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖OpenAI失控AI攻破第二家账户！",
+    "duration": 4.4,
+    "time": "2026-07-30T08:39:51.496132"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "英伟达豪赌5000亿算力？💥",
+    "duration": 4.4,
+    "time": "2026-07-29T08:31:43.626610"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI大佬集体护驾！联盟成立暗藏玄机？",
+    "duration": 3.6,
+    "time": "2026-07-28T08:33:41.048587"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "三星密会OpenAI，万亿AI芯片棋局曝",
+    "duration": 4.3,
+    "time": "2026-07-27T08:34:41.136676"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🍎苹果AI新Mac，性能炸裂来袭！",
+    "duration": 3.8,
+    "time": "2026-07-24T08:33:37.138875"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤯GPT-5.6失控入侵！AI自主搞事？",
+    "duration": 4.3,
+    "time": "2026-07-23T08:29:55.385218"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥算力军备赛升级！微软猛砸千亿，国产黑马",
+    "duration": 4.5,
+    "time": "2026-07-22T08:27:38.896088"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥AI落地狂飙！200亿大单背后藏了什么",
+    "duration": 4.2,
+    "time": "2026-07-21T08:33:28.828246"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI同事上线，老板们抢着租！",
+    "duration": 4.8,
+    "time": "2026-07-20T08:37:29.348056"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥AI界炸了！秒变开发大神？",
+    "duration": 4.2,
+    "time": "2026-07-19T08:58:29.205329"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖习近平放话AI大棋！30国将被改写？",
+    "duration": 4.5,
+    "time": "2026-07-18T08:29:49.516792"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖英伟达联手丰田，AI要接管未来？",
+    "duration": 3.8,
+    "time": "2026-07-17T08:34:01.917315"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI监管+音箱+手机！科技圈要变天了？",
+    "duration": 4.0,
+    "time": "2026-07-16T08:35:30.442124"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥孙正义赌上万亿，AI要变天了？",
+    "duration": 4.0,
+    "time": "2026-07-15T08:42:19.514744"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI炸裂！手机要成精了？",
+    "duration": 3.8,
+    "time": "2026-07-14T08:33:19.721376"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥AI太费电？燃气轮机价格狂飙300%！",
+    "duration": 3.5,
+    "time": "2026-07-13T08:39:13.371008"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "💸AI让物价“情绪化”？小心钱包！",
+    "duration": 4.6,
+    "time": "2026-07-12T08:49:38.370621"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤫OpenAI高管突然离职，真相是？",
+    "duration": 3.9,
+    "time": "2026-07-11T08:44:04.941189"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤯苹果偷偷搞大事！iPhone要装270",
+    "duration": 5.8,
+    "time": "2026-07-10T08:25:57.177458"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖Meta一键生成AI神图，你敢信？",
+    "duration": 3.7,
+    "time": "2026-07-09T08:39:18.094700"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "💰7.6万亿AI投资要来了？",
+    "duration": 3.8,
+    "time": "2026-07-08T08:42:42.482603"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖AI拆出超导体盲盒！",
+    "duration": 6.1,
+    "time": "2026-07-07T08:26:41.327193"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🔥鸿海AI营收暴增40%，英伟达要炸了？",
+    "duration": 4.3,
+    "time": "2026-07-06T08:53:51.120844"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "硅谷巨头秒变“铁公鸡”⁉️",
+    "duration": 3.8,
+    "time": "2026-07-05T08:36:39.049279"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖特朗普喊话AI：戴好护栏，别勒太紧！",
+    "duration": 4.1,
+    "time": "2026-07-04T08:25:04.622480"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤫OpenAI要给美国政府5%股份？",
+    "duration": 3.9,
+    "time": "2026-07-03T08:34:03.565229"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🤖松下砸5000亿日元猛攻AI，背后藏着",
+    "duration": 4.9,
+    "time": "2026-07-02T08:26:52.963001"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
+    "result_summary": "🇰🇷韩国千亿押注AI，中国却要停电了？😱",
+    "duration": 4.2,
+    "time": "2026-07-01T08:41:56.159313"
+  },
+  {
+    "task_id": "1067d48e",
+    "type": "creation",
+    "subject": "人工智能",
+    "trigger": "scheduler",
+    "success": true,
     "result_summary": "🔥AI算力告急！谷歌竟限制对手用Gemi",
     "duration": 4.6,
     "time": "2026-06-30T08:38:59.771854"
