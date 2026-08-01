@@ -471,144 +471,36 @@ def _run_disciplined_scan():
 # _czsc_scan_last_run replaced by file-based _already_ran_today
 
 def _run_czsc_scan():
-    """尽最大努力执行CZSC扫描: 15:40开始尝试, 每15分钟重试, 直到22:00放弃.
-    周六上午补跑周五数据(如果周五未成功)."""
+    """每日18:00~18:30执行：czsc新引擎扫描(等datapipeline完成后)(灰度，与旧引擎并行)"""
     from datetime import datetime
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
-
-    # Saturday morning catch-up: if Fri scan wasn't done, try 08:00-12:00
-    if now.weekday() == 5:  # Saturday
-        if now.hour < 8 or now.hour >= 12:
-            return
-        fri = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        fri_marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{fri}")
-        today_marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{today}")
-        if os.path.exists(fri_marker) or os.path.exists(today_marker):
-            return  # Friday already done
-        # Use Friday's date for logging
-        scan_date = fri
-        logger.info("周六补跑: 检查周五(%s)数据扫描", fri)
-    elif now.weekday() >= 6:  # Sunday
+    if _already_ran_today("czsc_scan"):
         return
-    else:
-        # Weekday window: 15:40 - 22:00
-        if now.hour < 15 or now.hour >= 22:
-            return
-        if now.hour == 15 and now.minute < 40:
-            return
-        scan_date = today
-
-    # Check if already done today (or for the target scan date)
-    done_marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{scan_date}")
-    if os.path.exists(done_marker):
+    # 工作日 15:40 触发
+    if now.weekday() >= 5:
         return
-
-    # Throttle: wait at least 15 minutes between attempts
-    status_file = "/var/log/d8q/czsc_scan_status.json"
-    retry_count = 0
-    last_attempt_time = None
-    try:
-        with open(status_file, "r") as f:
-            status = json.load(f)
-            if status.get("scan_date") == scan_date:
-                retry_count = status.get("retry_count", 0)
-                last_attempt_time = status.get("last_attempt", "")
-    except Exception:
-        pass
-
-    if last_attempt_time:
-        try:
-            last_dt = datetime.strptime(last_attempt_time, "%Y-%m-%d %H:%M:%S")
-            elapsed = (now - last_dt).total_seconds()
-            if elapsed < 900:  # 15 minutes
-                return
-        except Exception:
-            pass
-
-    # Run the scan
+    # datapipeline cron=16:30 耗时~90min 约18:00完成; 扫描必须在其之后
+    if not (now.hour == 18 and now.minute <= 30):
+        return
     import subprocess
-    attempt_num = retry_count + 1
-    logger.info("czsc扫描开始 (目标:%s, 第%d次尝试)...", scan_date, attempt_num)
-    _log_event("scan_attempt", "czsc_scan", "info",
-               f"开始扫描(目标:{scan_date}, 第{attempt_num}次尝试)")
-
     try:
+        logger.info("czsc扫描开始...")
         result = subprocess.run(
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
              "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py", "--push"],
             capture_output=True, text=True, timeout=300
         )
-        output = result.stdout.strip()[:500]
-        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-
-        if 'data_not_ready' in output or result.returncode != 0:
-            retry_count += 1
-            reason = "data_not_ready" if 'data_not_ready' in output else "error"
-            logger.info("czsc扫描未成功: %s (第%d次, 将在15分钟后重试)", reason, retry_count)
-            try:
-                with open(status_file, "w") as f:
-                    json.dump({"last_run": now_str, "last_attempt": now_str,
-                               "scan_date": scan_date,
-                               "skipped": True, "reason": reason,
-                               "retry_count": retry_count}, f)
-            except Exception:
-                pass
-            if reason == "data_not_ready":
-                _log_event("scan_retry", "czsc_scan", "warn",
-                           f"数据未就绪，第{retry_count}次重试(15分钟后再试)")
-            else:
-                _log_event("scan_error", "czsc_scan", "error",
-                           f"扫描异常(第{retry_count}次): {result.stderr[:200]}")
-            return
-
-        # Parse signal count from output
-        sig_count = 0
-        try:
-            for line in output.split("\n"):
-                if "signal" in line.lower() and "count" in line.lower():
-                    import re
-                    m = re.search(r'(\d+)', line)
-                    if m:
-                        sig_count = int(m.group(1))
-        except Exception:
-            pass
-
-        # Success!
-        logger.info("czsc扫描成功: %s 信号数=%d (第%d次尝试)", scan_date, sig_count, attempt_num)
-        try:
-            with open(status_file, "w") as f:
-                json.dump({"last_run": now_str, "last_attempt": now_str,
-                           "scan_date": scan_date,
-                           "skipped": False, "reason": "success",
-                           "signal_count": sig_count,
-                           "retry_count": retry_count}, f)
-        except Exception:
-            pass
-        _log_event("scan_success", "czsc_scan", "info",
-                   f"扫描完成({scan_date}): {sig_count}个信号, 第{attempt_num}次尝试成功",
-                   {"signal_count": sig_count, "attempts": attempt_num})
-        # Mark as done
-        with open(done_marker, "w") as f:
-            f.write(now.isoformat())
-
-    except subprocess.TimeoutExpired:
-        retry_count += 1
-        logger.error("czsc扫描超时(300s), 第%d次", retry_count)
-        try:
-            with open(status_file, "w") as f:
-                json.dump({"last_run": now.strftime("%Y-%m-%d %H:%M:%S"),
-                           "last_attempt": now.strftime("%Y-%m-%d %H:%M:%S"),
-                           "scan_date": scan_date,
-                           "skipped": True, "reason": "timeout",
-                           "retry_count": retry_count}, f)
-        except Exception:
-            pass
-        _log_event("scan_timeout", "czsc_scan", "error",
-                   f"扫描超时(第{retry_count}次, 15分钟后重试)")
+        output = result.stdout.strip()[:300]
+        # 数据未就绪时 czsc_scan 输出含 'data_not_ready', 不标记完成以允许重试
+        if 'data_not_ready' in output:
+            logger.info('czsc扫描: 数据未就绪, 等待下一轮重试 (%s)', output[:100])
+            return  # 不标记 _already_ran_today, 下分钟会再进入
+        logger.info('czsc扫描完成: %s', output)
+        if result.returncode != 0:
+            logger.error("czsc扫描异常: %s", result.stderr[:500])
     except Exception as e:
         logger.error("czsc扫描异常: %s", e)
-        _log_event("scan_exception", "czsc_scan", "error", f"扫描异常: {str(e)[:200]}")
 
 
 
@@ -694,201 +586,6 @@ def _run_experimental_scan():
     except Exception as e:
         logger.error("实验组扫描异常: %s", e)
 
-
-# === Pipeline 健康检查与自动恢复 ===
-_PIPELINE_FAIL_COUNT = 0
-_PIPELINE_MAX_FAILS = 3
-
-def _check_pipeline_health():
-    """Check if pipeline daemon is alive; restart if dead."""
-    global _PIPELINE_FAIL_COUNT
-    now = datetime.now()
-    # Check during broader window: 9:00 - 22:00 (covers collection + scan)
-    if now.hour < 9 or now.hour >= 22:
-        return
-    # Weekend skip (daemon handles its own schedule)
-    if now.weekday() >= 5:
-        return
-
-    import subprocess
-    daemon_alive = False
-    daily_running = False
-    try:
-        ps_result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
-        for line in ps_result.stdout.split("\n"):
-            if "pipeline.py" in line and "grep" not in line:
-                if "--mode daemon" in line:
-                    daemon_alive = True
-                if "--mode daily" in line:
-                    daily_running = True
-    except Exception:
-        pass
-
-    # Daemon is the critical process; if it's dead, try to restart
-    if daemon_alive:
-        _PIPELINE_FAIL_COUNT = 0
-        return
-
-    _PIPELINE_FAIL_COUNT += 1
-    if _PIPELINE_FAIL_COUNT > _PIPELINE_MAX_FAILS:
-        logger.warning("Pipeline daemon 连续 %d 次未检测到，停止自动恢复", _PIPELINE_FAIL_COUNT)
-        _log_event("pipeline_max_retries", "pipeline", "critical",
-                   f"Pipeline daemon 连续 {_PIPELINE_FAIL_COUNT} 次未检测到，需人工介入")
-        return
-
-    logger.warning("Pipeline daemon 不存在，尝试自动恢复 (第%d次)", _PIPELINE_FAIL_COUNT)
-    _log_event("pipeline_failure", "pipeline", "error",
-               f"Pipeline daemon 进程不存在，第 {_PIPELINE_FAIL_COUNT} 次自动恢复尝试")
-
-    try:
-        subprocess.Popen(
-            ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
-             "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/scripts/pipeline.py",
-             "--mode", "daemon"],
-            stdout=open("/var/log/d8q/datapipeline.log", "a"),
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-            cwd="/home/ecs-assist-user/d8q-intelligentengine-stockcompass"
-        )
-        logger.info("Pipeline daemon 自动恢复启动成功")
-        _log_event("pipeline_recovery", "pipeline", "info",
-                   f"Pipeline daemon 自动恢复成功 (第 {_PIPELINE_FAIL_COUNT} 次)")
-    except Exception as e:
-        logger.error("Pipeline daemon 自动恢复失败: %s", e)
-        _log_event("pipeline_recovery_failed", "pipeline", "error",
-                   f"Pipeline 自动恢复失败: {str(e)[:200]}")
-
-
-# ============================================================
-# NEW: Data collection monitor - track progress and log events
-# ============================================================
-_DATA_STATUS_FILE = "/var/log/d8q/data_status.json"
-_data_status_cache = {"_date": None}
-
-def _monitor_data_collection():
-    """Monitor daily data collection progress; log key milestones to system_events."""
-    now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
-
-    # Only monitor on weekdays during collection window (15:00 - 22:00)
-    if now.weekday() >= 5:
-        return
-    if now.hour < 15 or now.hour >= 22:
-        return
-
-    try:
-        import pymysql
-        db_cfg = {
-            "host": "127.0.0.1", "port": 3306,
-            "user": "d8q_remote", "password": "d8q_remote_pass_2026",
-            "database": "stock_analysis_system", "charset": "utf8mb4"
-        }
-        conn = pymysql.connect(**db_cfg)
-        cur = conn.cursor(pymysql.cursors.DictCursor)
-
-        # Get latest 3 dates and counts
-        cur.execute("SELECT date, COUNT(DISTINCT stock_code) as cnt "
-                    "FROM stock_data_daily GROUP BY date ORDER BY date DESC LIMIT 3")
-        rows = cur.fetchall()
-        conn.close()
-
-        if not rows:
-            return
-
-        latest_date = str(rows[0]["date"])
-        latest_count = rows[0]["cnt"]
-        ref_count = rows[1]["cnt"] if len(rows) > 1 else latest_count
-        ref_date = str(rows[1]["date"]) if len(rows) > 1 else ""
-
-        # Load previous status
-        prev = {}
-        try:
-            with open(_DATA_STATUS_FILE, "r") as f:
-                prev = json.load(f)
-        except Exception:
-            pass
-
-        curr = {"date": latest_date, "count": latest_count,
-                "ref_count": ref_count, "ref_date": ref_date,
-                "checked_at": now.strftime("%Y-%m-%d %H:%M:%S")}
-
-        # Detect state transitions
-        prev_state = prev.get("state", "")
-        is_latest_today = (latest_date == today)
-        is_ready = ref_count > 0 and latest_count >= ref_count * 0.95
-
-        # State: collecting -> ready
-        if is_latest_today and is_ready and prev_state != "ready":
-            curr["state"] = "ready"
-            _log_event("data_ready", "data_collection", "info",
-                       f"数据采集完成: {latest_date} 共{latest_count}只 "
-                       f"(参考{ref_date}={ref_count}只, 达{latest_count/ref_count*100:.1f}%)",
-                       {"date": latest_date, "count": latest_count, "ref_count": ref_count})
-            logger.info("数据就绪: %s %d只 (%.1f%%)", latest_date, latest_count,
-                        latest_count/ref_count*100 if ref_count else 0)
-        elif is_latest_today and not is_ready and prev_state not in ("collecting", "ready"):
-            curr["state"] = "collecting"
-            _log_event("data_collecting", "data_collection", "info",
-                       f"数据采集中: {latest_date} 已入库{latest_count}只 "
-                       f"(目标~{ref_count}只, {latest_count/ref_count*100:.1f}%)",
-                       {"date": latest_date, "count": latest_count, "ref_count": ref_count})
-            logger.info("数据采集中: %s %d/%d (%.1f%%)", latest_date, latest_count,
-                        ref_count, latest_count/ref_count*100 if ref_count else 0)
-        elif is_latest_today and is_ready:
-            curr["state"] = "ready"
-        elif is_latest_today:
-            curr["state"] = "collecting"
-        else:
-            curr["state"] = "waiting"
-
-        # Check for stale data (latest date is not today and it's past 17:00)
-        if not is_latest_today and now.hour >= 17:
-            curr["state"] = "stale"
-            if prev_state != "stale":
-                _log_event("data_stale", "data_collection", "warn",
-                           f"数据可能延迟: 最新日期={latest_date}, 当前={today}, "
-                           f"已过17:00仍未入库",
-                           {"latest_date": latest_date, "today": today})
-
-        # Save status
-        with open(_DATA_STATUS_FILE, "w") as f:
-            json.dump(curr, f, ensure_ascii=False)
-
-        _data_status_cache["_date"] = today
-        _data_status_cache.update(curr)
-
-    except Exception as e:
-        logger.error("数据采集监控异常: %s", e)
-
-
-def _log_event(event_type, component, severity, message, detail=None):
-    """Write event to system_events table via datafactory API or direct DB."""
-    try:
-        import urllib.request
-        body = json.dumps({"event_type": event_type, "component": component,
-                           "severity": severity, "message": message,
-                           "detail": detail}).encode()
-        req = urllib.request.Request("http://127.0.0.1:8088/api/monitor/events",
-                                    data=body, method="POST",
-                                    headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            pass
-    except Exception:
-        # Fallback: write directly to SQLite
-        try:
-            import sqlite3
-            db_path = "/home/ecs-assist-user/d8q-data-agent/data/financial_news.db"
-            conn = sqlite3.connect(db_path)
-            conn.execute(
-                "INSERT INTO system_events (event_type, component, severity, message, detail_json) VALUES (?,?,?,?,?)",
-                (event_type, component, severity, message, json.dumps(detail) if detail else None)
-            )
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
-
-
 def _tick():
     """一次调度检查（带文件锁防止多worker重复执行）"""
     lock_fd = open(LOCK_PATH, "w")
@@ -902,11 +599,6 @@ def _tick():
         now = datetime.now()
         tasks = _load_tasks()
         changed = False
-
-        # Pipeline 健康检查
-        _check_pipeline_health()
-        # 数据采集进度监控
-        _monitor_data_collection()
 
         # 每日附加任务
         _run_daily_extras()

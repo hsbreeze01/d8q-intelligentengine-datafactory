@@ -128,6 +128,10 @@ def _init_monitor_tables():
             for name, rtype, cfg, sev, interval in builtin_rules:
                 conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
                             (name, rtype, cfg, sev, interval))
+        # IT桔子 Cookie 有效性(与小红书Cookie同类型builtin规则)
+        if not conn.execute("SELECT 1 FROM monitor_rules WHERE name='IT桔子 Cookie有效性'").fetchone():
+            conn.execute("INSERT INTO monitor_rules (name,type,config_json,severity,enabled,builtin,interval_sec) VALUES (?,?,?,?,1,1,?)",
+                ('IT桔子 Cookie有效性', 'custom', '{"url": "http://localhost:8088/api/itjuzi/cookie-health", "judge": "valid", "status_url": "http://localhost:8088/api/itjuzi/cookie-health", "timeout": 10}', 'critical', 3600))
             conn.commit()
 
 
@@ -1258,6 +1262,56 @@ def update_push_config():
 
 
 # --- 服务状态 API (admin only, 读取健康检查结果) ---
+
+@app.route("/api/itjuzi/cookie-health")
+def itjuzi_cookie_health():
+    """IT桔子 Cookie 有效性检查(供监控规则调用)"""
+    try:
+        import pymysql as _mysql
+        _conn = _mysql.connect(host='127.0.0.1', port=3306, user='root',
+                               password='password', database='d8q_data_agent',
+                               cursorclass=_mysql.cursors.DictCursor)
+        _cur = _conn.cursor()
+        _cur.execute("SELECT id, account, is_active, login_at, last_valid_at FROM itjuzi_cookie WHERE is_active=1 ORDER BY id DESC LIMIT 1")
+        _row = _cur.fetchone()
+        _cur.execute("SELECT MAX(event_date) latest FROM itjuzi_investevent")
+        _ev = _cur.fetchone()
+        _conn.close()
+        from datetime import datetime, date
+        if not _row:
+            return jsonify({"valid": False, "message": "无活跃Cookie，IT桔子数据无法采集",
+                           "expired_fields": ["cookie"], "warn_fields": []}), 200
+        _login_at = _row.get('login_at')
+        _age = (datetime.now() - _login_at).days if _login_at else 999
+        _data_latest = _ev['latest'] if _ev and _ev.get('latest') else None
+        _data_age = (date.today() - _data_latest).days if _data_latest else 999
+        expired = []
+        warn = []
+        if _age > 7:
+            expired.append("cookie(已%d天)" % _age)
+        elif _age > 5:
+            warn.append("cookie(已%d天)" % _age)
+        if _data_age > 7:
+            expired.append("数据(停更%d天)" % _data_age)
+        elif _data_age > 3:
+            warn.append("数据(停更%d天)" % _data_age)
+        ok = not expired
+        return jsonify({
+            "valid": ok,
+            "message": ("正常(账号%s,cookie %d天,数据更新至%s)" % (_row['account'], _age, str(_data_latest)))
+                       if ok else ("异常: " + ", ".join(expired)),
+            "account": _row.get('account'),
+            "cookie_age_days": _age,
+            "data_latest": str(_data_latest) if _data_latest else None,
+            "data_stale_days": _data_age,
+            "expired_fields": expired,
+            "warn_fields": warn,
+        }), 200
+    except Exception as e:
+        return jsonify({"valid": False, "message": str(e)[:200],
+                       "expired_fields": ["exception"], "warn_fields": []}), 200
+
+
 @app.route("/api/service-status")
 def service_status():
     """实时检测所有微服务状态"""
@@ -1295,6 +1349,47 @@ def service_status():
             services["ghost_browser"] = {"status": "active", "type": "cdp_tunnel", "cdp": "ok"}
     except Exception:
         services["ghost_browser"] = {"status": "down", "type": "remote_cdp", "cdp": "down"}
+
+    # IT桔子 cookie 有效性检测
+    try:
+        import pymysql as _mysql
+        _conn = _mysql.connect(host='127.0.0.1', port=3306, user='root',
+                               password='password', database='d8q_data_agent',
+                               cursorclass=_mysql.cursors.DictCursor)
+        _cur = _conn.cursor()
+        _cur.execute("SELECT id, account, is_active, login_at, last_valid_at FROM itjuzi_cookie WHERE is_active=1 ORDER BY id DESC LIMIT 1")
+        _row = _cur.fetchone()
+        _cur.execute("SELECT MAX(event_date) latest FROM itjuzi_investevent")
+        _ev = _cur.fetchone()
+        _conn.close()
+        from datetime import datetime
+        if _row:
+            _login_at = _row.get('login_at')
+            _age_days = (datetime.now() - _login_at).days if _login_at else None
+            _data_age = (datetime.now().date() - _ev['latest']).days if _ev and _ev.get('latest') else None
+            _ok = (_age_days is not None and _age_days <= 7) and (_data_age is None or _data_age <= 7)
+            services['itjuzi_cookie'] = {
+                'status': 'ok' if _ok else 'warning',
+                'type': 'cookie_health',
+                'account': _row.get('account'),
+                'is_active': bool(_row.get('is_active')),
+                'cookie_age_days': _age_days,
+                'login_at': str(_login_at) if _login_at else None,
+                'last_valid_at': str(_row.get('last_valid_at', '')) if _row.get('last_valid_at') else None,
+                'data_latest_event': str(_ev['latest']) if _ev and _ev.get('latest') else None,
+                'data_stale_days': _data_age,
+                'warning': 'cookie过期或数据超7天未更新，需重新登录' if not _ok else None,
+            }
+        else:
+            services['itjuzi_cookie'] = {
+                'status': 'error',
+                'type': 'cookie_health',
+                'account': None,
+                'is_active': False,
+                'warning': 'cookie表为空或无活跃cookie，IT桔子数据无法采集',
+            }
+    except Exception as _e:
+        services['itjuzi_cookie'] = {'status': 'error', 'type': 'cookie_health', 'error': str(_e)}
 
     from datetime import datetime
     return jsonify({"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "services": services}), 200
@@ -1876,85 +1971,9 @@ def monitor_status():
     except Exception:
         services["ghost_browser"] = {"status": "down", "type": "remote_cdp", "cdp": "down"}
         alert_count += 1
-    # Pipeline & data & scan status
-    pipeline_status = {}
-    try:
-        import subprocess as _sp
-        ps_r = _sp.run(['ps','aux'], capture_output=True, text=True, timeout=5)
-        daemon_alive = any('pipeline.py' in l and '--mode daemon' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        daily_running = any('pipeline.py' in l and '--mode daily' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        pipeline_status = {'daemon_alive': daemon_alive, 'daily_running': daily_running}
-    except Exception:
-        pipeline_status = {'error': 'check failed'}
-
-    data_status = {}
-    try:
-        with open('/var/log/d8q/data_status.json','r') as f:
-            data_status = json.load(f)
-    except Exception:
-        pass
-
-    scan_status = {}
-    try:
-        with open('/var/log/d8q/czsc_scan_status.json','r') as f:
-            scan_status = json.load(f)
-    except Exception:
-        pass
-
     return jsonify({"services": services, "rules": rule_results, "alert_count": alert_count,
-        "pipeline": pipeline_status, "data_status": data_status, "scan_status": scan_status,
         "timestamp": _dt.now().strftime("%Y-%m-%d %H:%M:%S")})
 
-
-
-
-@app.route('/api/monitor/events', methods=['POST'])
-def post_monitor_event():
-    """Internal endpoint for system event logging."""
-    import sqlite3 as _s3
-    body = request.json or {}
-    db_path = '/home/ecs-assist-user/d8q-data-agent/data/financial_news.db'
-    try:
-        conn = _s3.connect(db_path)
-        conn.execute(
-            'INSERT INTO system_events (event_type, component, severity, message, detail_json) VALUES (?,?,?,?,?)',
-            (body.get('event_type',''), body.get('component',''),
-             body.get('severity','info'), body.get('message',''),
-             json.dumps(body.get('detail')) if body.get('detail') else None)
-        )
-        conn.commit()
-        conn.close()
-        return jsonify({'ok': True})
-    except Exception as e:
-        return jsonify({'error': str(e)[:200]}), 500
-
-
-@app.route('/api/monitor/events', methods=['GET'])
-def get_monitor_events():
-    if session.get('role') != 'admin':
-        return jsonify({'error': '权限不足'}), 403
-    import sqlite3 as _s3
-    from datetime import datetime as _dt2, timedelta as _td2
-    days = int(request.args.get('days', 3))
-    severity = request.args.get('severity', '')
-    limit = min(int(request.args.get('limit', 100)), 500)
-    since = (_dt2.now() - _td2(days=days)).strftime('%Y-%m-%d %H:%M:%S')
-    db_path = '/home/ecs-assist-user/d8q-data-agent/data/financial_news.db'
-    try:
-        conn = _s3.connect(db_path)
-        conn.row_factory = _s3.Row
-        sql = 'SELECT * FROM system_events WHERE created_at >= ?'
-        params = [since]
-        if severity:
-            sql += ' AND severity = ?'
-            params.append(severity)
-        sql += ' ORDER BY id DESC LIMIT ?'
-        params.append(limit)
-        rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
-        conn.close()
-        return jsonify({'events': rows, 'count': len(rows)})
-    except Exception as e:
-        return jsonify({'error': str(e)[:200]}), 500
 
 @app.route("/api/cookie/capture", methods=["POST"])
 def proxy_cookie_capture():
@@ -3390,113 +3409,6 @@ def rec_backfill_trigger():
         conn.commit()
     return jsonify({"filled": filled})
 
-
-
-@app.route("/api/chanlun/czsc/history", methods=["GET"])
-def chanlun_czsc_history():
-    import pymysql
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
-    code = request.args.get("code", "")
-    limit = request.args.get("limit", 200, type=int)
-
-    DB = {"host":"127.0.0.1","port":3306,"user":"root","password":"password","database":"stock_analysis_system","charset":"utf8mb4"}
-    try:
-        conn = pymysql.connect(**DB)
-        cur = conn.cursor(pymysql.cursors.DictCursor)
-
-        query = "SELECT signal_date, code, name, type, price, stop_loss, score, grade, reason, trend_type, weekly_trend, divergence, div_ratio, market_attitude, market_env_score, seg_zg, seg_zd, entry_price, profile FROM czsc_signal_history WHERE 1=1"
-        params = []
-
-        if start_date:
-            query += " AND signal_date >= %s"
-            params.append(start_date)
-        if end_date:
-            query += " AND signal_date <= %s"
-            params.append(end_date)
-        if code:
-            query += " AND code = %s"
-            params.append(code)
-
-        query += " ORDER BY signal_date DESC, score DESC LIMIT %s"
-        params.append(limit)
-
-        cur.execute(query, params)
-        signals = cur.fetchall()
-
-        cur.execute("SELECT DISTINCT signal_date FROM czsc_signal_history ORDER BY signal_date DESC LIMIT 30")
-        available_dates = [str(r["signal_date"]) for r in cur.fetchall()]
-
-        conn.close()
-        return jsonify({"signals": signals, "available_dates": available_dates, "count": len(signals)})
-    except Exception as e:
-        return jsonify({"error": str(e), "signals": [], "available_dates": []})
-@app.route("/api/pipeline/status", methods=["GET"])
-def pipeline_status_public():
-    """Public endpoint: daily pipeline effort status (no auth required)."""
-    from datetime import datetime as _dt
-    import subprocess as _sp
-    import sqlite3 as _s3
-
-    result = {"timestamp": _dt.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-    # 1. Pipeline daemon status
-    try:
-        ps_r = _sp.run(['ps','aux'], capture_output=True, text=True, timeout=5)
-        daemon_alive = any('pipeline.py' in l and '--mode daemon' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        daily_running = any('pipeline.py' in l and '--mode daily' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        result["pipeline"] = {"daemon_alive": daemon_alive, "daily_running": daily_running}
-    except Exception:
-        result["pipeline"] = {"error": "check failed"}
-
-    # 2. Data collection status
-    try:
-        with open('/var/log/d8q/data_status.json','r') as f:
-            result["data"] = json.load(f)
-    except Exception:
-        result["data"] = {}
-
-    # 3. CZSC scan status
-    try:
-        with open('/var/log/d8q/czsc_scan_status.json','r') as f:
-            result["scan"] = json.load(f)
-    except Exception:
-        result["scan"] = {}
-
-    # 4. Recent system events (last 24h, max 20)
-    try:
-        db_path = '/home/ecs-assist-user/d8q-data-agent/data/financial_news.db'
-        since = (_dt.now(). _dt.now()).strftime('%Y-%m-%d %H:%M:%S')
-    except Exception:
-        since = ''
-    try:
-        from datetime import timedelta as _td
-        since = (_dt.now() - _td(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
-        db_path = '/home/ecs-assist-user/d8q-data-agent/data/financial_news.db'
-        conn = _s3.connect(db_path)
-        conn.row_factory = _s3.Row
-        rows = [dict(r) for r in conn.execute(
-            'SELECT event_type, component, severity, message, created_at '
-            'FROM system_events WHERE created_at >= ? ORDER BY id DESC LIMIT 20', (since,)).fetchall()]
-        conn.close()
-        result["events"] = rows
-    except Exception as e:
-        result["events"] = []
-
-    # 5. Today's signal count
-    try:
-        with open('/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache_czsc.json','r') as f:
-            sig_data = json.load(f)
-        result["signals"] = {
-            "generated_at": sig_data.get("generated_at"),
-            "count": len(sig_data.get("today_signals", []))
-        }
-    except Exception:
-        result["signals"] = {}
-
-    return jsonify(result)
-
-
 @app.route("/<path:path>")
 def spa_fallback(path):
     """SPA 路由 fallback — 所有非 API/static 路由返回 index.html"""
@@ -3560,7 +3472,8 @@ def chanlun_disciplined():
     from datetime import datetime as _dt
     
     signals_path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache.json"
-    holdings_path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/holdings.json"
+    # P0-B1: disciplined 策略已改用独立持仓文件(原与 czsc 共用 holdings.json 且字段不兼容)
+    holdings_path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/holdings_disciplined.json"
     
     signals = []
     try:
@@ -3599,12 +3512,21 @@ def chanlun_disciplined():
 def chanlun_czsc():
     import json as _json, os as _os
     path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache_czsc.json"
+    status_path = "/var/log/d8q/czsc_scan_status.json"
     try:
+        d = {}
         if _os.path.exists(path):
             with open(path) as f:
                 d = _json.load(f)
-            return jsonify(d)
-        return jsonify({"signals": [], "engine": "czsc", "signal_count": 0})
+        if _os.path.exists(status_path):
+            with open(status_path) as f:
+                scan_status = _json.load(f)
+            d["scan_status"] = scan_status
+            if scan_status.get("skipped"):
+                d["scan_error"] = scan_status.get("reason", "unknown")
+        else:
+            d["scan_status"] = {"last_run": None, "reason": "no_status_file"}
+        return jsonify(d)
     except Exception as e:
         return jsonify({"error": str(e), "signals": []})
 
