@@ -4022,7 +4022,21 @@ async function loadChanlunCzsc(el){
         h += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">';
         var tierColors={A:'#f5222d',B:'#fa8c16',C:'#faad14',D:'#52c41a'};var tierLabels={A:'龙头',B:'主力',C:'活跃',D:'机会'};
         var tBadge=s.tier?'<span style="font-size:10px;color:#fff;background:'+(tierColors[s.tier]||'#999')+';padding:1px 5px;border-radius:3px;margin-right:4px">'+(tierLabels[s.tier]||s.tier)+'</span>':'';
-        var freshBadge=s.freshness==='fresh'?'<span style="font-size:10px;color:#52c41a;border:1px solid #52c41a;padding:0 4px;border-radius:3px">今日</span>':'<span style="font-size:10px;color:#fa8c16;border:1px solid #fa8c16;padding:0 4px;border-radius:3px">可操作</span>';
+        var _sigDt=s.signal_date_label||(s.dt||'').substring(5,10).replace('-','/');
+        var _stBadge;
+        if(s.status==='actionable'){
+          var _isBuy=s.type&&s.type.indexOf('buy')===0;
+          _stBadge='<span style="font-size:10px;color:#52c41a;border:1px solid #b7eb8f;padding:1px 6px;border-radius:3px;background:#f6ffed"><b>'+_sigDt+'</b>\u786e\u8ba4 \u00b7 ' + (_isBuy?'\u4ecd\u5728\u53ef\u4e70\u533a\u95f4':s.status_label||'\u53ef\u64cd\u4f5c') + '</span>';
+        } else if(s.status==='expired_high'){
+          _stBadge='<span style="font-size:10px;color:#f5222d;border:1px solid #ffccc7;padding:1px 6px;border-radius:3px;background:#fff2f0"><b>'+_sigDt+'</b>\u786e\u8ba4 \u00b7 '+(s.status_label||'\u5df2\u6da8\u79bb')+'</span>';
+        } else if(s.status==='expired_low'){
+          _stBadge='<span style="font-size:10px;color:#fa8c16;border:1px solid #ffe58f;padding:1px 6px;border-radius:3px;background:#fffbe6"><b>'+_sigDt+'</b>\u786e\u8ba4 \u00b7 '+(s.status_label||'\u5df2\u8dcc\u7834')+'</span>';
+        } else if(s.status==='expired_down'){
+          _stBadge='<span style="font-size:10px;color:#52c41a;border:1px solid #b7eb8f;padding:1px 6px;border-radius:3px;background:#f6ffed"><b>'+_sigDt+'</b>\u786e\u8ba4 \u00b7 '+(s.status_label||'\u5356\u51fa\u5151\u73b0')+'</span>';
+        } else {
+          _stBadge='<span style="font-size:10px;color:#1890ff;border:1px solid #91d5ff;padding:1px 6px;border-radius:3px;background:#e6f7ff"><b>'+_sigDt+'</b>\u786e\u8ba4</span>';
+        }
+        var freshBadge=_stBadge;
         h += '<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer" onclick="czscShowDetail(\x27'+s.code+'\x27,\x27'+(s.name||'')+'\x27)">'+tBadge+s.code+'</span>';
         h += ' '+freshBadge;
         h += '<span style="font-size:14px;color:#333">'+(s.name||'')+'</span>';
