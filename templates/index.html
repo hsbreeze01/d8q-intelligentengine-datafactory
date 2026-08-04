@@ -377,7 +377,7 @@ const PAGES=[
 {id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心'},
 {id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
-{id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
+// [DISABLED] {id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
 {id:"chanlun-czsc",icon:"🧪",label:"缠论(czsc)",title:"缠论czsc引擎"},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
@@ -428,7 +428,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,chanlun:loadChanlun,'chanlun-beta':loadChanlunBeta,'chanlun-czsc':loadChanlunCzsc};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -3851,6 +3851,7 @@ try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringif
 
 </script>
 <script>
+/* [DISABLED: chanlun module soft-deleted 2026-08-04]
 // === 缠论纪律化策略页面 ===
 async function loadChanlun(el){
   var dData = await apiV("/api/chanlun/disciplined");
@@ -3948,6 +3949,7 @@ async function chanlunDetail(code){
   }
 }
 
+[END DISABLED] */
 // === 缠论czsc新引擎(灰度对比) ===
 async function loadChanlunCzsc(el){
   var data = await apiV("/api/chanlun/czsc");

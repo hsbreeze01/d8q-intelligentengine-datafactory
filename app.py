@@ -31,6 +31,21 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
+# [DISABLED 2026-08-04] 缠论非czsc路由已停用，保留czsc引擎
+_CHANLUN_DISABLED_PATHS = ("/api/chanlun/signals", "/api/chanlun/backtest",
+    "/api/chanlun/scan", "/api/chanlun/disciplined",
+    "/api/chanlun/review", "/api/chanlun/notify")
+
+@app.before_request
+def _chanlun_disabled_guard():
+    path = request.path
+    for dp in _CHANLUN_DISABLED_PATHS:
+        if path == dp or path.startswith(dp + "/"):
+            # Keep /api/chanlun/czsc* routes active
+            if "/czsc" in path:
+                return None
+            return jsonify({"status": "disabled", "message": "缠论(非czsc)模块已停用"}), 410
+
 @app.before_request
 def _track_start():
     request._track_start = _time.time()

@@ -492,10 +492,10 @@ def _run_czsc_scan():
     elif now.weekday() >= 6:  # Sunday
         return
     else:
-        # Weekday window: 15:40 - 22:00
-        if now.hour < 15 or now.hour >= 22:
+        # Weekday window: 16:40 - 22:00 (shifted +1h to allow data pipeline at 18:00 to finish)
+        if now.hour < 16 or now.hour >= 22:
             return
-        if now.hour == 15 and now.minute < 40:
+        if now.hour == 16 and now.minute < 40:
             return
         scan_date = today
 
@@ -619,7 +619,7 @@ def _run_signal_review():
     now = datetime.now()
     if now.weekday() >= 5:
         return
-    if now.hour != 16 or now.minute > 5:
+    if now.hour != 17 or now.minute > 5:
         return
     if _already_ran_today("signal_review"):
         return
@@ -786,9 +786,19 @@ def _monitor_data_collection():
         conn = pymysql.connect(**db_cfg)
         cur = conn.cursor(pymysql.cursors.DictCursor)
 
-        # Get latest 3 dates and counts
-        cur.execute("SELECT date, COUNT(DISTINCT stock_code) as cnt "
-                    "FROM stock_data_daily GROUP BY date ORDER BY date DESC LIMIT 3")
+        # Get latest 3 dates and counts, excluding non-normal stocks:
+        # BSE (9/4/8 prefix), ST/suspended, CDR (689 prefix)
+        _EXCL = (
+            "stock_code NOT LIKE '9%%' AND stock_code NOT LIKE '4%%' "
+            "AND stock_code NOT LIKE '8%%' AND stock_code NOT LIKE '689%%' "
+            "AND stock_code NOT IN "
+            "(SELECT code FROM stock_basic WHERE name LIKE '%%ST%%')"
+        )
+        cur.execute(
+            "SELECT date, COUNT(DISTINCT stock_code) as cnt "
+            "FROM stock_data_daily WHERE " + _EXCL + " "
+            "GROUP BY date ORDER BY date DESC LIMIT 3"
+        )
         rows = cur.fetchall()
         conn.close()
 
@@ -915,10 +925,10 @@ def _tick():
         _run_alert_scan()
 
         # 缠论每日扫描(15:35)
-        _run_chanlun_scan()
+        # [DISABLED 2026-08-04] _run_chanlun_scan()
 
         # 纪律化策略扫描(15:37, 独立入口)
-        _run_disciplined_scan()
+        # [DISABLED 2026-08-04] _run_disciplined_scan()
 
         # czsc新引擎扫描(15:40, 灰度并行)
         _run_czsc_scan()
