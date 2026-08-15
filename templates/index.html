@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#001529"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="/static/images/icon-192.png">
 <title>D8Q 智能资讯平台</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
@@ -325,6 +326,9 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
   </div>
   <div class="drawer-body" id="drawerBody"><div class="empty">加载中...</div></div>
 </div>
+<script>
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
+</script>
 </body>
 </html>
 <script>
@@ -3849,8 +3853,8 @@ var minScore=parseInt(document.getElementById('prefMinScore').value)||60;
 try{await api('/api/recommendation/preferences',{method:'PUT',body:JSON.stringify({style:style,risk_tolerance:risk,min_score:minScore})});toast('偏好已保存');}catch(e){toast('保存失败',true);}
 }
 
-</script>
-<script>
+
+
 /* [DISABLED: chanlun module soft-deleted 2026-08-04]
 // === 缠论纪律化策略页面 ===
 async function loadChanlun(el){
@@ -3964,7 +3968,7 @@ async function loadChanlunCzsc(el){
   function daysBetween(dtStr){if(!dtStr)return 0;var d=new Date(dtStr.replace(' ','T'));return Math.floor((new Date()-d)/86400000);}
 
   // 存储筛选状态
-  if(!window._czscFilter) window._czscFilter = {types:['buy1','buy2','buy3','sell1','sell2','sell3'],maxSl:15,hideWeak:false};
+  if(!window._czscFilter) window._czscFilter = {types:['buy1','buy2','buy3','sell1','sell2','sell3'],maxSl:15,hideWeak:false,industry:''};
   var F = window._czscFilter;
 
   function applyFilter(){
@@ -3974,6 +3978,7 @@ async function loadChanlunCzsc(el){
       if(F.hideWeak && !s.weekly_allow) return false;
       if(F.hideWeak && !mkt.bullish && s.type.startsWith('buy')) return false;
       if(F.board && F.board!=='all' && s.board!==F.board) return false;
+      if(F.industry && F.industry!=='all' && s.industry_l1!==F.industry) return false;
       return true;
     });
     return filtered;
@@ -4044,6 +4049,16 @@ async function loadChanlunCzsc(el){
       var sel=F.board===b.k;
       h+='<span class="fb'+(sel?' active':'')+'" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;'+(sel?'background:#1890ff;color:#fff':'background:#f0f0f0;color:#555')+'" onclick="window._czscBoardFilter(\x27'+b.k+'\x27)">'+b.l+'</span>';
     });
+    // 行业筛选
+    var _indList=[]; (data.today_signals||[]).forEach(function(x){ if(x.industry_l1 && _indList.indexOf(x.industry_l1)<0) _indList.push(x.industry_l1); });
+    _indList.sort();
+    h += '<div style="width:1px;height:20px;background:#e0e0e0;margin:0 4px"></div>';
+    h += '<div style="font-size:12px;color:#666;font-weight:500">行业:</div>';
+    h += '<span class="fb'+(!F.industry?' active':'')+'" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;'+(!F.industry?'background:#1890ff;color:#fff':'background:#f0f0f0;color:#555')+'" onclick="window._czscIndFilter(\'\')">全部</span>';
+    _indList.forEach(function(ind){
+      var _sel=F.industry===ind;
+      h += '<span class="fb'+(_sel?' active':'')+'" style="font-size:11px;padding:2px 8px;border-radius:4px;cursor:pointer;'+(_sel?'background:#1890ff;color:#fff':'background:#f0f0f0;color:#555')+'" onclick="window._czscIndFilter(\''+ind+'\')">'+ind+'</span>';
+    });
     // 结果计数
     h += '<div style="margin-left:auto;font-size:12px;color:#999">显示 '+sigs.length+'/'+allSigs.length;
     if(data.pool_tiers){var _pt=data.pool_tiers;h+=' · 覆盖 '+(data.pool_size||'-')+'只 (A'+_pt.A+'/B'+_pt.B+'/C'+_pt.C+'/D'+_pt.D+')';}else{h+=' · 标的池'+(data.pool_size||'-')+'只';}
@@ -4054,7 +4069,7 @@ async function loadChanlunCzsc(el){
     // === SECTION 1: 今日信号(可操作) ===
     h += '<div style="margin-bottom:24px">';
     h += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #52c41a;padding-bottom:6px">\ud83c\udfaf \u4eca\u65e5\u4fe1\u53f7 <span style="font-size:12px;color:#999;font-weight:400">\u660e\u65e5\u5f00\u76d8\u53ef\u64cd\u4f5c</span></h4>';
-    var todaySigs = (data.today_signals||[]).filter(function(s){if(F.types.indexOf(s.type)<0)return false;if(F.board&&F.board!=='all'&&s.board!==F.board)return false;if(s.stop_loss_pct>F.maxSl)return false;if(F.hideWeak&&!s.weekly_allow)return false;return true;});
+    var todaySigs = (data.today_signals||[]).filter(function(s){if(F.types.indexOf(s.type)<0)return false;if(F.board&&F.board!=='all'&&s.board!==F.board)return false;if(F.industry&&F.industry!=='all'&&s.industry_l1!==F.industry)return false;if(s.stop_loss_pct>F.maxSl)return false;if(F.hideWeak&&!s.weekly_allow)return false;return true;});
     if(!todaySigs.length){
       h += '<div style="text-align:center;padding:30px 20px;color:#666;background:#fafafa;border-radius:8px">';
       h += '<div style="font-size:28px;margin-bottom:6px">📊</div>';
@@ -4095,6 +4110,7 @@ async function loadChanlunCzsc(el){
         h += '<span style="font-size:15px;font-weight:700;color:#1890ff;cursor:pointer" onclick="czscShowDetail(\x27'+s.code+'\x27,\x27'+(s.name||'')+'\x27)">'+tBadge+s.code+'</span>';
         h += ' '+freshBadge;
         h += '<span style="font-size:14px;color:#333">'+(s.name||'')+'</span>';
+        if(s.industry_l1) h += '<span style="font-size:11px;color:#666;background:#f0f0f0;padding:1px 6px;border-radius:4px;margin-left:4px">'+(s.industry_l1||'')+'</span>';
         h += '<span style="background:'+accent+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">'+(typeMap[s.type]||s.type)+'</span>';
         if(s.grade_label) h += '<span style="font-size:12px;margin-left:3px">'+s.grade_label+'</span>';
         if(s.score) h += '<span style="font-size:11px;color:#fa8c16;font-weight:600;border:1px solid #fa8c16;padding:1px 6px;border-radius:8px;margin-left:4px">'+s.score+'\u5206</span>';
@@ -4118,8 +4134,8 @@ async function loadChanlunCzsc(el){
     h += '</div>';
 
     // === SECTION 2: 持仓管理(出场跟踪) ===
-    var holdings = data.holdings||[];
-    var exited = data.exited_today||[];
+    var holdings = (data.holdings||[]).filter(function(h){return !(F.industry&&F.industry!=='all'&&h.industry_l1&&h.industry_l1!==F.industry);});
+    var exited = (data.exited_today||[]).filter(function(e){return !(F.industry&&F.industry!=='all'&&e.industry_l1&&e.industry_l1!==F.industry);});
     h += '<div style="margin-bottom:24px">';
     h += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #1890ff;padding-bottom:6px">\ud83d\udcbc \u6301\u4ed3\u7ba1\u7406 <span style="font-size:12px;color:#999;font-weight:400">'+holdings.length+'\u53ea\u6d3b\u8dc3</span></h4>';
     if(!holdings.length && !exited.length){
@@ -4153,58 +4169,6 @@ async function loadChanlunCzsc(el){
     // === SECTION 3: 信号回顾(复盘) ===
     // 异步加载复盘数据
     h += '<div id="czscReviewSection" style="margin-bottom:20px"><div style="text-align:center;padding:20px;color:#bbb">加载复盘数据...</div></div>';
-    setTimeout(async function(){
-      var rv = await apiV("/api/chanlun/review");
-      var rEl = document.getElementById("czscReviewSection");
-      if(!rEl) return;
-      var rh = '';
-      rh += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #722ed1;padding-bottom:6px">📊 信号复盘 <span style="font-size:12px;color:#999;font-weight:400">历史信号表现统计</span></h4>';
-      if(!rv || !rv.total){
-        rh += '<div style="padding:20px;background:#fafafa;border-radius:8px;text-align:center;color:#999">暂无已完成信号，数据累积中...</div>';
-      } else {
-        // 总览指标
-        rh += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">';
-        rh += '<div style="background:#f6ffed;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">总信号</div><b style="font-size:18px">'+rv.total+'</b></div>';
-        rh += '<div style="background:'+(rv.win_rate>=50?'#f6ffed':'#fff2f0')+';padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">胜率</div><b style="font-size:18px;color:'+(rv.win_rate>=50?'#52c41a':'#f5222d')+'">'+rv.win_rate+'%</b></div>';
-        rh += '<div style="background:#e6f7ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">盈亏比</div><b style="font-size:18px">'+rv.profit_loss_ratio+'</b></div>';
-        rh += '<div style="background:#fff7e6;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">平均持仓</div><b style="font-size:18px">'+rv.avg_hold_days+'天</b></div>';
-        rh += '<div style="background:#f9f0ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">出场分布</div><b style="font-size:12px">止损'+(rv.exit_reasons?rv.exit_reasons.stop_loss:0)+'/达标'+(rv.exit_reasons?rv.exit_reasons.target_hit:0)+'/过期'+(rv.exit_reasons?rv.exit_reasons.expired:0)+'</b></div>';
-        rh += '</div>';
-        // 分类型表现
-        if(rv.by_type){
-          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按信号类型:</b></div>';
-          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-          var typeNames={buy1:'一买',buy2:'二买',buy3:'三买',sell1:'一卖',sell2:'二卖',sell3:'三卖'};
-          Object.keys(rv.by_type).forEach(function(t){var d=rv.by_type[t];
-            var color=d.avg_pnl>=0?'#52c41a':'#f5222d';
-            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(typeNames[t]||t)+'</b> 共'+d.total+'笔 胜率<span style="color:'+color+'">'+d.win_rate+'%</span> 均盈<span style="color:'+color+'">'+d.avg_pnl+'%</span></div>';
-          });
-          rh += '</div>';
-        }
-        // 分Tier表现
-        if(rv.by_tier){
-          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按流动性层级:</b></div>';
-          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-          var tierIcons={A:'🔴',B:'🟠',C:'🟡',D:'🟢'};
-          Object.keys(rv.by_tier).forEach(function(t){var d=rv.by_tier[t];
-            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px">'+(tierIcons[t]||'')+'<b>'+t+'层</b> '+d.total+'笔 胜率'+d.win_rate+'% 均盈'+d.avg_pnl+'%</div>';
-          });
-          rh += '</div>';
-        }
-        // 分板块表现
-        if(rv.by_board){
-          rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按板块:</b></div>';
-          rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-          var boardNames={main:'主板',gem:'创业板',star:'科创板',bse:'北交所'};
-          Object.keys(rv.by_board).forEach(function(b){var d=rv.by_board[b];
-            rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(boardNames[b]||b)+'</b> '+d.total+'笔 胜率'+d.win_rate+'% 均盈'+d.avg_pnl+'%</div>';
-          });
-          rh += '</div>';
-        }
-        rh += '<div style="font-size:11px;color:#bbb;margin-top:8px">更新: '+(rv.generated_at||'-')+' · 每日16:00自动回填 · 持仓上限10天</div>';
-      }
-      rEl.innerHTML = rh;
-    }, 100);
 
 
 
@@ -4336,7 +4300,54 @@ async function loadChanlunCzsc(el){
     renderAll();
   };
 
+  window._czscIndFilter = function(ind){
+    F.industry = ind;
+    renderAll();
+  };
+
   renderAll();
+
+  // 复盘数据加载(只在页面初始化时执行一次)
+  setTimeout(async function(){ try{
+    var rv = await apiV("/api/chanlun/review?_t="+Date.now());
+    var rEl = document.getElementById("czscReviewSection");
+    if(!rEl) return;
+    var rh = "";
+    rh += '<h4 style="margin:0 0 12px;font-size:16px;color:#333;border-bottom:2px solid #722ed1;padding-bottom:6px">📊 信号复盘 <span style="font-size:12px;color:#999;font-weight:400">历史信号表现统计</span></h4>';
+    if(!rv || !rv.total){
+      rh += '<div style="padding:20px;background:#fafafa;border-radius:8px;text-align:center;color:#999">暂无已完成信号，数据累积中...</div>';
+    } else {
+      rh += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">';
+      rh += '<div style="background:#f6ffed;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">总信号</div><b style="font-size:18px">'+rv.total+'</b></div>';
+      rh += '<div style="background:'+(rv.win_rate>=50?'#f6ffed':'#fff2f0')+';padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">胜率</div><b style="font-size:18px;color:'+(rv.win_rate>=50?'#52c41a':'#f5222d')+'">'+rv.win_rate+'%</b></div>';
+      rh += '<div style="background:#e6f7ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">盈亏比</div><b style="font-size:18px">'+rv.profit_loss_ratio+'</b></div>';
+      rh += '<div style="background:#fff7e6;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">平均持仓</div><b style="font-size:18px">'+rv.avg_hold_days+'天</b></div>';
+      rh += '<div style="background:#f9f0ff;padding:10px;border-radius:8px;text-align:center"><div style="font-size:11px;color:#999">出场分布</div><b style="font-size:12px">止损'+(rv.exit_reasons?rv.exit_reasons.stop_loss:0)+'/达标'+(rv.exit_reasons?rv.exit_reasons.target_hit:0)+'/过期'+(rv.exit_reasons?rv.exit_reasons.expired:0)+'</b></div>';
+      rh += '</div>';
+      if(rv.by_type){
+        rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按信号类型:</b></div>';
+        rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+        var typeNames={buy1:'一买',buy2:'二买',buy3:'三买',sell1:'一卖',sell2:'二卖',sell3:'三卖'};
+        Object.keys(rv.by_type).forEach(function(t){var d=rv.by_type[t];
+          var color=d.avg_pnl>=0?'#52c41a':'#f5222d';
+          rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(typeNames[t]||t)+'</b> 共'+d.total+'笔 胜率<span style="color:'+color+'">'+d.win_rate+'%</span> 均盈<span style="color:'+color+'">'+d.avg_pnl+'%</span></div>';
+        });
+        rh += '</div>';
+      }
+      if(rv.by_board){
+        rh += '<div style="margin-bottom:8px"><b style="font-size:13px">按板块:</b></div>';
+        rh += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+        var boardNames={main:'主板',gem:'创业板',star:'科创板',bse:'北交所'};
+        Object.keys(rv.by_board).forEach(function(b){var d=rv.by_board[b];
+          rh+='<div style="background:#fafafa;border:1px solid #f0f0f0;padding:8px 12px;border-radius:6px;font-size:12px"><b>'+(boardNames[b]||b)+'</b> '+d.total+'笔 胜率'+d.win_rate+'% 均盈'+d.avg_pnl+'%</div>';
+        });
+        rh += '</div>';
+      }
+      rh += '<div style="font-size:11px;color:#bbb;margin-top:8px">更新: '+(rv.generated_at||'-')+' · 每日16:00自动回填 · 持仓上限10天</div>';
+    }
+    rEl.innerHTML = rh;
+  }catch(e){var rEl2=document.getElementById("czscReviewSection");if(rEl2)rEl2.innerHTML='<div style="padding:12px;color:#f5222d;font-size:13px">复盘加载失败: '+e.message+'</div>'} }, 500);
+
 }
 
 
