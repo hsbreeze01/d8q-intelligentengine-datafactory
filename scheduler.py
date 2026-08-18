@@ -470,6 +470,18 @@ def _run_disciplined_scan():
 
 # _czsc_scan_last_run replaced by file-based _already_ran_today
 
+def _is_czsc_scan_ok(output, scan_date, returncode):
+    # 2026-08-18: strict success check - scan counts as done only when it ran
+    # on the target trading day data (reason=ok AND data_date==scan_date);
+    # data_not_ready / non_trading_day / crash / stale data all retry,
+    # preventing a wrong done-marker from dropping the day's signals.
+    import re as _re
+    _m = _re.search(r'czsc_scan: reason=(\w+) data_date=(\d{4}-\d{2}-\d{2})', output)
+    _scan_reason = _m.group(1) if _m else None
+    _scan_data_date = _m.group(2) if _m else None
+    return (returncode == 0 and _scan_reason == 'ok' and _scan_data_date == scan_date)
+
+
 def _run_czsc_scan():
     """尽最大努力执行CZSC扫描: 15:40开始尝试, 每15分钟重试, 直到22:00放弃.
     周六上午补跑周五数据(如果周五未成功)."""
@@ -547,12 +559,7 @@ def _run_czsc_scan():
         # 2026-08-18: 严格成功判定 — 只有扫描真正跑在目标交易日数据上(reason=ok
         # 且 data_date==scan_date)才算完成; data_not_ready / non_trading_day /
         # 崩溃 / 旧数据一律重试, 防止 done-marker 误写导致当日信号永久丢失.
-        import re as _re
-        _m = _re.search(r'czsc_scan: reason=(\w+) data_date=(\d{4}-\d{2}-\d{2})', output)
-        _scan_reason = _m.group(1) if _m else None
-        _scan_data_date = _m.group(2) if _m else None
-        _scan_ok = (result.returncode == 0 and _scan_reason == 'ok'
-                    and _scan_data_date == scan_date)
+        _scan_ok = _is_czsc_scan_ok(output, scan_date, result.returncode)
         if not _scan_ok:
             retry_count += 1
             if result.returncode != 0:
