@@ -3,3 +3,12 @@ articles/
 app.py.bak
 data/content_tasks.json
 venv/
+
+# === d8q engineering cleanup (2026-08-18) ===
+*.bak
+*.bak.*
+._*
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*.json
