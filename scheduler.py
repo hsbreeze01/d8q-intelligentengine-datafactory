@@ -492,10 +492,12 @@ def _run_czsc_scan():
     elif now.weekday() >= 6:  # Sunday
         return
     else:
-        # Weekday window: 16:40 - 22:00 (shifted +1h to allow data pipeline at 18:00 to finish)
-        if now.hour < 16 or now.hour >= 22:
+        # Weekday window: 18:10 - 22:00 (daily data pipeline starts at 18:00
+        # and finishes ~20:30-21:00; attempts before that always hit stale
+        # T-1 data and must retry until data_date == target trading day)
+        if now.hour < 18 or now.hour >= 22:
             return
-        if now.hour == 16 and now.minute < 40:
+        if now.hour == 18 and now.minute < 10:
             return
         scan_date = today
 
@@ -537,14 +539,28 @@ def _run_czsc_scan():
         result = subprocess.run(
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
              "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py", "--push"],
-            capture_output=True, text=True, timeout=300
+            capture_output=True, text=True, timeout=1200
         )
         output = result.stdout.strip()[:500]
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
-        if 'data_not_ready' in output or result.returncode != 0:
+        # 2026-08-18: 严格成功判定 — 只有扫描真正跑在目标交易日数据上(reason=ok
+        # 且 data_date==scan_date)才算完成; data_not_ready / non_trading_day /
+        # 崩溃 / 旧数据一律重试, 防止 done-marker 误写导致当日信号永久丢失.
+        import re as _re
+        _m = _re.search(r'czsc_scan: reason=(\w+) data_date=(\d{4}-\d{2}-\d{2})', output)
+        _scan_reason = _m.group(1) if _m else None
+        _scan_data_date = _m.group(2) if _m else None
+        _scan_ok = (result.returncode == 0 and _scan_reason == 'ok'
+                    and _scan_data_date == scan_date)
+        if not _scan_ok:
             retry_count += 1
-            reason = "data_not_ready" if 'data_not_ready' in output else "error"
+            if result.returncode != 0:
+                reason = "error"
+            elif _scan_reason is None:
+                reason = "no_result_line"
+            else:
+                reason = _scan_reason
             logger.info("czsc扫描未成功: %s (第%d次, 将在15分钟后重试)", reason, retry_count)
             try:
                 with open(status_file, "w") as f:
@@ -594,7 +610,7 @@ def _run_czsc_scan():
 
     except subprocess.TimeoutExpired:
         retry_count += 1
-        logger.error("czsc扫描超时(300s), 第%d次", retry_count)
+        logger.error("czsc扫描超时(1200s), 第%d次", retry_count)
         try:
             with open(status_file, "w") as f:
                 json.dump({"last_run": now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -688,7 +704,7 @@ def _run_experimental_scan():
             ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python3.12",
              "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/czsc_scan.py",
              "--profile", "experimental"],
-            capture_output=True, text=True, timeout=300
+            capture_output=True, text=True, timeout=1200
         )
         logger.info("实验组扫描完成: %s", result.stdout.strip()[:200])
     except Exception as e:
@@ -791,7 +807,7 @@ def _monitor_data_collection():
         _EXCL = (
             "stock_code NOT LIKE '9%%' AND stock_code NOT LIKE '4%%' "
             "AND stock_code NOT LIKE '8%%' AND stock_code NOT LIKE '689%%' "
-            "AND stock_code NOT IN "
+            "AND stock_code COLLATE utf8mb4_unicode_ci NOT IN "
             "(SELECT code FROM stock_basic WHERE name LIKE '%%ST%%')"
         )
         cur.execute(
