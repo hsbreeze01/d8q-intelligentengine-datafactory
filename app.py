@@ -31,10 +31,23 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=24)
 app.register_blueprint(auth_bp)
 app.before_request(check_auth)
 
+# --- PWA Support ---
+@app.route("/sw.js")
+def _pwa_sw():
+    from flask import send_from_directory
+    return send_from_directory(app.static_folder, "sw.js", mimetype="application/javascript")
+
+@app.route("/manifest.json")
+def _pwa_manifest():
+    from flask import send_from_directory
+    return send_from_directory(app.static_folder, "manifest.json", mimetype="application/json")
+
+
+
 # [DISABLED 2026-08-04] 缠论非czsc路由已停用，保留czsc引擎
 _CHANLUN_DISABLED_PATHS = ("/api/chanlun/signals", "/api/chanlun/backtest",
     "/api/chanlun/scan", "/api/chanlun/disciplined",
-    "/api/chanlun/review", "/api/chanlun/notify")
+    "/api/chanlun/notify")
 
 @app.before_request
 def _chanlun_disabled_guard():
@@ -71,6 +84,49 @@ def _track_event(response):
         pass
     _cleanup_old_events()
     return response
+
+
+@app.after_request
+def _static_cache(response):
+    """2026-08-18: 静态资源浏览器缓存 1 天(echarts 1MB 只下载一次)."""
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+@app.after_request
+def _gzip_response(response):
+    """2026-08-18: gzip 压缩大文本响应 — index.html 356KB 压后 ~70KB,
+    避免低带宽下每次页面加载/切换都拖 356KB."""
+    import gzip as _gzip
+    if response.direct_passthrough:
+        return response
+    ctype = (response.content_type or '').lower()
+    if not any(t in ctype for t in ('text/html', 'text/css', 'application/json',
+                                    'application/javascript', 'text/javascript')):
+        return response
+    if 'gzip' not in (request.headers.get('Accept-Encoding') or '').lower():
+        return response
+    body = response.get_data()
+    if len(body) < 512:
+        return response
+    compressed = _gzip.compress(body, 6)
+    if len(compressed) >= len(body):
+        return response
+    response.set_data(compressed)
+    response.headers['Content-Encoding'] = 'gzip'
+    response.headers['Content-Length'] = len(compressed)
+    response.headers['Vary'] = 'Accept-Encoding'
+    return response
+
+
+@app.route("/favicon.ico")
+def favicon():
+    """2026-08-18: 真实 favicon — 原先 catch-all 把它回落成 356KB 的 index.html,
+    每次页面切换浏览器都会重新拉一遍."""
+    resp = app.send_static_file('images/icon-192.png')
+    resp.headers['Cache-Control'] = 'public, max-age=604800'
+    return resp
 
 app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
@@ -431,7 +487,7 @@ def proxy_tracks(**kwargs):
             url = url + sep + "user_id=" + urllib.parse.quote(_username)
     try:
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             import json as _json
             return _json.loads(resp.read()), resp.status
     except Exception as e:
@@ -453,7 +509,7 @@ def proxy_tracks_keywords_write(track_id, keyword=None):
         url = AGENT_API + f"/api/tracks/{track_id}/keywords/{kw_enc}"
         req = urllib.request.Request(url, method="DELETE")
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             return json.loads(resp.read()), resp.status
     except urllib.error.HTTPError as e:
         body = e.read()
@@ -3644,7 +3700,7 @@ def chanlun_czsc_detail(stock_code):
 def chanlun_review():
     """复盘统计API"""
     import json as _json, os as _os
-    path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/review_stats.json"
+    path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signal_review_stats.json"
     try:
         if _os.path.exists(path):
             with open(path) as f:
