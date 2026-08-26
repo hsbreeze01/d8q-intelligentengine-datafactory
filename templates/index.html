@@ -383,6 +383,7 @@ const PAGES=[
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
 // [DISABLED] {id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
 {id:"chanlun-czsc",icon:"🧪",label:"缠论(czsc)",title:"缠论czsc引擎"},
+{id:'macro',icon:'🌐',label:'宏观仪表盘',title:'宏观仪表盘'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
 {id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
@@ -432,7 +433,7 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc};
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc,macro:loadMacro};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }
@@ -4506,5 +4507,110 @@ window.addEventListener('DOMContentLoaded',function(){
     if(document.getElementById('czscHistoryStartDate'))resetCzscHistoryDates();
   },1000);
 });
+
+
+async function loadMacro(el){
+  var data = await apiV("/api/macro/sentiment?days=250");
+  var latest = data.latest||{}, hist = data.history||[];
+  if(!hist.length){el.innerHTML='<div style="padding:40px;text-align:center;color:#999">暂无情绪数据</div>';return;}
+
+  var PHASE={
+    '冰点':{c:'#1890ff',tip:'连板高度压缩、亏钱效应弥漫。冰点末期小仓试错，不恐慌割肉'},
+    '修复':{c:'#52c41a',tip:'涨停回升、龙头先走。做主线龙头，分歧转一致'},
+    '温和':{c:'#faad14',tip:'趋势运行、持仓观望。模式内正常参与'},
+    '亢奋':{c:'#fa8c16',tip:'涨停潮、连板高度抬升。高潮次日规避后排跟风'},
+    '过热':{c:'#f5222d',tip:'人人皆赚、缩量一字。持股不开仓，命好就锁命不好赶紧跑'}
+  };
+  function phaseOf(v){return v>=80?'过热':v>=60?'亢奋':v>=40?'温和':v>=20?'修复':'冰点';}
+  var ph=latest.phase||phaseOf(latest.composite||0);
+  var PC=PHASE[ph]||PHASE['温和'];
+  function fmt(v,d){return (v===null||v===undefined||isNaN(v))?'-':Number(v).toFixed(d===undefined?1:d);}
+  function pct(v){return (v===null||v===undefined||isNaN(v))?'-':(Number(v)*100).toFixed(1)+'%';}
+  function yi(v){return (v===null||v===undefined||isNaN(v))?'-':(Number(v)/1e8).toFixed(0);}
+  var sd=latest.streak_dist||{};
+
+  var h='<div style="max-width:1100px;margin:0 auto;padding:20px 16px">';
+  h+='<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  h+='<h3 style="margin:0;font-size:22px;font-weight:700">🌐 宏观仪表盘</h3>';
+  h+='<span style="font-size:11px;color:#aaa">板块 1/1 · 市场情绪</span></div>';
+
+  h+='<div class="macro-section" id="sec-sentiment" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);padding:18px;margin-bottom:16px">';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
+  h+='<h4 style="margin:0;font-size:16px;font-weight:700">📈 市场情绪温度计</h4>';
+  h+='<span style="background:'+PC.c+';color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:12px">'+ph+' '+fmt(latest.composite)+'</span>';
+  h+='<span style="font-size:12px;color:#999">截至 '+latest.date+'</span>';
+  h+='<span style="font-size:11px;color:#888;margin-left:auto;max-width:420px">'+PC.tip+'</span></div>';
+
+  var cards=[
+    ['涨停 / 跌停',(latest.limit_up||0)+' / '+(latest.limit_down||0), '触及涨停 '+(latest.touch_limit||0)],
+    ['封板率', pct(latest.seal_rate), '收盘封板 / 盘中触板'],
+    ['连板高度', (latest.max_streak||'-')+' 板', '首板 '+(sd['1']||0)+' · 2板 '+(sd['2']||0)+' · 3板 '+(sd['3']||0)+' · 4板+ '+(sd['4+']||0)],
+    ['晋级率 1进2', pct(latest.promo_1_2), '2进3 '+pct(latest.promo_2_3)],
+    ['昨涨停溢价', fmt(latest.premium_mean)+'%', '中位数 '+fmt(latest.premium_median)+'%'],
+    ['大面 / 天地板', (latest.big_face||0)+' / '+(latest.heaven_hell||0), '昨涨停今暴跌 · 触板收跌停'],
+    ['上涨占比', pct(latest.up_ratio), '全市场涨家比例'],
+    ['成交额', yi(latest.total_turnover)+' 亿', '沪深合计']
+  ];
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
+  cards.forEach(function(c){
+    h+='<div style="background:#fafafa;border-radius:10px;padding:12px 14px">';
+    h+='<div style="font-size:11px;color:#999;margin-bottom:4px">'+c[0]+'</div>';
+    h+='<div style="font-size:20px;font-weight:700;color:#333">'+c[1]+'</div>';
+    h+='<div style="font-size:11px;color:#aaa;margin-top:3px">'+c[2]+'</div></div>';
+  });
+  h+='</div>';
+  h+='<div id="macroSentChart" style="height:340px"></div>';
+  h+='<div id="macroStreakChart" style="height:230px;margin-top:8px"></div>';
+  h+='</div>';
+  h+='<div style="text-align:center;color:#bbb;font-size:11px;padding:8px 0 30px">后续宏观板块将追加于此（资金面 / 北向 / 估值 …）</div>';
+  h+='</div>';
+  el.innerHTML=h;
+
+  ['macroSentChart','macroStreakChart'].forEach(function(id){
+    var d=document.getElementById(id);
+    if(d){var old=echarts.getInstanceByDom(d);if(old)old.dispose();}
+  });
+
+  var dates=hist.map(function(r){return r.date;});
+  var comp=hist.map(function(r){return r.composite;});
+  var ma5=hist.map(function(r){return r.composite_ma5;});
+  var streak=hist.map(function(r){return r.max_streak;});
+  var lu=hist.map(function(r){return r.limit_up;});
+  var ld=hist.map(function(r){return r.limit_down;});
+
+  var c1=echarts.init(document.getElementById('macroSentChart'));
+  c1.setOption({
+    tooltip:{trigger:'axis'},
+    legend:{data:['情绪指数','5日均线'],top:0,textStyle:{fontSize:11}},
+    grid:{left:40,right:16,top:30,bottom:44},
+    xAxis:{type:'category',data:dates,axisLabel:{fontSize:10}},
+    yAxis:{type:'value',min:0,max:100,splitNumber:5},
+    dataZoom:[{type:'inside'},{type:'slider',height:16,bottom:6}],
+    visualMap:{show:false,seriesIndex:0,dimension:1,pieces:[
+      {lte:20,color:'#1890ff'},{gt:20,lte:40,color:'#52c41a'},{gt:40,lte:60,color:'#faad14'},
+      {gt:60,lte:80,color:'#fa8c16'},{gt:80,color:'#f5222d'}]},
+    series:[
+      {name:'情绪指数',type:'line',data:comp,showSymbol:false,lineStyle:{width:2},areaStyle:{opacity:.08},
+       markLine:{silent:true,symbol:'none',lineStyle:{type:'dashed',color:'#ccc'},label:{fontSize:9},
+         data:[{yAxis:20},{yAxis:40},{yAxis:60},{yAxis:80}]}},
+      {name:'5日均线',type:'line',data:ma5,showSymbol:false,lineStyle:{width:1,type:'dashed',color:'#888'}}
+    ]
+  });
+
+  var c2=echarts.init(document.getElementById('macroStreakChart'));
+  c2.setOption({
+    tooltip:{trigger:'axis'},
+    legend:{data:['连板高度','涨停家数','跌停家数'],top:0,textStyle:{fontSize:11}},
+    grid:{left:36,right:36,top:30,bottom:24},
+    xAxis:{type:'category',data:dates,axisLabel:{fontSize:10}},
+    yAxis:[{type:'value',name:'板',minInterval:1},{type:'value',name:'家'}],
+    series:[
+      {name:'连板高度',type:'bar',data:streak,barMaxWidth:6,itemStyle:{color:'#fa8c16'}},
+      {name:'涨停家数',type:'line',yAxisIndex:1,data:lu,showSymbol:false,lineStyle:{width:1.5,color:'#f5222d'}},
+      {name:'跌停家数',type:'line',yAxisIndex:1,data:ld,showSymbol:false,lineStyle:{width:1,color:'#52c41a'}}
+    ]
+  });
+  window._macroCharts=[c1,c2];
+}
 
 </script>

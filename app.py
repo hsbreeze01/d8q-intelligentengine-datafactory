@@ -3710,6 +3710,39 @@ def chanlun_review():
     except Exception as e:
         return jsonify({"error": str(e), "total": 0})
 
+@app.route("/api/macro/sentiment", methods=["GET"])
+def macro_sentiment():
+    """市场情绪温度计: sentiment_daily 最新值 + 历史序列(升序)"""
+    import pymysql
+    from decimal import Decimal
+    import json as _json
+    days = request.args.get("days", 250, type=int)
+    DB = {"host": "127.0.0.1", "port": 3306, "user": "root", "password": "password",
+          "database": "stock_analysis_system", "charset": "utf8mb4"}
+    try:
+        conn = pymysql.connect(**DB)
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+        cur.execute("SELECT * FROM sentiment_daily ORDER BY date DESC LIMIT %s", (days,))
+        rows = cur.fetchall()
+        conn.close()
+        history = []
+        for r in reversed(rows):
+            r["date"] = str(r["date"])
+            r.pop("updated_at", None)
+            for k, v in list(r.items()):
+                if isinstance(v, Decimal):
+                    r[k] = float(v)
+            history.append(r)
+        latest = dict(history[-1]) if history else {}
+        if isinstance(latest.get("streak_dist"), str):
+            try:
+                latest["streak_dist"] = _json.loads(latest["streak_dist"])
+            except Exception:
+                pass
+        return jsonify({"latest": latest, "history": history, "count": len(history)})
+    except Exception as e:
+        return jsonify({"error": str(e), "latest": {}, "history": []})
+
 @app.route("/api/chanlun/notify", methods=["POST"])
 def chanlun_notify():
     """企微群机器人推送缠论信号"""
