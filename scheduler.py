@@ -562,12 +562,15 @@ def _run_czsc_scan():
         _scan_ok = _is_czsc_scan_ok(output, scan_date, result.returncode)
         if not _scan_ok:
             retry_count += 1
+            import re as _re_fail
+            _m_fail = _re_fail.search(r'czsc_scan: reason=(\w+)', output)
+            _fail_reason = _m_fail.group(1) if _m_fail else None
             if result.returncode != 0:
                 reason = "error"
-            elif _scan_reason is None:
+            elif _fail_reason is None:
                 reason = "no_result_line"
             else:
-                reason = _scan_reason
+                reason = _fail_reason
             logger.info("czsc扫描未成功: %s (第%d次, 将在15分钟后重试)", reason, retry_count)
             try:
                 with open(status_file, "w") as f:
