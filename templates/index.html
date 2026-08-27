@@ -4698,43 +4698,43 @@ async function loadMacro(el){
   }
 }
 
-  // v4: 猛男值/菜比值双曲线(DOM 已构建, 使用 hist 全局变量)
+  // v4: 猛男值/菜比值双曲线(30天, 直线折线)
   setTimeout(function(){
   var mcEl=document.getElementById('macroMoneyChart');
   if(mcEl){
     var oldmc=echarts.getInstanceByDom(mcEl);if(oldmc)oldmc.dispose();
-    var hh90=hist.slice(-90);
-    var dates90=hh90.map(function(r){return r.date;});
-    var mData=hh90.map(function(r){return r.masculinity_score;});
-    var rData=hh90.map(function(r){return r.retail_ratio;});
+    var hh30=hist.slice(-30);
+    var dates30=hh30.map(function(r){return r.date;});
+    var mData=hh30.map(function(r){return r.masculinity_score;});
+    var rData=hh30.map(function(r){return r.retail_ratio;});
     var cM=echarts.init(mcEl);
     cM.setOption({
       tooltip:{trigger:'axis'},
       legend:{data:['猛男值','菜比值'],top:0,textStyle:{fontSize:11}},
-      grid:{left:40,right:40,top:28,bottom:24},
-      xAxis:{type:'category',data:dates90,axisLabel:{fontSize:10}},
+      grid:{left:40,right:40,top:28,bottom:28},
+      xAxis:{type:'category',data:dates30,axisLabel:{fontSize:9,interval:2}},
       yAxis:{type:'value',min:0,max:100},
       series:[
-        {name:'猛男值',type:'line',data:mData,showSymbol:false,smooth:true,lineStyle:{width:1.5,color:'#1890ff',type:'dashed'},areaStyle:{opacity:.08}},
-        {name:'菜比值',type:'line',data:rData,showSymbol:false,smooth:true,lineStyle:{width:1.5,color:'#fa8c16'}}
+        {name:'猛男值',type:'line',data:mData,showSymbol:false,smooth:false,lineStyle:{width:1.5,color:'#1890ff',type:'dashed'}},
+        {name:'菜比值',type:'line',data:rData,showSymbol:false,smooth:false,lineStyle:{width:1.5,color:'#fa8c16'}}
       ]
     });
   }
   }, 50);
 
-  // v4: 冰川6级温度计(左侧6级刻度标记, 纯折线图)
+  // v4: 冰川6级温度计(30天, 直线折线, 左侧6级刻度)
   setTimeout(function(){
   var gEl=document.getElementById('macroGlaeChart');
   if(gEl){
     var oldg=echarts.getInstanceByDom(gEl);if(oldg)oldg.dispose();
-    var hh90=hist.slice(-90);
-    var dates90=hh90.map(function(r){return r.date;});
-    var gData=hh90.map(function(r){return r.composite_v2!=null&&r.composite_v2!==undefined&&!isNaN(r.composite_v2)?r.composite_v2:r.composite;});
+    var hh30=hist.slice(-30);
+    var dates30=hh30.map(function(r){return r.date;});
+    var gData=hh30.map(function(r){return r.composite_v2!=null&&r.composite_v2!==undefined&&!isNaN(r.composite_v2)?r.composite_v2:r.composite;});
     var cG=echarts.init(gEl);
     cG.setOption({
-      tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+': '+p.value.toFixed(2)+' ('+(hh90[p.dataIndex].phase_glae||'')+')';}},
-      grid:{left:60,right:16,top:10,bottom:24},
-      xAxis:{type:'category',data:dates90,axisLabel:{fontSize:10}},
+      tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+': '+p.value.toFixed(2)+' ('+(hh30[p.dataIndex].phase_glae||'')+')';}},
+      grid:{left:60,right:16,top:10,bottom:28},
+      xAxis:{type:'category',data:dates30,axisLabel:{fontSize:9,interval:2}},
       yAxis:{type:'value',min:0,max:100,inverse:true,
         axisLabel:{fontSize:11,fontWeight:60,formatter:function(v){
           if(v>=90)return '{bf}沸点';
@@ -4754,7 +4754,7 @@ async function loadMacro(el){
         }},
         splitLine:{show:false}
       },
-      series:[{type:'line',data:gData,showSymbol:false,smooth:true,lineStyle:{width:2.5,color:'#722ed1'},
+      series:[{type:'line',data:gData,showSymbol:false,smooth:false,lineStyle:{width:2.5,color:'#722ed1'},
         markArea:{silent:true,itemStyle:{opacity:.10},data:[
           [{yAxis:90,itemStyle:{color:'#c41d1d'}},{yAxis:100}],
           [{yAxis:80,itemStyle:{color:'#fa541c'}},{yAxis:90}],
