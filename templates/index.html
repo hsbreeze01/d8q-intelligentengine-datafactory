@@ -4646,7 +4646,7 @@ async function loadMacro(el){
   var cd={};
   try{cd=(typeof latest.chg_dist==='string')?JSON.parse(latest.chg_dist):(latest.chg_dist||{});}catch(e){}
   var bkeys=[],bvals=[];
-  for(var bi=-10;bi<=10;bi++){bkeys.push(bi);bvals.push(cd['b'+bi]||0);}
+  for(var bi=-10;bi<=10;bi++){bkeys.push(bi);bvals.push(cd[String(bi)]||cd['b'+bi]||0);}
   var cdEl=document.getElementById('macroChgChart');
   if(cdEl){
     var old3c=echarts.getInstanceByDom(cdEl);if(old3c)old3c.dispose();
