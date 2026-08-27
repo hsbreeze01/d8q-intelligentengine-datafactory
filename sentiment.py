@@ -124,12 +124,13 @@ def _epct(s, use_rolling=False):
     # Work on tail starting at first_valid
     tail = arr[first_valid:]
     ser = pd.Series(tail)
+    # raw=True -> x is numpy 1D array (faster, no pandas overhead)
     if use_rolling:
         r = ser.rolling(ROLLING_PCT_WINDOW, min_periods=ROLLING_PCT_MIN)
-        pct_tail = r.apply(lambda x: (x <= x.iloc[-1]).mean() * 100.0, raw=True).values
+        pct_tail = r.apply(lambda x: (x <= x[-1]).mean() * 100.0, raw=True).values
     else:
         pct_tail = ser.expanding(min_periods=ROLLING_PCT_MIN).apply(
-            lambda x: (x <= x.iloc[-1]).mean() * 100.0, raw=True).values
+            lambda x: (x <= x[-1]).mean() * 100.0, raw=True).values
     result = np.full(len(arr), np.nan, dtype=float)
     result[first_valid:] = pct_tail
     return pd.Series(result, index=idx)
