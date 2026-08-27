@@ -3756,6 +3756,63 @@ def macro_sentiment():
     except Exception as e:
         return jsonify({"error": str(e), "latest": {}, "history": []})
 
+@app.route("/api/monitor/data-health", methods=["GET"])
+def monitor_data_health():
+    """数据链路新鲜度健康检查, 供 monitor http 规则探测(127.0.0.1 免鉴权).
+    check=sentiment: sentiment_daily 最新日期 <=4 自然日
+    check=signals:   czsc_signal_history(default) 最新 signal_date <=4 自然日
+    check=mysql:     stock_data_daily 最新日行数>=3000 且 重复 stock-day 占比<30%
+    健康 200 / 异常 503 (monitor 的 http 判定以 5xx 为故障)."""
+    import pymysql
+    from datetime import date as _d
+    check = request.args.get("check", "sentiment")
+
+    def _payload(ok, **kw):
+        return jsonify({"check": check, "ok": bool(ok), **kw}), (200 if ok else 503)
+
+    DB = {"host": "127.0.0.1", "port": 3306, "user": "root", "password": "password",
+          "database": "stock_analysis_system", "charset": "utf8mb4"}
+    try:
+        conn = pymysql.connect(**DB)
+        cur = conn.cursor()
+        if check == "sentiment":
+            cur.execute("SELECT MAX(date) FROM sentiment_daily")
+            d = cur.fetchone()[0]
+            conn.close()
+            if d is None:
+                return _payload(False, latest=None, message="sentiment_daily 为空")
+            age = (_d.today() - d).days
+            return _payload(age <= 4, latest=str(d), age_days=age,
+                            message="ok" if age <= 4 else "情绪数据过期 %d 天" % age)
+        if check == "signals":
+            cur.execute("SELECT MAX(signal_date) FROM czsc_signal_history WHERE profile='default'")
+            d = cur.fetchone()[0]
+            conn.close()
+            if d is None:
+                return _payload(False, latest=None, message="无 default 信号")
+            age = (_d.today() - d).days
+            return _payload(age <= 4, latest=str(d), age_days=age,
+                            message="ok" if age <= 4 else "信号新鲜度异常 %d 天" % age)
+        if check == "mysql":
+            cur.execute("SELECT date, COUNT(*) FROM stock_data_daily GROUP BY date ORDER BY date DESC LIMIT 1")
+            row = cur.fetchone()
+            if not row:
+                conn.close()
+                return _payload(False, message="stock_data_daily 为空")
+            d, n = row
+            cur.execute("SELECT COUNT(*), COUNT(DISTINCT stock_code, date) FROM stock_data_daily")
+            total, uniq = cur.fetchone()
+            conn.close()
+            dup = total - uniq
+            ratio = (dup / total) if total else 1.0
+            ok = n >= 3000 and ratio < 0.30
+            return _payload(ok, latest_date=str(d), latest_rows=n, total_rows=total,
+                            dup_rows=dup, dup_ratio=round(ratio, 4),
+                            message="ok" if ok else "最新日仅%d行或重复占比%.1f%%" % (n, ratio * 100))
+        return _payload(False, message="未知 check: %s" % check)
+    except Exception as e:
+        return _payload(False, message=str(e)[:200])
+
 @app.route("/api/chanlun/notify", methods=["POST"])
 def chanlun_notify():
     """企微群机器人推送缠论信号"""
