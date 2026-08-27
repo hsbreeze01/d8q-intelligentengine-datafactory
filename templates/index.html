@@ -4704,12 +4704,14 @@ async function loadMacro(el){
     var hh30=hist.slice(-30);
     var dates30=hh30.map(function(r){return r.date;});
     var mData=hh30.map(function(r){
+      if(r.masculinity_score==null||r.masculinity_score==='')return null;
       var v=Number(r.masculinity_score);
-      return isNaN(v)?null:Math.max(-100,Math.min(100,v));
+      return isNaN(v)?null:Math.max(0,Math.min(100,v));
     });
     var rData=hh30.map(function(r){
+      if(r.retail_ratio==null||r.retail_ratio==='')return null;
       var v=Number(r.retail_ratio);
-      return isNaN(v)?null:Math.max(-100,Math.min(100,v));
+      return isNaN(v)?null:Math.max(0,Math.min(100,v));
     });
     var cM=echarts.init(mcEl);
     cM.setOption({
