@@ -4737,7 +4737,7 @@ async function loadMacro(el){
     var oldg=echarts.getInstanceByDom(gEl);if(oldg)oldg.dispose();
     var hh30=hist.slice(-30);
     var dates30=hh30.map(function(r){return r.date;});
-    var gData=hh30.map(function(r){return r.composite_v2!=null&&r.composite_v2!==undefined&&!isNaN(r.composite_v2)?r.composite_v2:r.composite;});
+    var gData=hh30.map(function(r){return r.composite_glae!=null&&r.composite_glae!==undefined&&!isNaN(r.composite_glae)?r.composite_glae:(r.composite_v2!=null&&r.composite_v2!==undefined&&!isNaN(r.composite_v2)?r.composite_v2:r.composite);});
     var cG=echarts.init(gEl);
     cG.setOption({
       tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+': '+p.value.toFixed(2)+' ('+(hh30[p.dataIndex].phase_glae||'')+')';}},
