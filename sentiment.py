@@ -660,8 +660,7 @@ def _fetch_lhb(start, end):
         f"龙虎榜[{start}~{end}]")
     if df is None or df.empty:
         return {}
-    # 同一股票同日多上榜原因会重复, 按(代码,上榜日)去重
-    df = df.drop_duplicates(subset=["代码", "上榜日"], keep="first")
+    # 注意: 同一股票同日可能有多条记录(不同席位类型), 不应去重, 应全部汇总
     per = {}
     for d, sub in df.groupby("上榜日"):
         nb = pd.to_numeric(sub["龙虎榜净买额"], errors="coerce").fillna(0.0).sum()
