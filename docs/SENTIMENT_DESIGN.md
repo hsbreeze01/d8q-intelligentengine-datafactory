@@ -1,7 +1,7 @@
 # 市场情绪温度计 · 设计文档
 
-> 版本: v1 已上线 (2026-08-27) · v2 待做
-> 代码: `sentiment.py` · 表: `sentiment_daily` · API: `/api/macro/sentiment` · 前端: 主看板「宏观仪表盘」tab
+> 版本: v1 已上线 (2026-08-27) · v2 已上线 (2026-08-27, 龙虎榜/两融/炸板池补充指标) · **v3 已上线 (2026-08-27, P0/P1: 涨跌幅分布/板块榜/连板值/非一字溢价)**
+> 代码: `sentiment.py` · 表: `sentiment_daily` + `sentiment_extras_daily` + `sentiment_sector_daily` · API: `/api/macro/sentiment` · 前端: 主看板「宏观仪表盘」tab
 > 调度: `d8q-sentiment.timer` 每日 21:30（当日 K 线约 16:00 入库后，安全槽位）
 
 ---
@@ -82,19 +82,72 @@ sentiment_daily 表 (每日17指标 + 合成指数 + 阶段)
 - **极端日符合史实**：2024-09-26 / 09-30「924 行情」识别为过热（97.79 / 95.55）
 - 当前样例（2026-08-26）：温和 53.26，涨停 56，最高 5 板，封板率 68.3%，昨涨停溢价 +2.4%
 
+### 2.5 v2 补充指标（已上线，2026-08-27）
+
+**采集**（AKShare EOD，独立表 `sentiment_extras_daily`，`--collect-extras` 触发，各组失败容忍不阻断 v1）：
+
+| 组 | 接口 | 口径 | 可回填性 |
+|---|---|---|---|
+| lhb 龙虎榜 | `stock_lhb_detail_em`（按月区间） | 家数 / 净买合计（元→万，按代码+上榜日去重）/ 机构席位次数（解读含"机构"） | 2024-01-02 起全量 |
+| margin 两融 | `stock_margin_sse`（区间）+ `stock_margin_szse`（逐日） | 沪+深 融资余额 / 融资买入额（亿；两源齐全才写，T+1 发布次日自动补） | 全量 |
+| broken 炸板池 | `stock_zt_pool_zbgc_em`（逐日） | 炸板家数（空表=当日无炸板记 0） | 仅近 ~30 交易日 |
+| 北向净买额 | ~~停发~~ | 2024-08-18 起港交所停发日度披露，**不采集** | — |
+
+**派生与合成**：
+- `true_seal_rate` 真实封板率 = 收盘涨停 ÷（收盘涨停 + 炸板），修正日线 proxy 低估（仅近 30 日有值）
+- `composite_v2` / `phase_v2`：九子指标加权（v1 六指标等比缩放 0.70 + 龙虎榜净买 0.15 + 真实封板率 0.10 + 融资余额 0.05），同样 expanding 分位 + 行级权重归一；**extras 全缺的历史段 composite_v2 == composite，曲线连续无断点**
+- 阶段映射与 v1 相同（phase_v2）
+
+**运行**：
+```
+venv/bin/python sentiment.py --collect-extras                      # 每日增量(采集近30缺口+重算近30日)
+venv/bin/python sentiment.py --collect-extras --extras-backfill    # 全量回填(一次性)
+venv/bin/python sentiment.py --collect-extras --only lhb           # 单组修复(不计算)
+```
+
+### 2.6 v3 P0/P1 指标（已上线，2026-08-27）
+
+对标冰川每日图的缺口补全：7 个指标全部**纯 DB 推导、零新增采集**，在 `_process_batch` 批内流式聚合（复用 range-scan 有界内存），任意运行模式（增量/`--backfill`/`--collect-extras`）都会计算并持久化。
+
+**P0（当日看盘必备）**
+
+| 指标 | 口径 | 对标 |
+|---|---|---|
+| `chg_dist` | 涨跌幅 21 档分桶 JSON（桶 i 覆盖 [i, i+1)pp，clip ±10；**分桶前 round 2dp**——涨停股 close/prev-1 常为 9.9999999998% 之类浮点尾差，不 round 会散落 b9/b10 桶） | 冰川图1 柱状图 |
+| `up_count / down_count / flat_count` | 收盘涨/跌/平家数（涨跌幅自算口径，非采集器列） | — |
+| `mkt_chg_mean / mkt_chg_median` | 全市场平均涨幅 / 中位数（中位数用直方图桶内线性插值近似） | 冰川图2 |
+| `sentiment_sector_daily` 表 | 申万一级行业日频聚合：成交额 / 家数 / 涨家数 / 均涨幅 / 龙头股（代码+名称+涨幅）；行业取 `stock_basic.industry` 一级（`-` 前段），缺失归「未分类」 | 冰川图4 板块成交额榜 |
+
+**P1（接力质量增强）**
+
+| 指标 | 口径 | 对标 |
+|---|---|---|
+| `premium_mean_noyizi / _median_noyizi` | 昨涨停溢价**剔除今日一字开盘**（今开 ≥ 涨停价-0.001 的剔除）——区分自然接力 vs 一字躺赢 | — |
+| `lb_strength` 连板值 | 昨连板（≥2板）股今涨幅 ≥7% 的比例（宽松接力口径） | 冰川图5 |
+| `lb_break` 连比值 | 昨连板股今涨幅 ≤0 的比例（断板收平/跌，连板梯队韧性的反向指标） | 冰川图5 |
+
+**实现与验证**：
+- 板块表 PK `(date, industry)`，`persist_sectors` 整日先删后插幂等，只保留最近 tail_days 个交易日；原值即用，无 60 日分位 warm-up 问题
+- API：`/api/macro/sentiment` 返回新增 `sectors` 字段（最新交易日按成交额 TOP8；表缺失时容忍返回空数组，不阻断 v1）
+- 单测：`tests/test_sentiment_v3.py`（FakeCur 模拟 ORDER BY 排序；覆盖 21 档分桶含浮点精度、非一字溢价、连板值/连比值、板块聚合与龙头）
+- 已知取舍：`lb_strength` 用 ≥7% 宽松口径（严格口径应「今涨停或≥7%」且剔除一字，样本量小噪声大，先宽后紧）
+
 ---
 
 ## 3. 前端（已实现）
 
 - 主看板 SPA（`templates/index.html`）`PAGES` 注册 `macro` tab，`loadMacro(el)` 渲染
 - **板块化布局**：外层可扩展容器，情绪是板块 1/1，后续宏观板块（资金面/北向/估值）追加即插
-- 内容：阶段徽章（颜色+分数+操作提示）→ 8 指标卡 → 情绪指数主图（ECharts，分色+阈值线+缩放，250 天）→ 连板高度/涨跌停副图
+- 内容：阶段徽章（颜色+分数+操作提示）→ 8 指标卡 → 情绪指数主图（ECharts，分色+阈值线+缩放）→ 连板高度/涨跌停副图
+- **趋势窗口 30/90 切换**（默认 90，2026-08-27 实证定标：584 日序列实测情绪周期中位 54 自然日≈37 交易日，90 日≈1.5~2 个完整周期可判位置，30 日看拐点；数据一次拉 90 日，30 由前端切片零二次请求）
+- **v2 元素**（紫色系区分）：v2 阶段徽章（龙虎榜/两融/炸板池融合，悬停提示口径）→ 3 张补充指标卡（龙虎榜净买/真实封板率/融资余额）→ 主图新增「情绪v2」紫色曲线（与 v1 同图对比）
+- **v3 元素**（P0/P1）：3 张 P1 指标卡（涨/跌/平家数+均涨中位、连板值/连比值、非一字溢价）→ 「全市场涨跌幅分布」21 档柱状图（红涨绿跌，悬停显示桶区间家数）→ 「板块成交额榜」TOP8 卡片（行业+均涨幅分色背景+成交额占比+涨家数占比+龙头股）
 
 ---
 
 ## 4. 未实现部分（Roadmap，按优先级）
 
-### v2 · 情绪闸门接入模拟器（优先级最高，半天）
+### 情绪闸门接入模拟器（优先级最高，半天）
 - **设计**：模拟器按 phase 客观调整买入纪律——
   - 冰点期：`BUY_MIN_SCORE` 60→70（或仅允许错杀修复类买点）
   - 亢奋末期/过热：不开新仓，只执行卖出纪律
@@ -135,9 +188,10 @@ sentiment_daily 表 (每日17指标 + 合成指数 + 阶段)
 
 | 资产 | 位置 |
 |---|---|
-| 计算引擎 | 47 `d8q-intelligentengine-datafactory/sentiment.py` |
-| 数据表 | 47 MySQL `stock_analysis_system.sentiment_daily`（642 天） |
-| API | 47 datafactory `:8088 /api/macro/sentiment` |
+| 计算引擎 | 47 `d8q-intelligentengine-datafactory/sentiment.py`（v1 纯 DB 计算 + v2 extras 采集） |
+| 数据表 | 47 MySQL `stock_analysis_system.sentiment_daily`（642 天, 含 v2 十列 + v3 十列）+ `sentiment_extras_daily` + `sentiment_sector_daily`（板块日频） |
+| 单测 | `tests/test_sentiment_v3.py`（分桶/非一字/连板值/板块聚合） |
+| API | 47 datafactory `:8088 /api/macro/sentiment`（SELECT *, v2/v3 列自动透传 + sectors 板块TOP8） |
 | 前端 | `templates/index.html` macro tab + `app.py` 端点 |
-| 调度 | `d8q-sentiment.timer`（21:30 每日） |
-| 提交 | datafactory `eb1d11a` |
+| 调度 | `d8q-sentiment.timer`（21:30 每日, 已改为 `--collect-extras` 增量采集+计算） |
+| 依赖 | 服务器 venv 已装 `akshare`（仅 extras 采集需要, 纯 DB 计算不受影响） |

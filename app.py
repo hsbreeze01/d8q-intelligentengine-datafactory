@@ -3724,6 +3724,13 @@ def macro_sentiment():
         cur = conn.cursor(pymysql.cursors.DictCursor)
         cur.execute("SELECT * FROM sentiment_daily ORDER BY date DESC LIMIT %s", (days,))
         rows = cur.fetchall()
+        try:
+            cur.execute("SELECT * FROM sentiment_sector_daily "
+                        "WHERE date=(SELECT MAX(date) FROM sentiment_sector_daily) "
+                        "ORDER BY turnover DESC LIMIT 8")
+            sectors = cur.fetchall()
+        except Exception:
+            sectors = []
         conn.close()
         history = []
         for r in reversed(rows):
@@ -3739,7 +3746,13 @@ def macro_sentiment():
                 latest["streak_dist"] = _json.loads(latest["streak_dist"])
             except Exception:
                 pass
-        return jsonify({"latest": latest, "history": history, "count": len(history)})
+        for s in sectors:
+            s["date"] = str(s["date"])
+            for k, v in list(s.items()):
+                if isinstance(v, Decimal):
+                    s[k] = float(v)
+        return jsonify({"latest": latest, "history": history, "count": len(history),
+                        "sectors": sectors})
     except Exception as e:
         return jsonify({"error": str(e), "latest": {}, "history": []})
 

@@ -4510,7 +4510,7 @@ window.addEventListener('DOMContentLoaded',function(){
 
 
 async function loadMacro(el){
-  var data = await apiV("/api/macro/sentiment?days=250");
+  var data = await apiV("/api/macro/sentiment?days=90");
   var latest = data.latest||{}, hist = data.history||[];
   if(!hist.length){el.innerHTML='<div style="padding:40px;text-align:center;color:#999">暂无情绪数据</div>';return;}
 
@@ -4538,6 +4538,9 @@ async function loadMacro(el){
   h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
   h+='<h4 style="margin:0;font-size:16px;font-weight:700">📈 市场情绪温度计</h4>';
   h+='<span style="background:'+PC.c+';color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:12px">'+ph+' '+fmt(latest.composite)+'</span>';
+  if(latest.composite_v2!==null&&latest.composite_v2!==undefined&&!isNaN(latest.composite_v2)){
+    h+='<span style="background:#722ed1;color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:12px" title="v2: 龙虎榜/两融/炸板池融合">'+(latest.phase_v2||'')+' '+fmt(latest.composite_v2)+'</span>';
+  }
   h+='<span style="font-size:12px;color:#999">截至 '+latest.date+'</span>';
   h+='<span style="font-size:11px;color:#888;margin-left:auto;max-width:420px">'+PC.tip+'</span></div>';
 
@@ -4549,7 +4552,13 @@ async function loadMacro(el){
     ['昨涨停溢价', fmt(latest.premium_mean)+'%', '中位数 '+fmt(latest.premium_median)+'%'],
     ['大面 / 天地板', (latest.big_face||0)+' / '+(latest.heaven_hell||0), '昨涨停今暴跌 · 触板收跌停'],
     ['上涨占比', pct(latest.up_ratio), '全市场涨家比例'],
-    ['成交额', yi(latest.total_turnover)+' 亿', '沪深合计']
+    ['成交额', yi(latest.total_turnover)+' 亿', '沪深合计'],
+    ['龙虎榜净买', latest.lhb_net_buy==null?'-':fmt(latest.lhb_net_buy,0)+' 万', '上榜 '+(latest.lhb_count==null?'-':latest.lhb_count)+' · 机构席 '+(latest.lhb_inst_seats==null?'-':latest.lhb_inst_seats)],
+    ['真实封板率', pct(latest.true_seal_rate), '炸板池口径 · 炸板 '+(latest.broken_count==null?'-':latest.broken_count)+' 家'],
+    ['融资余额', latest.margin_balance==null?'-':fmt(latest.margin_balance,0)+' 亿', '当日融资买入 '+(latest.margin_buy_amt==null?'-':fmt(latest.margin_buy_amt,0))+' 亿'],
+    ['涨 / 跌 / 平', (latest.up_count==null?'-':latest.up_count)+' / '+(latest.down_count==null?'-':latest.down_count)+' / '+(latest.flat_count==null?'-':latest.flat_count), '平均 '+fmt(latest.mkt_chg_mean)+'% · 中位 '+fmt(latest.mkt_chg_median)+'%'],
+    ['连板值', pct(latest.lb_strength), '连比值 '+pct(latest.lb_break)+' · 昨连板接力/断板'],
+    ['非一字溢价', fmt(latest.premium_mean_noyizi)+'%', '剔除一字开盘 · 中位 '+fmt(latest.premium_median_noyizi)+'%']
   ];
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
   cards.forEach(function(c){
@@ -4559,29 +4568,44 @@ async function loadMacro(el){
     h+='<div style="font-size:11px;color:#aaa;margin-top:3px">'+c[2]+'</div></div>';
   });
   h+='</div>';
+  h+='<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:6px">'
+    +'<button id="macroR30" style="border:none;cursor:pointer;font-size:11px;padding:3px 12px;border-radius:10px;background:#eee;color:#666">30日 · 拐点</button>'
+    +'<button id="macroR90" style="border:none;cursor:pointer;font-size:11px;padding:3px 12px;border-radius:10px;background:#eee;color:#666">90日 · 周期</button></div>';
   h+='<div id="macroSentChart" style="height:340px"></div>';
   h+='<div id="macroStreakChart" style="height:230px;margin-top:8px"></div>';
+  h+='<div style="font-size:12px;color:#666;margin:12px 0 4px;font-weight:600">📊 全市场涨跌幅分布 <span style="color:#999;font-weight:400;font-size:11px">'+latest.date+' · 21档</span></div>';
+  h+='<div id="macroChgChart" style="height:200px"></div>';
+  h+='<div style="font-size:12px;color:#666;margin:12px 0 4px;font-weight:600">💰 板块成交额榜 <span style="color:#999;font-weight:400;font-size:11px">申万一级 · 前8</span></div>';
+  h+='<div id="macroSectorBox" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px"></div>';
   h+='</div>';
-  h+='<div style="text-align:center;color:#bbb;font-size:11px;padding:8px 0 30px">后续宏观板块将追加于此（资金面 / 北向 / 估值 …）</div>';
+  h+='<div style="text-align:center;color:#bbb;font-size:11px;padding:8px 0 30px">后续宏观板块将追加于此（资金面 / 估值 …）· v2 补充指标: 龙虎榜 / 两融 / 炸板池 · v3: 涨跌幅分布 / 板块榜</div>';
   h+='</div>';
   el.innerHTML=h;
 
+  function macroRenderRange(n){
   ['macroSentChart','macroStreakChart'].forEach(function(id){
     var d=document.getElementById(id);
     if(d){var old=echarts.getInstanceByDom(d);if(old)old.dispose();}
   });
+  ['macroR30','macroR90'].forEach(function(id){
+    var b=document.getElementById(id); if(!b)return;
+    var on=(id==='macroR30'&&n===30)||(id==='macroR90'&&n===90);
+    b.style.background=on?'#333':'#eee'; b.style.color=on?'#fff':'#666';
+  });
 
-  var dates=hist.map(function(r){return r.date;});
-  var comp=hist.map(function(r){return r.composite;});
-  var ma5=hist.map(function(r){return r.composite_ma5;});
-  var streak=hist.map(function(r){return r.max_streak;});
-  var lu=hist.map(function(r){return r.limit_up;});
-  var ld=hist.map(function(r){return r.limit_down;});
+  var hh=hist.slice(-n);
+  var dates=hh.map(function(r){return r.date;});
+  var comp=hh.map(function(r){return r.composite;});
+  var comp2=hh.map(function(r){return r.composite_v2;});
+  var ma5=hh.map(function(r){return r.composite_ma5;});
+  var streak=hh.map(function(r){return r.max_streak;});
+  var lu=hh.map(function(r){return r.limit_up;});
+  var ld=hh.map(function(r){return r.limit_down;});
 
   var c1=echarts.init(document.getElementById('macroSentChart'));
   c1.setOption({
     tooltip:{trigger:'axis'},
-    legend:{data:['情绪指数','5日均线'],top:0,textStyle:{fontSize:11}},
+    legend:{data:['情绪指数','情绪v2','5日均线'],top:0,textStyle:{fontSize:11}},
     grid:{left:40,right:16,top:30,bottom:44},
     xAxis:{type:'category',data:dates,axisLabel:{fontSize:10}},
     yAxis:{type:'value',min:0,max:100,splitNumber:5},
@@ -4593,6 +4617,7 @@ async function loadMacro(el){
       {name:'情绪指数',type:'line',data:comp,showSymbol:false,lineStyle:{width:2},areaStyle:{opacity:.08},
        markLine:{silent:true,symbol:'none',lineStyle:{type:'dashed',color:'#ccc'},label:{fontSize:9},
          data:[{yAxis:20},{yAxis:40},{yAxis:60},{yAxis:80}]}},
+      {name:'情绪v2',type:'line',data:comp2,showSymbol:false,connectNulls:true,lineStyle:{width:1.5,color:'#722ed1'}},
       {name:'5日均线',type:'line',data:ma5,showSymbol:false,lineStyle:{width:1,type:'dashed',color:'#888'}}
     ]
   });
@@ -4611,6 +4636,56 @@ async function loadMacro(el){
     ]
   });
   window._macroCharts=[c1,c2];
+  }
+  var _r30=document.getElementById('macroR30'),_r90=document.getElementById('macroR90');
+  if(_r30)_r30.onclick=function(){macroRenderRange(30)};
+  if(_r90)_r90.onclick=function(){macroRenderRange(90)};
+  macroRenderRange(90);
+
+  // v3: 涨跌幅分布(最新交易日, 21档)
+  var cd={};
+  try{cd=(typeof latest.chg_dist==='string')?JSON.parse(latest.chg_dist):(latest.chg_dist||{});}catch(e){}
+  var bkeys=[],bvals=[];
+  for(var bi=-10;bi<=10;bi++){bkeys.push(bi);bvals.push(cd['b'+bi]||0);}
+  var cdEl=document.getElementById('macroChgChart');
+  if(cdEl){
+    var old3c=echarts.getInstanceByDom(cdEl);if(old3c)old3c.dispose();
+    var c3=echarts.init(cdEl);
+    c3.setOption({
+      tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+'% ~ '+(Number(p.name)+1)+'% : '+p.value+' 家';}},
+      grid:{left:36,right:16,top:8,bottom:22},
+      xAxis:{type:'category',data:bkeys.map(function(v){return ''+v;}),axisLabel:{fontSize:10}},
+      yAxis:{type:'value',name:'家'},
+      series:[{type:'bar',barMaxWidth:14,
+        data:bvals.map(function(v,i){var k=bkeys[i];
+          return {value:v,itemStyle:{color:k<0?'#52c41a':(k>0?'#f5222d':'#999')}};})}]
+    });
+  }
+
+  // v3: 板块成交额榜(API sectors)
+  var secs=data.sectors||[];
+  var sb=document.getElementById('macroSectorBox');
+  if(sb){
+    var sh='';
+    if(!secs.length){sh='<div style="color:#999;font-size:12px;padding:8px">暂无板块数据（需运行 sentiment.py 生成 sentiment_sector_daily）</div>';}
+    else{
+      var maxTo=Math.max.apply(null,secs.map(function(s){return Number(s.turnover)||0;}))||1;
+      secs.forEach(function(s){
+        var to=Number(s.turnover)||0,up=Number(s.up_count)||0,n=Number(s.stock_count)||0,cm=Number(s.chg_mean);
+        var w=Math.round(to/maxTo*100);
+        var upc=n?Math.round(up/n*100):0;
+        sh+='<div style="background:#fafafa;border-radius:10px;padding:10px 12px;position:relative;overflow:hidden">'
+          +'<div style="position:absolute;left:0;top:0;bottom:0;width:'+w+'%;background:'+(isNaN(cm)?'#ddd':(cm>=0?'rgba(245,34,45,.10)':'rgba(82,196,26,.10)'))+'"></div>'
+          +'<div style="position:relative;display:flex;justify-content:space-between;align-items:baseline">'
+          +'<span style="font-weight:600;font-size:13px">'+s.industry+'</span>'
+          +'<span style="font-weight:700;font-size:14px;color:'+(isNaN(cm)?'#333':(cm>=0?'#f5222d':'#52c41a'))+'">'+(isNaN(cm)?'-':cm.toFixed(2)+'%')+'</span></div>'
+          +'<div style="position:relative;display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:4px">'
+          +'<span>'+(to/1e8).toFixed(0)+' 亿 · '+up+'/'+n+' 家涨('+upc+'%)</span>'
+          +'<span>龙头 '+(s.lead_stock||'-')+' '+(s.lead_chg==null?'':Number(s.lead_chg).toFixed(2)+'%')+'</span></div></div>';
+      });
+    }
+    sb.innerHTML=sh;
+  }
 }
 
 </script>
