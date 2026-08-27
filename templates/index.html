@@ -4699,6 +4699,7 @@ async function loadMacro(el){
 }
 
   // v4: 猛男值/菜比值双曲线(DOM 已构建, 使用 hist 全局变量)
+  setTimeout(function(){
   var mcEl=document.getElementById('macroMoneyChart');
   if(mcEl){
     var oldmc=echarts.getInstanceByDom(mcEl);if(oldmc)oldmc.dispose();
@@ -4719,8 +4720,10 @@ async function loadMacro(el){
       ]
     });
   }
+  }, 50);
 
   // v4: 冰川6级温度计(DOM 已构建, 使用 hist 全局变量)
+  setTimeout(function(){
   var gEl=document.getElementById('macroGlaeChart');
   if(gEl){
     var oldg=echarts.getInstanceByDom(gEl);if(oldg)oldg.dispose();
@@ -4747,5 +4750,6 @@ async function loadMacro(el){
       }]
     });
   }
+  }, 50);
 
 </script>
