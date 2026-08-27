@@ -26,6 +26,9 @@
                                              缺失子指标按可用权重归一; extras 全缺时退化为 composite
   (北向净买额 2024-08-18 起港交所停发日度披露, 不采集)
   --- v3 P0/P1 指标(纯 DB 推导, 对标冰川每日图, 2026-08-27) ---
+  --- v4 资金结构指标(龙虎榜机构席位口径, 对标冰川资金图, 2026-08-27) ---
+  masculinity_score / retail_ratio  猛男值/菜比值(机构席位净买额占比, 0-100, 反向指标)
+  phase_glae  冰川6级温度计(沸点/过热/微热/微冷/过冷/冰点, 基于 composite_v2)
   chg_dist        涨跌幅分布 JSON 21档(桶i覆盖[i,i+1)pp, clip ±10) —— 冰川图1柱状图
   up_count / down_count / flat_count   阳/阴/平家数
   mkt_chg_mean / mkt_chg_median        全市场平均涨幅 / 中位数(直方图插值近似)
@@ -94,7 +97,7 @@ WEIGHTS_V2 = {
 EXTRAS_FROM = "2024-01-02"          # 与 stock_data_daily 起点一致
 EXTRAS_SLEEP = 0.35                 # 逐日接口限频间隔(秒)
 EXTRAS_RETRY = 3
-EXTRA_COLS = ["lhb_count", "lhb_net_buy", "lhb_inst_seats",
+EXTRA_COLS = ["lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy",
               "margin_balance", "margin_buy_amt", "broken_count"]
 
 
@@ -116,6 +119,23 @@ def _phase_label(v):
         if v >= th:
             label = name
     return label
+
+
+def _phase_glae_label(v):
+    """冰川6级温度计: 沸点>=90 / 过热>=80 / 微热>=60 / 微冷>=40 / 过冷>=20 / 冰点<20"""
+    if pd.isna(v):
+        return None
+    if v >= 90:
+        return "沸点"
+    if v >= 80:
+        return "过热"
+    if v >= 60:
+        return "微热"
+    if v >= 40:
+        return "微冷"
+    if v >= 20:
+        return "过冷"
+    return "冰点"
 
 
 def _fetch_codes(cur):
@@ -386,7 +406,7 @@ def compute():
 def _load_extras(cur):
     """读 sentiment_extras_daily -> DataFrame(date + 6列); 表缺失/为空返回空表(不阻断 v1)."""
     try:
-        cur.execute("SELECT date, lhb_count, lhb_net_buy, lhb_inst_seats, "
+        cur.execute("SELECT date, lhb_count, lhb_net_buy, lhb_inst_seats, lhb_inst_net_buy, "
                     "margin_balance, margin_buy_amt, broken_count "
                     "FROM sentiment_extras_daily")
         rows = cur.fetchall()
@@ -434,6 +454,13 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
+    # 猛男值/菜比值: 机构席位净买额占比
+    with np.errstate(invalid="ignore", divide="ignore"):
+        total_nb = b["lhb_net_buy"].replace(0, np.nan)
+        b["masculinity_score"] = (b["lhb_inst_net_buy"] / total_nb * 100.0).round(2)
+        b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)
+    # 冰川6级温度计
+    b["phase_glae"] = b["composite_v2"].fillna(b["composite"]).apply(_phase_glae_label)
     return b
 
 
@@ -450,7 +477,7 @@ CREATE TABLE IF NOT EXISTS sentiment_daily (
   up_ratio DECIMAL(6,4), total_turnover DECIMAL(20,2),
   composite DECIMAL(6,2), composite_ma5 DECIMAL(6,2),
   phase VARCHAR(8),
-  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT,
+  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2),
   margin_balance DECIMAL(12,2), margin_buy_amt DECIMAL(12,2),
   broken_count INT, true_seal_rate DECIMAL(6,4),
   composite_v2 DECIMAL(6,2), composite_v2_ma5 DECIMAL(6,2), phase_v2 VARCHAR(8),
@@ -459,6 +486,8 @@ CREATE TABLE IF NOT EXISTS sentiment_daily (
   mkt_chg_mean DECIMAL(6,3), mkt_chg_median DECIMAL(6,3),
   premium_mean_noyizi DECIMAL(7,3), premium_median_noyizi DECIMAL(7,3),
   lb_strength DECIMAL(6,4), lb_break DECIMAL(6,4),
+  masculinity_score DECIMAL(6,2), retail_ratio DECIMAL(6,2),
+  phase_glae VARCHAR(8),
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 """
@@ -473,7 +502,8 @@ COLS = ["date", "limit_up", "limit_down", "touch_limit", "seal_rate", "max_strea
         "chg_dist", "up_count", "down_count", "flat_count",
         "mkt_chg_mean", "mkt_chg_median",
         "premium_mean_noyizi", "premium_median_noyizi",
-        "lb_strength", "lb_break"]
+        "lb_strength", "lb_break",
+        "masculinity_score", "retail_ratio", "phase_glae"]
 
 # 老表补列(MySQL 无 ADD COLUMN IF NOT EXISTS, 1060=已存在则跳过)
 V2_COLS_DDL = [
@@ -497,6 +527,9 @@ V2_COLS_DDL = [
     ("premium_median_noyizi", "DECIMAL(7,3)"),
     ("lb_strength", "DECIMAL(6,4)"),
     ("lb_break", "DECIMAL(6,4)"),
+    ("masculinity_score", "DECIMAL(6,2)"),
+    ("retail_ratio", "DECIMAL(6,2)"),
+    ("phase_glae", "VARCHAR(8)"),
 ]
 
 
@@ -585,7 +618,7 @@ def persist_sectors(sec, tail_days):
 EXTRAS_DDL = """
 CREATE TABLE IF NOT EXISTS sentiment_extras_daily (
   date DATE NOT NULL PRIMARY KEY,
-  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT,
+  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2), lhb_inst_net_buy DECIMAL(14,2),
   margin_balance DECIMAL(12,2), margin_buy_amt DECIMAL(12,2),
   broken_count INT,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -624,11 +657,13 @@ def _fetch_lhb(start, end):
     per = {}
     for d, sub in df.groupby("上榜日"):
         nb = pd.to_numeric(sub["龙虎榜净买额"], errors="coerce").fillna(0.0).sum()
-        inst = (int(sub["解读"].astype(str).str.contains("机构").sum())
-                if "解读" in sub.columns else 0)
+        is_inst = sub["解读"].astype(str).str.contains("机构") if "解读" in sub.columns else False
+        inst = int(is_inst.sum())
+        inst_nb = pd.to_numeric(sub.loc[is_inst, "龙虎榜净买额"], errors="coerce").fillna(0.0).sum() if inst > 0 else 0.0
         per[_norm_date(d)] = {"lhb_count": int(len(sub)),
                               "lhb_net_buy": round(float(nb) / 1e4, 2),
-                              "lhb_inst_seats": inst}
+                              "lhb_inst_seats": inst,
+                              "lhb_inst_net_buy": round(float(inst_nb) / 1e4, 2)}
     return per
 
 
