@@ -93,6 +93,19 @@ WEIGHTS_V2 = {
     "margin_balance": 0.05,
 }
 
+# A2: 冰川6级温度计专用权重(对标冰川每日图, 其本质是涨停/连板/封板结构, 不含龙虎榜资金项).
+# 保持 v1 6 指标原比例 0.70, true_seal_rate 修 0.15, margin_balance 0.15. 缺失项仍按当日权重归一.
+WEIGHTS_GLAE = {
+    "limit_up": 0.200,
+    "promo_overall": 0.200,
+    "max_streak": 0.150,
+    "seal_rate": 0.150,
+    "premium_mean": 0.150,
+    "up_ratio": 0.150,
+    "true_seal_rate": 0.15,
+    "margin_balance": 0.15,
+}
+
 # --- v2 补充指标(采集参数) ---
 EXTRAS_FROM = "2024-01-02"          # 与 stock_data_daily 起点一致
 EXTRAS_SLEEP = 0.35                 # 逐日接口限频间隔(秒)
@@ -506,8 +519,19 @@ def _merge_extras(base, extras):
             (inst_buy / total_buy * 100.0).round(2),
             np.nan)
         b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)  # 菜比值 = 100 - 猛男值
-    # 冰川6级温度计
-    b["phase_glae"] = b["composite_v2"].fillna(b["composite"]).apply(_phase_glae_label)
+    # A2: 冰川6级温度计专用值(剔除龙虎榜项, 与冰川图只看涨停/连板/封板结构一致)
+    glae_keys = [k for k in WEIGHTS_GLAE if b[k].notna().any()]
+    if glae_keys:
+        glae_pct = pd.DataFrame({
+            k: _epct(b[k], use_rolling=(k in ROLLING_PCT_KEYS)) for k in glae_keys})
+        gws = pd.Series({k: WEIGHTS_GLAE[k] for k in glae_keys})
+        gnum = glae_pct.mul(gws, axis=1).sum(axis=1, skipna=True)
+        gden = glae_pct.notna().mul(gws, axis=1).sum(axis=1)
+        b["composite_glae"] = (gnum / gden.replace(0, np.nan)).round(2)
+    else:
+        b["composite_glae"] = np.nan
+    # 缺失时回退 composite (v1 六指标也无龙虎榜, 天然对齐冰川口径)
+    b["phase_glae"] = b["composite_glae"].fillna(b["composite"]).apply(_phase_glae_label)
     return b
 
 
@@ -550,7 +574,7 @@ COLS = ["date", "limit_up", "limit_down", "touch_limit", "seal_rate", "max_strea
         "mkt_chg_mean", "mkt_chg_median",
         "premium_mean_noyizi", "premium_median_noyizi",
         "lb_strength", "lb_break",
-        "masculinity_score", "retail_ratio", "phase_glae"]
+        "masculinity_score", "retail_ratio", "composite_glae", "phase_glae"]
 
 # 老表补列(MySQL 无 ADD COLUMN IF NOT EXISTS, 1060=已存在则跳过)
 V2_COLS_DDL = [
@@ -579,6 +603,7 @@ V2_COLS_DDL = [
     ("lb_break", "DECIMAL(6,4)"),
     ("masculinity_score", "DECIMAL(6,2)"),
     ("retail_ratio", "DECIMAL(6,2)"),
+    ("composite_glae", "DECIMAL(6,2)"),
     ("phase_glae", "VARCHAR(8)"),
 ]
 
