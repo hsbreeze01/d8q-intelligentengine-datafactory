@@ -1,17 +1,38 @@
-"""LLM内容创作配置 - 用户可通过管理页面调整"""
+"""LLM内容创作配置 - 支持多 provider 切换"""
 import json
 import os
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "llm_content_config.json")
+# 配置文件路径
+PROVIDERS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "llm_providers.json")
+CONTENT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "llm_content_config.json")
 
-DEFAULTS = {
-    "llm": {
-        "api_key": "sk-858d16b6349a4ad98026a0a1da811a8f",
-        "base_url": "https://api.deepseek.com",
-        "model": "deepseek-chat",
-        "temperature": 0.7,
-        "max_tokens": 2000,
-    },
+# 默认 provider 配置
+DEFAULT_PROVIDERS = {
+    "active": "qwen",
+    "providers": {
+        "deepseek": {
+            "base_url": "https://api.deepseek.com",
+            "api_key": "",
+            "model": "deepseek-chat",
+            "request_timeout_s": 60,
+            "max_requests_per_minute": 60,
+            "max_retries": 3,
+            "extra_body": {}
+        },
+        "qwen": {
+            "base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "api_key": "",
+            "model": "qwen3.7-plus",
+            "request_timeout_s": 120,
+            "max_requests_per_minute": 60,
+            "max_retries": 3,
+            "extra_body": {}
+        }
+    }
+}
+
+# 默认内容创作配置
+DEFAULT_CONTENT = {
     "news_brief": {
         "name": "资讯速递",
         "max_items": 5,
@@ -30,13 +51,24 @@ DEFAULTS = {
 }
 
 
-def load_config():
-    if os.path.exists(CONFIG_PATH):
+def load_providers_config():
+    """加载 provider 配置"""
+    if os.path.exists(PROVIDERS_CONFIG_PATH):
         try:
-            with open(CONFIG_PATH, encoding="utf-8") as f:
+            with open(PROVIDERS_CONFIG_PATH, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return json.loads(json.dumps(DEFAULT_PROVIDERS))
+
+
+def load_content_config():
+    """加载内容创作配置"""
+    if os.path.exists(CONTENT_CONFIG_PATH):
+        try:
+            with open(CONTENT_CONFIG_PATH, encoding="utf-8") as f:
                 saved = json.load(f)
-            # 合并：saved覆盖defaults
-            merged = json.loads(json.dumps(DEFAULTS))
+            merged = json.loads(json.dumps(DEFAULT_CONTENT))
             for k, v in saved.items():
                 if isinstance(v, dict) and k in merged:
                     merged[k].update(v)
@@ -45,10 +77,38 @@ def load_config():
             return merged
         except Exception:
             pass
-    return json.loads(json.dumps(DEFAULTS))
+    return json.loads(json.dumps(DEFAULT_CONTENT))
+
+
+def get_active_llm_config():
+    """获取当前活跃的 LLM 配置"""
+    providers_config = load_providers_config()
+    active_provider = providers_config.get("active", "qwen")
+    provider = providers_config.get("providers", {}).get(active_provider, {})
+    
+    return {
+        "api_key": provider.get("api_key", ""),
+        "base_url": provider.get("base_url", ""),
+        "model": provider.get("model", "deepseek-chat"),
+        "temperature": 0.7,
+        "max_tokens": 2000,
+    }
+
+
+def load_config():
+    """加载完整配置（兼容旧接口）"""
+    llm_config = get_active_llm_config()
+    content_config = load_content_config()
+    
+    return {
+        "llm": llm_config,
+        **content_config
+    }
 
 
 def save_config(config):
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    """保存配置（兼容旧接口，只保存内容部分）"""
+    content = {k: v for k, v in config.items() if k != "llm"}
+    os.makedirs(os.path.dirname(CONTENT_CONFIG_PATH), exist_ok=True)
+    with open(CONTENT_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(content, f, ensure_ascii=False, indent=2)
