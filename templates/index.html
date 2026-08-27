@@ -4698,25 +4698,35 @@ async function loadMacro(el){
   }
 }
 
-  // v4: 猛男值/菜比值双曲线(30天, 直线折线)
+  // v4: 猛男值/菜比值双曲线(30天, 直线折线, 有界[-100,100])
   setTimeout(function(){
   var mcEl=document.getElementById('macroMoneyChart');
   if(mcEl){
     var oldmc=echarts.getInstanceByDom(mcEl);if(oldmc)oldmc.dispose();
     var hh30=hist.slice(-30);
     var dates30=hh30.map(function(r){return r.date;});
-    var mData=hh30.map(function(r){return r.masculinity_score;});
-    var rData=hh30.map(function(r){return r.retail_ratio;});
+    var mData=hh30.map(function(r){
+      var v=Number(r.masculinity_score);
+      return isNaN(v)?null:Math.max(-100,Math.min(100,v));
+    });
+    var rData=hh30.map(function(r){
+      var v=Number(r.retail_ratio);
+      return isNaN(v)?null:Math.max(-100,Math.min(100,v));
+    });
     var cM=echarts.init(mcEl);
     cM.setOption({
-      tooltip:{trigger:'axis'},
+      tooltip:{trigger:'axis',formatter:function(ps){
+        var p=ps[0],idx=p.dataIndex,r=hh30[idx];
+        return p.name+'<br/>猛男值: '+fmt(r.masculinity_score,1)+'<br/>菜比值: '+fmt(r.retail_ratio,1);
+      }},
       legend:{data:['猛男值','菜比值'],top:0,textStyle:{fontSize:11}},
       grid:{left:40,right:40,top:28,bottom:28},
       xAxis:{type:'category',data:dates30,axisLabel:{fontSize:9,interval:2}},
-      yAxis:{type:'value',min:0,max:100},
+      yAxis:{type:'value',min:-100,max:100,splitLine:{show:true,lineStyle:{type:'dashed',color:'#eee'}},
+        axisLabel:{fontSize:10,formatter:function(v){return v+'%';}}},
       series:[
-        {name:'猛男值',type:'line',data:mData,showSymbol:false,smooth:false,lineStyle:{width:1.5,color:'#1890ff',type:'dashed'}},
-        {name:'菜比值',type:'line',data:rData,showSymbol:false,smooth:false,lineStyle:{width:1.5,color:'#fa8c16'}}
+        {name:'猛男值',type:'line',data:mData,showSymbol:false,smooth:false,connectNulls:true,lineStyle:{width:1.5,color:'#1890ff',type:'dashed'}},
+        {name:'菜比值',type:'line',data:rData,showSymbol:false,smooth:false,connectNulls:true,lineStyle:{width:1.5,color:'#fa8c16'}}
       ]
     });
   }
@@ -4754,7 +4764,7 @@ async function loadMacro(el){
         }},
         splitLine:{show:false}
       },
-      series:[{type:'line',data:gData,showSymbol:false,smooth:false,lineStyle:{width:2.5,color:'#722ed1'},
+      series:[{type:'line',data:gData,showSymbol:false,smooth:false,connectNulls:true,lineStyle:{width:2.5,color:'#722ed1'},
         markArea:{silent:true,itemStyle:{opacity:.10},data:[
           [{yAxis:90,itemStyle:{color:'#c41d1d'}},{yAxis:100}],
           [{yAxis:80,itemStyle:{color:'#fa541c'}},{yAxis:90}],

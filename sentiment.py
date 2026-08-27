@@ -454,11 +454,18 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
-    # 猛男值/菜比值: 机构席位净买额占比
+    # 猛男值/菜比值: 机构席位净买额占龙虎榜总净买额比例, 有界 [-100, 100]
+    # 分母用 |机构净买| + |非机构净买|, 避免总净买接近0时比值爆炸
     with np.errstate(invalid="ignore", divide="ignore"):
-        total_nb = b["lhb_net_buy"].replace(0, np.nan)
-        b["masculinity_score"] = (b["lhb_inst_net_buy"] / total_nb * 100.0).round(2)
-        b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)
+        inst = b["lhb_inst_net_buy"]
+        total = b["lhb_net_buy"]
+        non_inst = total - inst   # 非机构席位净买
+        denom = inst.abs() + non_inst.abs()   # L1 范数, 有界分母
+        b["masculinity_score"] = np.where(
+            denom > 0,
+            (inst / denom * 100.0).round(2),
+            np.nan)
+        b["retail_ratio"] = (-b["masculinity_score"]).round(2)  # 反向: 机构买则菜比值为负
     # 冰川6级温度计
     b["phase_glae"] = b["composite_v2"].fillna(b["composite"]).apply(_phase_glae_label)
     return b
