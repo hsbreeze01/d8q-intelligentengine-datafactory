@@ -97,7 +97,7 @@ WEIGHTS_V2 = {
 EXTRAS_FROM = "2024-01-02"          # 与 stock_data_daily 起点一致
 EXTRAS_SLEEP = 0.35                 # 逐日接口限频间隔(秒)
 EXTRAS_RETRY = 3
-EXTRA_COLS = ["lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy",
+EXTRA_COLS = ["lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy", "lhb_inst_buy", "lhb_total_buy",
               "margin_balance", "margin_buy_amt", "broken_count"]
 
 
@@ -406,7 +406,7 @@ def compute():
 def _load_extras(cur):
     """读 sentiment_extras_daily -> DataFrame(date + 6列); 表缺失/为空返回空表(不阻断 v1)."""
     try:
-        cur.execute("SELECT date, lhb_count, lhb_net_buy, lhb_inst_seats, lhb_inst_net_buy, "
+        cur.execute("SELECT date, lhb_count, lhb_net_buy, lhb_inst_seats, lhb_inst_net_buy, lhb_inst_buy, lhb_total_buy, "
                     "margin_balance, margin_buy_amt, broken_count "
                     "FROM sentiment_extras_daily")
         rows = cur.fetchall()
@@ -454,18 +454,16 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
-    # 猛男值/菜比值: 机构席位净买额占龙虎榜总净买额比例, 有界 [-100, 100]
-    # 分母用 |机构净买| + |非机构净买|, 避免总净买接近0时比值爆炸
+    # 猛男值/菜比值: 机构/主力席位买入额占龙虎榜总买入额比例(对标冰川口径)
+    # 买入额比例稳定, 不受净买额波动影响; [0, 100] 有界
     with np.errstate(invalid="ignore", divide="ignore"):
-        inst = b["lhb_inst_net_buy"]
-        total = b["lhb_net_buy"]
-        non_inst = total - inst   # 非机构席位净买
-        denom = inst.abs() + non_inst.abs()   # L1 范数, 有界分母
+        inst_buy = b.get("lhb_inst_buy", b["lhb_inst_net_buy"])
+        total_buy = b.get("lhb_total_buy", b["lhb_net_buy"].abs())
         b["masculinity_score"] = np.where(
-            denom > 0,
-            (inst / denom * 100.0).round(2),
+            (total_buy > 0) & inst_buy.notna(),
+            (inst_buy / total_buy * 100.0).round(2),
             np.nan)
-        b["retail_ratio"] = (-b["masculinity_score"]).round(2)  # 反向: 机构买则菜比值为负
+        b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)  # 菜比值 = 100 - 猛男值
     # 冰川6级温度计
     b["phase_glae"] = b["composite_v2"].fillna(b["composite"]).apply(_phase_glae_label)
     return b
@@ -484,7 +482,7 @@ CREATE TABLE IF NOT EXISTS sentiment_daily (
   up_ratio DECIMAL(6,4), total_turnover DECIMAL(20,2),
   composite DECIMAL(6,2), composite_ma5 DECIMAL(6,2),
   phase VARCHAR(8),
-  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2),
+  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2), lhb_inst_buy DECIMAL(14,2), lhb_total_buy DECIMAL(14,2),
   margin_balance DECIMAL(12,2), margin_buy_amt DECIMAL(12,2),
   broken_count INT, true_seal_rate DECIMAL(6,4),
   composite_v2 DECIMAL(6,2), composite_v2_ma5 DECIMAL(6,2), phase_v2 VARCHAR(8),
@@ -503,7 +501,7 @@ COLS = ["date", "limit_up", "limit_down", "touch_limit", "seal_rate", "max_strea
         "streak_dist", "promo_1_2", "promo_2_3", "promo_3_up", "promo_overall",
         "premium_mean", "premium_median", "big_face", "heaven_hell", "up_ratio",
         "total_turnover", "composite", "composite_ma5", "phase",
-        "lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy", "margin_balance",
+        "lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy", "lhb_inst_buy", "lhb_total_buy", "margin_balance",
         "margin_buy_amt", "broken_count", "true_seal_rate",
         "composite_v2", "composite_v2_ma5", "phase_v2",
         "chg_dist", "up_count", "down_count", "flat_count",
@@ -518,6 +516,8 @@ V2_COLS_DDL = [
     ("lhb_net_buy", "DECIMAL(14,2)"),
     ("lhb_inst_seats", "INT"),
     ("lhb_inst_net_buy", "DECIMAL(14,2)"),
+    ("lhb_inst_buy", "DECIMAL(14,2)"),
+    ("lhb_total_buy", "DECIMAL(14,2)"),
     ("margin_balance", "DECIMAL(12,2)"),
     ("margin_buy_amt", "DECIMAL(12,2)"),
     ("broken_count", "INT"),
@@ -626,7 +626,7 @@ def persist_sectors(sec, tail_days):
 EXTRAS_DDL = """
 CREATE TABLE IF NOT EXISTS sentiment_extras_daily (
   date DATE NOT NULL PRIMARY KEY,
-  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2),
+  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2), lhb_inst_buy DECIMAL(14,2), lhb_total_buy DECIMAL(14,2),
   margin_balance DECIMAL(12,2), margin_buy_amt DECIMAL(12,2),
   broken_count INT,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -664,13 +664,19 @@ def _fetch_lhb(start, end):
     per = {}
     for d, sub in df.groupby("上榜日"):
         nb = pd.to_numeric(sub["龙虎榜净买额"], errors="coerce").fillna(0.0).sum()
-        is_inst = sub["解读"].astype(str).str.contains("机构") if "解读" in sub.columns else False
+        # 机构席位口径: 机构+主力+买一主买+地区资金(游资), 对标冰川"猛男值"
+        jd = sub["解读"].astype(str) if "解读" in sub.columns else pd.Series([""]*len(sub))
+        is_inst = jd.str.contains("机构|主力|买一|西藏|上海|北京|广东|深圳|杭州|宁波|成都|武汉|南京|重庆|天津|青岛|厦门|福州|郑州|长沙|西安|大连|济南|沈阳|昆明|乌鲁木齐")
         inst = int(is_inst.sum())
         inst_nb = pd.to_numeric(sub.loc[is_inst, "龙虎榜净买额"], errors="coerce").fillna(0.0).sum() if inst > 0 else 0.0
+        inst_buy = pd.to_numeric(sub.loc[is_inst, "龙虎榜买入额"], errors="coerce").fillna(0.0).sum() if inst > 0 else 0.0
+        total_buy = pd.to_numeric(sub["龙虎榜买入额"], errors="coerce").fillna(0.0).sum()
         per[_norm_date(d)] = {"lhb_count": int(len(sub)),
                               "lhb_net_buy": round(float(nb) / 1e4, 2),
                               "lhb_inst_seats": inst,
-                              "lhb_inst_net_buy": round(float(inst_nb) / 1e4, 2)}
+                              "lhb_inst_net_buy": round(float(inst_nb) / 1e4, 2),
+                              "lhb_inst_buy": round(float(inst_buy) / 1e4, 2),
+                              "lhb_total_buy": round(float(total_buy) / 1e4, 2)}
     return per
 
 
