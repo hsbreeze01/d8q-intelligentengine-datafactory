@@ -453,6 +453,7 @@ def agent_request(method, path, data=None):
 @app.route("/follows")
 @app.route("/monitor")
 @app.route("/recommend")
+@app.route("/macro")
 def index():
     with open(os.path.join(TMPL_DIR, "index.html"), encoding="utf-8") as f:
         return f.read()

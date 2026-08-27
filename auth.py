@@ -28,7 +28,8 @@ WRITE_ROUTES = [
     (("POST","DELETE","PUT","GET"), "/api/auth/users", "admin"),
 ]
 
-PUBLIC_PATHS = {"/login", "/api/auth/login"}
+PUBLIC_PATHS = {"/login", "/api/auth/login",
+               "/manifest.json", "/sw.js", "/favicon.ico"}
 INTERNAL_IPS = {"127.0.0.1"}
 
 # --- 登录限流 ---
