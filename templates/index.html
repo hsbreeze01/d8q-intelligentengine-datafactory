@@ -4722,7 +4722,7 @@ async function loadMacro(el){
   }
   }, 50);
 
-  // v4: 冰川6级温度计(DOM 已构建, 使用 hist 全局变量)
+  // v4: 冰川6级温度计(左侧6级刻度标记, 纯折线图)
   setTimeout(function(){
   var gEl=document.getElementById('macroGlaeChart');
   if(gEl){
@@ -4733,11 +4733,29 @@ async function loadMacro(el){
     var cG=echarts.init(gEl);
     cG.setOption({
       tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+': '+p.value.toFixed(2)+' ('+(hh90[p.dataIndex].phase_glae||'')+')';}},
-      grid:{left:100,right:16,top:10,bottom:24},
+      grid:{left:60,right:16,top:10,bottom:24},
       xAxis:{type:'category',data:dates90,axisLabel:{fontSize:10}},
-      yAxis:{type:'value',min:0,max:100,show:false},
-      series:[{type:'line',data:gData,showSymbol:false,smooth:true,lineStyle:{width:2,color:'#722ed1'},areaStyle:{opacity:.12},
-        markArea:{silent:true,itemStyle:{opacity:.08},data:[
+      yAxis:{type:'value',min:0,max:100,inverse:true,
+        axisLabel:{fontSize:11,fontWeight:60,formatter:function(v){
+          if(v>=90)return '{bf}沸点';
+          if(v>=80)return '{hot}过热';
+          if(v>=60)return '{warm}微热';
+          if(v>=40)return '{cool}微冷';
+          if(v>=20)return '{cold}过冷';
+          return '{freeze}冰点';
+        },
+        textStyle:{rich:{
+          bf:{color:'#c41d1d',backgroundColor:'#fff1f0',padding:[2,6],borderRadius:4},
+          hot:{color:'#fa541c',backgroundColor:'#fff2e8',padding:[2,6],borderRadius:4},
+          warm:{color:'#faad14',backgroundColor:'#fffbe6',padding:[2,6],borderRadius:4},
+          cool:{color:'#13c2c2',backgroundColor:'#e6fffb',padding:[2,6],borderRadius:4},
+          cold:{color:'#2f54eb',backgroundColor:'#f0f5ff',padding:[2,6],borderRadius:4},
+          freeze:{color:'#1890ff',backgroundColor:'#e6f7ff',padding:[2,6],borderRadius:4}
+        }},
+        splitLine:{show:false}
+      },
+      series:[{type:'line',data:gData,showSymbol:false,smooth:true,lineStyle:{width:2.5,color:'#722ed1'},
+        markArea:{silent:true,itemStyle:{opacity:.10},data:[
           [{yAxis:90,itemStyle:{color:'#c41d1d'}},{yAxis:100}],
           [{yAxis:80,itemStyle:{color:'#fa541c'}},{yAxis:90}],
           [{yAxis:60,itemStyle:{color:'#faad14'}},{yAxis:80}],
@@ -4745,7 +4763,7 @@ async function loadMacro(el){
           [{yAxis:20,itemStyle:{color:'#2f54eb'}},{yAxis:40}],
           [{yAxis:0,itemStyle:{color:'#1890ff'}},{yAxis:20}]
         ]},
-        markLine:{silent:true,symbol:'none',lineStyle:{type:'dashed',color:'#999'},label:{fontSize:9,position:'insideTopRight'},
+        markLine:{silent:true,symbol:'none',lineStyle:{type:'dashed',color:'#bbb',width:1},
           data:[{yAxis:20},{yAxis:40},{yAxis:60},{yAxis:80},{yAxis:90}]}
       }]
     });
