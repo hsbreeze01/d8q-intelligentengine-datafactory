@@ -81,14 +81,14 @@ PHASES = [(0, "冰点"), (20, "修复"), (40, "温和"), (60, "亢奋"), (80, "�
 
 WEIGHTS_V2 = {
     # v1 六指标等比缩放 0.70(保证 extras 全缺时 composite_v2 与 composite 数值一致),
-    # 余 0.30 给补充指标: 龙虎榜净买 .15 / 真实封板率 .10 / 融资余额 .05
+    # 余 0.30 给补充指标: 龙虎榜净买强度 .15 / 真实封板率 .10 / 融资余额 .05
     "limit_up": 0.140,
     "promo_overall": 0.140,
     "max_streak": 0.105,
     "seal_rate": 0.105,
     "premium_mean": 0.105,
     "up_ratio": 0.105,
-    "lhb_net_buy": 0.15,
+    "lhb_ratio": 0.15,          # 方案A: lhb 净买额/总成交额*1e4 (bp), rolling(252)分位, 剔除成交额扩张趋势
     "true_seal_rate": 0.10,
     "margin_balance": 0.05,
 }
@@ -105,10 +105,38 @@ def _conn():
     return pymysql.connect(**DB)
 
 
-def _epct(s):
-    """expanding 历史分位(min_periods=60, 无未来函数)"""
-    return pd.Series(s.values, index=s.index).expanding(min_periods=60).apply(
-        lambda x: (x <= x[-1]).mean() * 100.0, raw=True)
+ROLLING_PCT_WINDOW = 252          # 方案A: 1 年约 252 交易日滚动, 丢弃远期低基数
+ROLLING_PCT_MIN = 60                     # 与 expanding 最小样本一致, 早期稳定后再给分位
+
+
+def _epct(s, use_rolling=False):
+    """历史分位(无未来函数). 默认 expanding; use_rolling=True 走 rolling(252)
+    对应方案 A: 对有量纲绝对值项(龙虎榜/融资)用 rolling 丢弃远期低基数样本, 抑制定向趋势失真.
+    方案 B1: 稀疏序列(如 true_seal_rate 早期缺失)在首次非空前保持 NaN, 从有值起点开始算分位,
+    避免整条序列因 leading NaN 全空.
+    """
+    arr = np.asarray(s.values, dtype=float)
+    idx = s.index
+    # Locate first non-NA: leading NA stays NA
+    first_valid = next((i for i, v in enumerate(arr) if not np.isnan(v)), len(arr))
+    if first_valid >= len(arr):
+        return pd.Series(np.nan, index=idx)
+    # Work on tail starting at first_valid
+    tail = arr[first_valid:]
+    ser = pd.Series(tail)
+    if use_rolling:
+        r = ser.rolling(ROLLING_PCT_WINDOW, min_periods=ROLLING_PCT_MIN)
+        pct_tail = r.apply(lambda x: (x <= x.iloc[-1]).mean() * 100.0, raw=True).values
+    else:
+        pct_tail = ser.expanding(min_periods=ROLLING_PCT_MIN).apply(
+            lambda x: (x <= x.iloc[-1]).mean() * 100.0, raw=True).values
+    result = np.full(len(arr), np.nan, dtype=float)
+    result[first_valid:] = pct_tail
+    return pd.Series(result, index=idx)
+
+
+# 方案 A: 这些分项天然有量纲/随市场规模扩张 -> 强制 rolling 分位
+ROLLING_PCT_KEYS = {"lhb_ratio", "margin_balance"}
 
 
 def _phase_label(v):
@@ -443,9 +471,22 @@ def _merge_extras(base, extras):
         b["true_seal_rate"] = np.where(
             b["broken_count"].notna() & (denom > 0), b["limit_up"] / denom, np.nan)
 
+    # === 方案 A ===
+    # 龙虎榜分项从"净买绝对值"改为"净买/总成交额*1e4 (bp)",
+    # 消除成交扩容的时间趋势, 冷市不再因 lhb 历史膨胀而给出 80+ 高分
+    with np.errstate(invalid="ignore", divide="ignore"):
+        lhb_nb = pd.to_numeric(b.get("lhb_net_buy"), errors="coerce")
+        tot = pd.to_numeric(b.get("total_turnover"), errors="coerce")
+        # lhb_net_buy 单: 万; total_turnover 单: 原始stock_data_daily一致(元), 转万除以1e4 -> 比例 *1e4 = bp
+        # 实际上 total_turnover 从 base 来是元量级, 需与 lhb_net_buy (万元) 对齐 -> 比例 = lhb*1e4/total
+        b["lhb_ratio"] = np.where(
+            tot.notna() & lhb_nb.notna() & (tot > 0),
+            (lhb_nb * 1.0e4 / tot * 1.0e4).round(6),   # 净买占比 (bp) 再乘1e4 = 净买*1e8 / tot; 实际 bp 量级为正数/负数
+            np.nan)
+    # === 方案 A/B1: 按列选择分位算法(rolling vs expanding), 并让稀疏首段 NaN 不再拖垮全列 ===
     keys = [k for k in WEIGHTS_V2 if b[k].notna().any()]
     if keys:
-        pct = pd.DataFrame({k: _epct(b[k]) for k in keys})
+        pct = pd.DataFrame({k: _epct(b[k], use_rolling=(k in ROLLING_PCT_KEYS)) for k in keys})
         ws = pd.Series({k: WEIGHTS_V2[k] for k in keys})
         num = pct.mul(ws, axis=1).sum(axis=1, skipna=True)
         den = pct.notna().mul(ws, axis=1).sum(axis=1)
@@ -704,46 +745,90 @@ def _collect_lhb(cur, target, force, existing):
 
 
 def _collect_margin(cur, target, force, existing):
+    """两融采集(方案 B2 重构):
+    主路: ak.macro_china_market_margin_sh / macro_china_market_margin_sz
+         — 东方财富汇总接口, 覆盖多年历史, 绕过上交所/深交所直连限流/封禁, 一次 HTTP 即完整返回;
+    辅路: 原 stock_margin_sse + stock_margin_szse 仅在 macro 接口不可用时兜底;
+    输出单位: margin_balance / margin_buy_amt 统一 亿元.
+    """
     todo = [d for d in target if force or d not in existing["margin_balance"]]
     if not todo:
         log.info("extras.margin 无缺口")
         return
-    lo, hi = todo[0].replace("-", ""), todo[-1].replace("-", "")
-    df = _retry(lambda: ak.stock_margin_sse(start_date=lo, end_date=hi),
-                f"两融-沪[{lo}~{hi}]")
-    sse = {}
-    if df is not None and not df.empty:
+    got = 0
+
+    # --- 主路: macro 汇总接口(沪/深各自一张完整全历史表, 1~2 次请求搞定, 47 机已验证可访问) ---
+    def _parse_macro(df, d_col, bal_col, buy_col):
+        out = {}
+        if df is None or df.empty:
+            return out
         for _, r in df.iterrows():
             try:
-                sse[_norm_date(r["信用交易日期"])] = (
-                    float(r["融资余额"]) / 1e8, float(r["融资买入额"]) / 1e8)
-            except (TypeError, ValueError):
+                d = _norm_date(r[d_col])
+                bal = float(r[bal_col]) / 1e8
+                buy = float(r[buy_col]) / 1e8
+                if bal >= 0 and buy >= 0:
+                    out[d] = (bal, buy)
+            except (TypeError, ValueError, KeyError):
                 continue
-    got = 0
-    consec_fail = 0
-    for d in todo:
-        _keepalive(cur)
-        if d not in sse:
-            continue                                 # 沪缺(T+1未发布)该日跳过, 下次补
-        sz = _retry(lambda: ak.stock_margin_szse(date=d.replace("-", "")), f"两融-深[{d}]")
-        if sz is None:
-            consec_fail += 1
-            if consec_fail >= 10:                    # 连续失败=深交所限流, 快速中止避免数小时空转
-                log.warning("extras.margin 连续 %d 日失败(疑似限流), 中止本组待下次补", consec_fail)
-                break
-            continue
-        if sz.empty:
-            continue
+        return out
+
+    sse = {}
+    sz = {}
+    # 先用 macro 接口(批量, 不耗流)
+    sh_macro = _retry(lambda: ak.macro_china_market_margin_sh(), "两融-沪[macro]")
+    sse = _parse_macro(sh_macro, "日期", "融资余额", "融资买入额")
+    sz_macro = _retry(lambda: ak.macro_china_market_margin_sz(), "两融-深[macro]")
+    sz = _parse_macro(sz_macro, "日期", "融资余额", "融资买入额")
+    log.info("extras.margin 主路 macro: 沪 %d 日, 深 %d 日 (完整历史)", len(sse), len(sz))
+
+    # --- 辅路(兜底): 若 macro 接口缺失, 尝试原始 SSE/SZSE 接口补齐 todo ---
+    if len(sse) < 10 or len(sz) < 10:
+        lo, hi = todo[0].replace("-", ""), todo[-1].replace("-", "")
+        sse_df = _retry(lambda: ak.stock_margin_sse(start_date=lo, end_date=hi),
+                        f"两融-沪[兜底 {lo}~{hi}]")
+        if sse_df is not None and not sse_df.empty:
+            for _, r in sse_df.iterrows():
+                try:
+                    d = _norm_date(r["信用交易日期"])
+                    if d not in sse:
+                        sse[d] = (float(r["融资余额"]) / 1e8, float(r["融资买入额"]) / 1e8)
+                except (TypeError, ValueError, KeyError):
+                    pass
         consec_fail = 0
-        try:
-            row = sz.iloc[0]                         # 深市原生亿元
-            _upsert(cur, d, {"margin_balance": round(sse[d][0] + float(row["融资余额"]), 2),
-                             "margin_buy_amt": round(sse[d][1] + float(row["融资买入额"]), 2)})
-            got += 1
-        except (KeyError, TypeError, ValueError):
-            continue
-        time.sleep(EXTRAS_SLEEP)
-    log.info("extras.margin 待补 %d 日(沪覆盖 %d), 合成 %d 日", len(todo), len(sse), got)
+        for d in todo:
+            if d in sse and d in sz:
+                continue
+            _keepalive(cur)
+            if d not in sse:
+                continue
+            sz_row = _retry(lambda: ak.stock_margin_szse(date=d.replace("-", "")), f"两融-深[兜底 {d}]")
+            if sz_row is None or sz_row.empty:
+                consec_fail += 1
+                if consec_fail >= 10:
+                    log.warning("extras.margin 辅路 连续失败(疑似限流), 中止本组", consec_fail)
+                    break
+                continue
+            try:
+                r = sz_row.iloc[0]
+                if d not in sz:
+                    sz[d] = (float(r["融资余额"]), float(r["融资买入额"]))  # SZSE 原生亿元
+            except (KeyError, TypeError, ValueError):
+                pass
+            time.sleep(EXTRAS_SLEEP)
+
+    # --- 写入 ---
+    written = set()
+    for d in todo:
+        if d not in sse or d not in sz:
+            continue                           # 任一市场暂缺(T+1公布/节假日), 留待下次补
+        _upsert(cur, d, {
+            "margin_balance": round(sse[d][0] + sz[d][0], 2),
+            "margin_buy_amt": round(sse[d][1] + sz[d][1], 2)})
+        written.add(d)
+        got += 1
+    log.info("extras.margin 待补 %d 日, 合成写入 %d 日 (macro 沪 %d/深 %d)",
+             len(todo), got, len(sse), len(sz))
 
 
 def _collect_broken(cur, target, force, existing, lookback=30):
