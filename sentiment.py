@@ -503,7 +503,7 @@ COLS = ["date", "limit_up", "limit_down", "touch_limit", "seal_rate", "max_strea
         "streak_dist", "promo_1_2", "promo_2_3", "promo_3_up", "promo_overall",
         "premium_mean", "premium_median", "big_face", "heaven_hell", "up_ratio",
         "total_turnover", "composite", "composite_ma5", "phase",
-        "lhb_count", "lhb_net_buy", "lhb_inst_seats", "margin_balance",
+        "lhb_count", "lhb_net_buy", "lhb_inst_seats", "lhb_inst_net_buy", "margin_balance",
         "margin_buy_amt", "broken_count", "true_seal_rate",
         "composite_v2", "composite_v2_ma5", "phase_v2",
         "chg_dist", "up_count", "down_count", "flat_count",
@@ -517,6 +517,7 @@ V2_COLS_DDL = [
     ("lhb_count", "INT"),
     ("lhb_net_buy", "DECIMAL(14,2)"),
     ("lhb_inst_seats", "INT"),
+    ("lhb_inst_net_buy", "DECIMAL(14,2)"),
     ("margin_balance", "DECIMAL(12,2)"),
     ("margin_buy_amt", "DECIMAL(12,2)"),
     ("broken_count", "INT"),
@@ -625,7 +626,7 @@ def persist_sectors(sec, tail_days):
 EXTRAS_DDL = """
 CREATE TABLE IF NOT EXISTS sentiment_extras_daily (
   date DATE NOT NULL PRIMARY KEY,
-  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2), lhb_inst_net_buy DECIMAL(14,2),
+  lhb_count INT, lhb_net_buy DECIMAL(14,2), lhb_inst_seats INT, lhb_inst_net_buy DECIMAL(14,2),
   margin_balance DECIMAL(12,2), margin_buy_amt DECIMAL(12,2),
   broken_count INT,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
