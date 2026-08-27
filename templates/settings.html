@@ -68,6 +68,11 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 .btn-expand:hover{text-decoration:underline}
 .loading{text-align:center;padding:40px;color:#999}
 </style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#001529">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/images/icon-192.png">
 </head>
 <body>
 <div class="header"><h1>📊 D8Q 智能资讯工厂</h1><p>Intelligent Engine DataFactory</p></div>
@@ -347,6 +352,9 @@ function savePrompt(svc,key,idx){
     }
   }).catch(()=>{});
 })();
+</script>
+<script>
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
 </script>
 </body>
 </html>
