@@ -93,8 +93,8 @@ WEIGHTS_V2 = {
     "margin_balance": 0.05,
 }
 
-# A2: 冰川6级温度计专用权重(对标冰川每日图, 其本质是涨停/连板/封板结构, 不含龙虎榜资金项).
-# 保持 v1 6 指标原比例 0.70, true_seal_rate 修 0.15, margin_balance 0.15. 缺失项仍按当日权重归一.
+# A2: 冰川6级温度计专用权重(对标冰川每日图, 其本质是涨停/连板/封板结构, 不含龙虎榜/融资资金项).
+# v1 六指标原比例 + true_seal_rate 0.15, 剩余项按当日权重归一. (2026-08-28 剔除 margin_balance, 名实对齐"纯结构")
 WEIGHTS_GLAE = {
     "limit_up": 0.200,
     "promo_overall": 0.200,
@@ -103,7 +103,6 @@ WEIGHTS_GLAE = {
     "premium_mean": 0.150,
     "up_ratio": 0.150,
     "true_seal_rate": 0.15,
-    "margin_balance": 0.15,
 }
 
 # --- v2 补充指标(采集参数) ---
@@ -532,6 +531,15 @@ def _merge_extras(base, extras):
         b["composite_glae"] = np.nan
     # 缺失时回退 composite (v1 六指标也无龙虎榜, 天然对齐冰川口径)
     b["phase_glae"] = b["composite_glae"].fillna(b["composite"]).apply(_phase_glae_label)
+    # 事件式强制触发: 分位法在极端区钝化(历史含更惨日), 用绝对条件确认两端
+    # (社区实证"冰点五信号"思路: 跌停>涨停x3 / 红盘占比<15%; 连板高度>=7 / 封板率>85%)
+    _gbase = b["composite_glae"].fillna(b["composite"])
+    _ice = (_gbase < 25) & (
+        (b["limit_down"] > b["limit_up"] * 3) | (b["up_ratio"] < 0.15))
+    _boil = (_gbase > 85) & (
+        (b["max_streak"] >= 7) | (b["seal_rate"] > 0.85))
+    b.loc[_ice, "phase_glae"] = "冰点"
+    b.loc[_boil, "phase_glae"] = "沸点"
     return b
 
 
