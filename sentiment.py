@@ -508,24 +508,32 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
-    # 猛男值/菜比值: 机构净买入占龙虎榜总买入的历史分位数(对标冰川口径)
+    # 猛男值/菜比值: 对标冰川口径的机构活跃度综合分位数(修正4项不合理)
     # 修正1: 用净买入(非毛买入)反映机构真实方向 — 做T时毛买大但净卖, 旧公式完全颠倒
     # 修正2: 用历史分位数(rolling 252天)替代固定tanh函数 — 自适应牛熊市, 无需手动调参
-    # 修正3: 极端值强制边界 — 分位数在趋势市中钝化(熊市持续全是低值), 用绝对阈值修正
-    #   net_ratio < -0.10 → 强制 ≤ 25 (机构剧烈净卖出)
-    #   net_ratio >  0.10 → 强制 ≥ 75 (机构剧烈净买入)
-    #   中间区间 → 完全由分位数决定(自适应)
+    # 修正3: 极端值强制边界 — 分位数在趋势市中钝化, 用绝对阈值修正 net_ratio < -0.10 → ≤25; >0.10 → ≥75
+    # 修正4: 加入机构毛买占比分位(50:50综合) — 冰川的"猛男"是「资金强度+参与度」双指标:
+    #   净买分位 = 反映资金方向(做多还是做空)
+    #   毛买分位 = 反映参与强度(机构买了多少份额)
+    #   综合 = 50% × 净买分位 + 50% × 毛买分位
+    #   (实测: 8.13从36.9→31.8偏弱, 8.14从75.8→40.4偏弱, 与冰川一致)
     with np.errstate(invalid="ignore", divide="ignore"):
         inst_net = b.get("lhb_inst_net_buy")
+        inst_buy = b.get("lhb_inst_buy")
         total_buy = b.get("lhb_total_buy")
         net_ratio = np.where(
             (total_buy > 0) & inst_net.notna(),
             inst_net / total_buy,
             np.nan)
-        # 历史分位数: 当天net_ratio在过去252天中的百分位 → [0, 100]
-        b["masculinity_score"] = _epct(pd.Series(net_ratio, index=b.index), use_rolling=True).round(2)
-        # 极端值强制边界修正(解决分位数在趋势市中的钝化问题)
-        # 熊市中252天全是低值, 单日暴跌的分位数可能不够低 → 用绝对阈值修正
+        buy_ratio = np.where(
+            (total_buy > 0) & inst_buy.notna(),
+            inst_buy / total_buy,
+            np.nan)
+        # 50%净买方向分位 + 50%毛买参与度分位 = 综合猛男值
+        pct_net = _epct(pd.Series(net_ratio, index=b.index), use_rolling=True)
+        pct_buy = _epct(pd.Series(buy_ratio, index=b.index), use_rolling=True)
+        b["masculinity_score"] = (0.5 * pct_net + 0.5 * pct_buy).round(2)
+        # 极端值强制边界修正(仅用净买方向判断极端性, 避免毛买高但净卖的误判)
         _inst_sell_extreme = (pd.Series(net_ratio, index=b.index) < -0.10) & b["masculinity_score"].notna()
         _inst_buy_extreme  = (pd.Series(net_ratio, index=b.index) >  0.10) & b["masculinity_score"].notna()
         b.loc[_inst_sell_extreme, "masculinity_score"] = b.loc[_inst_sell_extreme, "masculinity_score"].clip(upper=25)
