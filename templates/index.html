@@ -4745,7 +4745,7 @@ async function loadMacro(el){
       tooltip:{trigger:'axis',formatter:function(ps){var p=ps[0];return p.name+': '+p.value.toFixed(2)+' ('+(hh30[p.dataIndex].phase_glae||'')+')';}},
       grid:{left:60,right:16,top:10,bottom:28},
       xAxis:{type:'category',data:dates30,axisLabel:{fontSize:9,interval:2}},
-      yAxis:{type:'value',min:0,max:100,inverse:true,
+      yAxis:{type:'value',min:0,max:100,
         axisLabel:{fontSize:11,fontWeight:60,formatter:function(v){
           if(v>=90)return '{bf}沸点';
           if(v>=80)return '{hot}过热';
