@@ -508,16 +508,20 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
-    # 猛男值/菜比值: 机构/主力席位买入额占龙虎榜总买入额比例(对标冰川口径)
-    # 买入额比例稳定, 不受净买额波动影响; [0, 100] 有界
+    # 猛男值/菜比值: 机构净买入/总买入的归一化分位(对标冰川口径)
+    # 冰川猛男值基于机构净买入方向: 净卖出时猛男值低, 净买入时猛男值高
+    # 使用 tanh 归一化: masculinity = 50 + 50*tanh(net_ratio * 4), 映射 [-∞,+∞] → [0,100]
+    # k=4 使常用区间 [-0.25, 0.25] 映射到 [12, 88], 有效区分度
     with np.errstate(invalid="ignore", divide="ignore"):
-        inst_buy = b.get("lhb_inst_buy", b["lhb_inst_net_buy"])
-        total_buy = b.get("lhb_total_buy", b["lhb_net_buy"].abs())
-        b["masculinity_score"] = np.where(
-            (total_buy > 0) & inst_buy.notna(),
-            (inst_buy / total_buy * 100.0).round(2),
+        inst_net = b.get("lhb_inst_net_buy")
+        total_buy = b.get("lhb_total_buy")
+        net_ratio = np.where(
+            (total_buy > 0) & inst_net.notna(),
+            inst_net / total_buy,
             np.nan)
-        b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)  # 菜比值 = 100 - 猛男值
+        # tanh 归一化, 裁剪到 [0, 100]
+        b["masculinity_score"] = (50.0 + 50.0 * np.tanh(net_ratio * 4.0)).clip(0, 100).round(2)
+        b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)
     # A2: 冰川6级温度计专用值(剔除龙虎榜项, 与冰川图只看涨停/连板/封板结构一致)
     glae_keys = [k for k in WEIGHTS_GLAE if b[k].notna().any()]
     if glae_keys:
@@ -739,9 +743,10 @@ def _fetch_lhb(start, end):
     per = {}
     for d, sub in df.groupby("上榜日"):
         nb = pd.to_numeric(sub["龙虎榜净买额"], errors="coerce").fillna(0.0).sum()
-        # 机构席位口径: 机构+主力+买一主买+地区资金(游资), 对标冰川"猛男值"
+        # 机构席位口径: 仅"机构"和"主力"席位(剔除"买一"和地区资金, 对标冰川"猛男值")
+        # 冰川猛男值基于机构净买入的方向, 非毛买入占比
         jd = sub["解读"].astype(str) if "解读" in sub.columns else pd.Series([""]*len(sub))
-        is_inst = jd.str.contains("机构|主力|买一|西藏|上海|北京|广东|深圳|杭州|宁波|成都|武汉|南京|重庆|天津|青岛|厦门|福州|郑州|长沙|西安|大连|济南|沈阳|昆明|乌鲁木齐")
+        is_inst = jd.str.contains("机构|主力")
         inst = int(is_inst.sum())
         inst_nb = pd.to_numeric(sub.loc[is_inst, "龙虎榜净买额"], errors="coerce").fillna(0.0).sum() if inst > 0 else 0.0
         inst_buy = pd.to_numeric(sub.loc[is_inst, "龙虎榜买入额"], errors="coerce").fillna(0.0).sum() if inst > 0 else 0.0
