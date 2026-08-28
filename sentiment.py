@@ -508,10 +508,13 @@ def _merge_extras(base, extras):
         b["composite_v2"] = np.nan
     b["composite_v2_ma5"] = b["composite_v2"].rolling(5).mean().round(2)
     b["phase_v2"] = b["composite_v2"].map(_phase_label)
-    # 猛男值/菜比值: 机构净买入/总买入的归一化分位(对标冰川口径)
-    # 冰川猛男值基于机构净买入方向: 净卖出时猛男值低, 净买入时猛男值高
-    # 使用 tanh 归一化: masculinity = 50 + 50*tanh(net_ratio * 4), 映射 [-∞,+∞] → [0,100]
-    # k=4 使常用区间 [-0.25, 0.25] 映射到 [12, 88], 有效区分度
+    # 猛男值/菜比值: 机构净买入占龙虎榜总买入的历史分位数(对标冰川口径)
+    # 修正1: 用净买入(非毛买入)反映机构真实方向 — 做T时毛买大但净卖, 旧公式完全颠倒
+    # 修正2: 用历史分位数(rolling 252天)替代固定tanh函数 — 自适应牛熊市, 无需手动调参
+    # 修正3: 极端值强制边界 — 分位数在趋势市中钝化(熊市持续全是低值), 用绝对阈值修正
+    #   net_ratio < -0.10 → 强制 ≤ 25 (机构剧烈净卖出)
+    #   net_ratio >  0.10 → 强制 ≥ 75 (机构剧烈净买入)
+    #   中间区间 → 完全由分位数决定(自适应)
     with np.errstate(invalid="ignore", divide="ignore"):
         inst_net = b.get("lhb_inst_net_buy")
         total_buy = b.get("lhb_total_buy")
@@ -519,8 +522,14 @@ def _merge_extras(base, extras):
             (total_buy > 0) & inst_net.notna(),
             inst_net / total_buy,
             np.nan)
-        # tanh 归一化, 裁剪到 [0, 100]
-        b["masculinity_score"] = (50.0 + 50.0 * np.tanh(net_ratio * 4.0)).clip(0, 100).round(2)
+        # 历史分位数: 当天net_ratio在过去252天中的百分位 → [0, 100]
+        b["masculinity_score"] = _epct(pd.Series(net_ratio, index=b.index), use_rolling=True).round(2)
+        # 极端值强制边界修正(解决分位数在趋势市中的钝化问题)
+        # 熊市中252天全是低值, 单日暴跌的分位数可能不够低 → 用绝对阈值修正
+        _inst_sell_extreme = (pd.Series(net_ratio, index=b.index) < -0.10) & b["masculinity_score"].notna()
+        _inst_buy_extreme  = (pd.Series(net_ratio, index=b.index) >  0.10) & b["masculinity_score"].notna()
+        b.loc[_inst_sell_extreme, "masculinity_score"] = b.loc[_inst_sell_extreme, "masculinity_score"].clip(upper=25)
+        b.loc[_inst_buy_extreme,  "masculinity_score"] = b.loc[_inst_buy_extreme, "masculinity_score"].clip(lower=75)
         b["retail_ratio"] = (100.0 - b["masculinity_score"]).round(2)
     # A2: 冰川6级温度计专用值(剔除龙虎榜项, 与冰川图只看涨停/连板/封板结构一致)
     glae_keys = [k for k in WEIGHTS_GLAE if b[k].notna().any()]
@@ -743,8 +752,9 @@ def _fetch_lhb(start, end):
     per = {}
     for d, sub in df.groupby("上榜日"):
         nb = pd.to_numeric(sub["龙虎榜净买额"], errors="coerce").fillna(0.0).sum()
-        # 机构席位口径: 仅"机构"和"主力"席位(剔除"买一"和地区资金, 对标冰川"猛男值")
-        # 冰川猛男值基于机构净买入的方向, 非毛买入占比
+        # 机构席位口径: 仅"机构"和"主力"席位(剔除"买一"和地区游资)
+        # 买一是当天最大买家(不一定是机构), 地区关键词代表游资/小资金
+        # 对标冰川猛男值: 只计真正的机构/主力资金, 不含游资席位
         jd = sub["解读"].astype(str) if "解读" in sub.columns else pd.Series([""]*len(sub))
         is_inst = jd.str.contains("机构|主力")
         inst = int(is_inst.sum())
