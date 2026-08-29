@@ -203,6 +203,7 @@ def run_migrate(db_path=None):
     # ---------- 5. 历史数据补全: 老 portfolios -> 生成同名 account/strategy/journal ----------
     if not applied("2.0.5-backfill"):
         # 为每个用户建立 默认策略 + 默认日记 复用
+        # 注意: backfill使用conn而非cur，保证事务一致
         # 先找到所有已有 portfolios (含user_id且没填account_id)
         old_rows = cur.execute("""
             SELECT id, user_id, name, initial_capital FROM portfolios
@@ -219,20 +220,29 @@ def run_migrate(db_path=None):
                 return cache[(user_id, kind)]
 
             if kind.startswith("account_portfolio_"):
-                # 按组合名创建账户
-                pname = kind[len("account_portfolio_"):]
-                cur.execute("""
+                # 按组合名创建账户 — initial_capital NOT NULL, 用传参避免IntegrityError
+                _parts = kind.split("|$$|")
+                if len(_parts) >= 2:
+                    pname = _parts[0][len("account_portfolio_"):]
+                    try:
+                        _ic = float(_parts[1]) if _parts[1] else 1000000.0
+                    except (TypeError, ValueError):
+                        _ic = 1000000.0
+                else:
+                    pname = kind[len("account_portfolio_"):]
+                    _ic = 1000000.0
+                conn.execute("""
                     INSERT INTO accounts(user_id, name, initial_capital, description, risk_level, is_active)
                     VALUES (?,?,?,?, 'medium', 1)
-                """, (user_id, pname + "账户", None, f"由旧组合[{pname}]迁移自动生成, 已预拨100%额度进对应组合"))
-                # initial_capital稍后单独update
+                """, (user_id, pname + "账户", _ic,
+                      f"由旧组合[{pname}]迁移自动生成, 已预拨100%额度进对应组合"))
                 aid = cur.lastrowid
                 cache[(user_id, kind)] = aid
                 stats["accounts"] += 1
                 return aid
 
             if kind == "strategy_default":
-                cur.execute("""
+                conn.execute("""
                     INSERT INTO strategies(user_id, name, strategy_type, style, description, parameters, tags, is_active)
                     VALUES (?,?, 'manual','mixed',?, '{}', '默认', 1)
                 """, (user_id, f"{user_id}-默认策略", "系统默认策略(手动交易), 可随时替换"))
@@ -242,7 +252,7 @@ def run_migrate(db_path=None):
                 return sid
 
             if kind == "journal_default":
-                cur.execute("""
+                conn.execute("""
                     INSERT INTO trade_journals(user_id, name, journal_type, description, tags, is_active)
                     VALUES (?,?, 'default',?, '默认', 1)
                 """, (user_id, f"{user_id}-交易日记", f"{user_id} 默认交易日记, 可在组合中自由绑定"))
@@ -253,19 +263,20 @@ def run_migrate(db_path=None):
 
         for r in old_rows:
             pid, uid, pname, initial = r["id"], r["user_id"], r["name"], r["initial_capital"] or 1000000
-            aid = get_or_create(uid, f"account_portfolio_{pname}")
-            # update account初始资金
-            cur.execute("UPDATE accounts SET initial_capital=? WHERE id=?", (initial, aid))
+            # 用分隔符携带初始资金，避免INSERT时传NULL触发NOT NULL约束
+            kind = f"account_portfolio_{pname}|$$|{initial}"
+            aid = get_or_create(uid, kind)
             sid = get_or_create(uid, "strategy_default")
             jid = get_or_create(uid, "journal_default")
             # 写回portfolios外键, 并且allocated_capital=100% (旧组合直接继承账户的全部初始资金)
-            cur.execute("""
+            conn.execute("""
                 UPDATE portfolios
                 SET account_id=?, strategy_id=?, journal_id=?, allocated_capital=?
                 WHERE id=?
             """, (aid, sid, jid, initial, pid))
             stats["portfolios"] += 1
 
+        conn.commit()
         print(f"  ✓ 2.0.5 backfill: 迁移{stats['portfolios']}个组合 + {stats['accounts']}账户 + {stats['strategies']}策略 + {stats['journals']}日记")
         mark("2.0.5-backfill", f"历史数据回填: 组合{stats['portfolios']}/账户{stats['accounts']}/策略{stats['strategies']}/日记{stats['journals']}")
     else:
@@ -296,6 +307,7 @@ def run_migrate(db_path=None):
             LEFT JOIN portfolios p ON p.account_id=a.id
             GROUP BY a.id;
         """)
+        conn.commit()
         mark("2.0.6-views", "账户总览视图 v_account_summary")
         print("  ✓ 2.0.6 views (v_account_summary)")
     else:
