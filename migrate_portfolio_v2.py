@@ -96,7 +96,7 @@ def run_migrate(db_path=None):
 
     # ---------- 1. Accounts 账户(只体现初始额度 + 交易收益归属) ----------
     if not applied("2.0.1-accounts"):
-        cur.execute("""
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
@@ -117,7 +117,7 @@ def run_migrate(db_path=None):
 
     # ---------- 2. Strategies 策略库 ----------
     if not applied("2.0.2-strategies"):
-        cur.execute("""
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS strategies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
@@ -141,7 +141,7 @@ def run_migrate(db_path=None):
 
     # ---------- 3. TradeJournals 交易日记(独立的笔记容器) ----------
     if not applied("2.0.3-journals"):
-        cur.execute("""
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS trade_journals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
@@ -272,7 +272,7 @@ def run_migrate(db_path=None):
 
     # ---------- 6. 为新架构建view: 方便老前端继续用 ----------
     if not applied("2.0.6-views"):
-        cur.executescript("""
+        conn.executescript("""
             CREATE VIEW IF NOT EXISTS v_account_summary AS
             SELECT
                 a.id, a.user_id, a.name, a.initial_capital, a.risk_level, a.description, a.is_active,
