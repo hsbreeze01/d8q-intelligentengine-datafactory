@@ -132,6 +132,24 @@ app.register_blueprint(export_bp)
 app.register_blueprint(prompts_bp)
 app.register_blueprint(compass_bp)
 app.register_blueprint(investment_bp)
+
+# --- 模拟交易v2四层解耦架构: Accounts / Strategies / TradeJournals / Portfolios ---
+try:
+    from portfolio_v2_api import portfolio_v2_bp
+    app.register_blueprint(portfolio_v2_bp)
+except Exception as _pv2e:
+    print(f"[portfolio_v2] blueprint import skipped: {_pv2e}")
+# 启动时幂等执行迁移
+try:
+    import threading, migrate_portfolio_v2 as _mpv2
+    def _run():
+        try:
+            _mpv2.run_migrate()
+        except Exception as _e:
+            print(f"[portfolio_v2] migrate skipped: {_e}")
+    threading.Thread(target=_run, daemon=True).start()
+except Exception as _me:
+    print(f"[portfolio_v2] migrate init skipped: {_me}")
 AGENT_API = "http://localhost:8000"
 SHARK_API = "http://49.234.48.221:5000"
 COMPASS_API = "http://localhost:8087"
