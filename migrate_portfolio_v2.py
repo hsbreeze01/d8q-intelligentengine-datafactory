@@ -178,15 +178,16 @@ def run_migrate(db_path=None):
 
     # ---------- 4. portfolios 加3个外键 + 资金切分字段 ----------
     cols_to_add = [
-        ("account_id",  "INTEGER REFERENCES accounts(id)"),
-        ("strategy_id", "INTEGER REFERENCES strategies(id)"),
-        ("journal_id",  "INTEGER REFERENCES trade_journals(id)"),
-        ("allocated_capital", "REAL DEFAULT 0 -- 从账户划拨到本组合的额度,<=账户.initial_capital"),
+        # ALTER TABLE 不接受内联注释, 所以 cdef 必须是纯列定义
+        ("account_id",  "INTEGER"),
+        ("strategy_id", "INTEGER"),
+        ("journal_id",  "INTEGER"),
+        ("allocated_capital", "REAL DEFAULT 0"),
     ]
     migrated = False
     for cname, cdef in cols_to_add:
         if not col_exists(conn, "portfolios", cname):
-            cur.execute(f"ALTER TABLE portfolios ADD COLUMN {cname} {cdef}")
+            conn.execute(f"ALTER TABLE portfolios ADD COLUMN {cname} {cdef}")
             print(f"  ✓ portfolios +{cname}")
             migrated = True
     if not migrated:
@@ -194,7 +195,7 @@ def run_migrate(db_path=None):
 
     # trades 增加 journal_entry_id (关联日记条目)
     if not col_exists(conn, "trades", "journal_entry_id"):
-        cur.execute("ALTER TABLE trades ADD COLUMN journal_entry_id INTEGER REFERENCES trade_notes(id)")
+        conn.execute("ALTER TABLE trades ADD COLUMN journal_entry_id INTEGER")
         print("  ✓ trades +journal_entry_id")
     else:
         print("  ⏭ trades +journal_entry_id 已就绪")
