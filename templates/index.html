@@ -1908,7 +1908,21 @@ toast('配置已保存');
 }
 async function loadUserMgmt(){
 const users=await api('/api/auth/users');
-document.getElementById('userMgmt').innerHTML=`<div style="margin-bottom:12px"><button class="btn" style="font-size:12px;padding:6px 14px" onclick="addUser()">+ 新增用户</button></div>
+const _permCard=`<details open style="background:#f0f7ff;border:1px solid #d4e7fc;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#333">
+<summary style="cursor:pointer;font-weight:600;color:#1890ff">📋 角色权限说明（各角色可见版面）</summary>
+<table class="et" style="margin-top:10px;font-size:11px">
+<thead><tr><th>版面</th><th>analyst 投研分析师</th><th>trader 交易员</th><th>viewer 只读</th><th>editor 编辑</th><th>admin 管理员</th></tr></thead>
+<tbody>
+<tr><td>概览 / 个股 / 我的关注 / 预警 / 宏观仪表盘</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td>赛道 / 资讯 / 周报 / 研报 / 政策 / 投融资（投研人格）</td><td>✅</td><td>—</td><td>—</td><td>—</td><td>✅</td></tr>
+<tr><td>推荐 / 策略发现 / 回测中心 / 我的策略（交易人格）</td><td>—</td><td>✅</td><td>—</td><td>—</td><td>✅</td></tr>
+<tr><td>缠论信号 / 虚拟组合（模拟交易）</td><td>—</td><td>✅</td><td>✅</td><td>—</td><td>✅</td></tr>
+<tr><td>任务管理</td><td>—</td><td>—</td><td>—</td><td>✅</td><td>✅</td></tr>
+<tr><td>运行监控 / 策略管理 / 系统设置</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✅</td></tr>
+</tbody></table>
+<div style="margin-top:8px;color:#888;font-size:11px">说明：viewer 保留模拟交易最小集（缠论信号+组合）；analyst/trader 为双人格业务角色；admin 全量可见。修改角色即时生效（会话懒同步）。</div>
+</details>`;
+document.getElementById('userMgmt').innerHTML=_permCard+`<div style="margin-bottom:12px"><button class="btn" style="font-size:12px;padding:6px 14px" onclick="addUser()">+ 新增用户</button></div>
 <table class="et"><thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead>
 <tbody>${(users||[]).map(u=>`<tr><td>${esc(u.username)}</td><td><span class="badge badge-info">${u.role}</span></td>
 <td>${u.frozen?'<span style="color:#ff4d4f">🔒 已冻结</span>':'<span style="color:#52c41a">正常</span>'}</td>
@@ -1929,7 +1943,7 @@ form.innerHTML=`<div style="font-weight:500;margin-bottom:12px">新增用户</di
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 <div><label style="font-size:12px;color:#666">用户名</label><input id="nu_name" class="search" style="width:100%;margin-top:4px;padding:8px 10px" placeholder="输入用户名"></div>
 <div><label style="font-size:12px;color:#666">密码（≥8位）</label><input id="nu_pass" type="password" class="search" style="width:100%;margin-top:4px;padding:8px 10px" placeholder="输入密码"></div>
-<div><label style="font-size:12px;color:#666">角色</label><select id="nu_role" class="search" style="width:100%;margin-top:4px;padding:8px 10px"><option value="viewer">viewer - 只读</option><option value="editor">editor - 可编辑</option><option value="admin">admin - 管理员</option></select></div>
+<div><label style="font-size:12px;color:#666">角色</label><select id="nu_role" class="search" style="width:100%;margin-top:4px;padding:8px 10px"><option value="viewer">viewer - 只读</option><option value="editor">editor - 可编辑</option><option value="analyst">analyst - 投研分析师</option><option value="trader">trader - 交易员</option><option value="admin">admin - 管理员</option></select></div>
 </div>
 <div style="margin-top:12px;display:flex;gap:8px">
 <button class="btn" style="font-size:12px;padding:6px 16px" onclick="submitAddUser()">确认创建</button>
@@ -1994,7 +2008,7 @@ modal.style.display='flex';
 modal.innerHTML=`<div class="card" style="max-width:95vw;width:100%">
 <h3 style="margin-bottom:20px">🔄 修改角色</h3>
 <div style="text-align:center;margin-bottom:20px"><div style="width:56px;height:56px;border-radius:50%;background:#e6f7ff;display:inline-flex;align-items:center;justify-content:center;font-size:24px">👤</div><div style="margin-top:8px;font-size:15px;font-weight:600">${esc(name)}</div><div style="font-size:12px;color:#999">当前角色：<span class="badge badge-info">${currentRole}</span></div></div>
-<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新角色</label><select id="cr_role" class="search" style="width:100%;margin-top:6px;padding:10px 12px"><option value="viewer" ${currentRole==='viewer'?'selected':''}>viewer - 只读</option><option value="editor" ${currentRole==='editor'?'selected':''}>editor - 可编辑</option><option value="admin" ${currentRole==='admin'?'selected':''}>admin - 管理员</option></select></div>
+<div style="margin-bottom:16px"><label style="font-size:13px;color:#555;font-weight:500">新角色</label><select id="cr_role" class="search" style="width:100%;margin-top:6px;padding:10px 12px"><option value="viewer" ${currentRole==='viewer'?'selected':''}>viewer - 只读</option><option value="editor" ${currentRole==='editor'?'selected':''}>editor - 可编辑</option><option value="analyst" ${currentRole==='analyst'?'selected':''}>analyst - 投研分析师</option><option value="trader" ${currentRole==='trader'?'selected':''}>trader - 交易员</option><option value="admin" ${currentRole==='admin'?'selected':''}>admin - 管理员</option></select></div>
 <div style="background:#fff7e6;border:1px solid #ffe58f;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#d48806;line-height:1.6">角色变更将立即生效，该用户下次操作时自动获得新权限，无需重新登录。</div>
 <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid #f0f0f0"><button class="btn-ghost" onclick="closeModal()">取消</button><button class="btn" onclick="submitChangeRole('${name}','${currentRole}')">确认修改</button></div></div>`;
 }
