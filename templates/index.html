@@ -314,6 +314,9 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 <div class="main">
 <div class="topbar"><div class="menu-btn" onclick="toggleMobileMenu()">☰</div><div class="title" id="pageTitle">概览</div><div id="viewToggle" style="display:none" class="view-toggle"><span class="active" data-v="mine" onclick="switchView('mine')">我的视图</span><span data-v="all" onclick="switchView('all')">全局视图</span></div></div>
 <div class="content" id="contentArea"></div>
+<div id="riskDisclosure" style="display:none;max-width:1100px;margin:0 auto 24px;padding:10px 16px;background:#fffbe6;border:1px solid #ffe58f;border-radius:8px;font-size:11px;color:#8c6d1f;line-height:1.7">
+⚠️ <b>合规声明</b>：本平台全部内容（信号、推荐、回测、统计与研报）均为历史数据与量化模型在<b>模拟环境</b>下的研究性输出，<b>不构成任何投资建议、要约或收益承诺</b>。市场有风险，投资决策需独立作出并自担风险；历史表现不代表未来收益。数据可能存在延迟、缺失或错误，请以官方披露信息为准。
+</div>
 </div>
 <div class="toast" id="toast"></div>
 <div id="taskModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:1000;justify-content:center;align-items:center"></div>
@@ -433,6 +436,8 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
+var _rd=document.getElementById('riskDisclosure');
+if(_rd)_rd.style.display=(id==='recommend'||id==='chanlun-czsc'||id==='backtest')?'block':'none';
 const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc,macro:loadMacro};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
@@ -1197,7 +1202,7 @@ const editor=document.getElementById('weeklyEditor');
 editor.innerHTML='<p style="color:#999">⏳ 正在生成周报，请稍候...</p>';
 try{
 const data=await api('/api/weekly/generate',{method:'POST',body:JSON.stringify({track_id:parseInt(trackId),days:parseInt(days)})});
-if(data.content){editor.innerText=data.content;toast('周报生成成功')}
+if(data.content){editor.innerText='> ⚠️ **合规声明**：本报告由 AI 基于公开资讯自动生成，仅供内部研究参考，不构成任何投资建议或收益承诺；历史数据不代表未来表现。\n\n'+data.content;toast('周报生成成功')}
 else{editor.innerHTML='<p style="color:#ff4d4f">生成失败: '+(data.error||'未知错误')+'</p>';toast(data.error||'生成失败',true)}
 }catch(e){editor.innerHTML='<p style="color:#ff4d4f">请求失败</p>';toast('网络错误',true)}
 }
