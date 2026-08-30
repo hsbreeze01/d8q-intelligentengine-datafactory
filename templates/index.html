@@ -367,31 +367,32 @@ function drawerGoBack(){
 }
 
 const PAGES=[
+// 共享底座(全角色): 概览/个股/关注/预警/宏观
 {id:'dashboard',icon:'📊',label:'概览',title:'概览'},
-{id:'track',icon:'🔥',label:'赛道',title:'赛道热度'},
-{id:'feed',icon:'📰',label:'资讯',title:'资讯'},
-{id:'weekly',icon:'📝',label:'周报',title:'周报工作台'},
+{id:'track',icon:'🔥',label:'赛道',title:'赛道热度',roles:['analyst','admin']},
+{id:'feed',icon:'📰',label:'资讯',title:'资讯',roles:['analyst','admin']},
+{id:'weekly',icon:'📝',label:'周报',title:'周报工作台',roles:['analyst','admin']},
 {id:'stock',icon:'📈',label:'个股',title:'个股分析'},
-{id:'recommend',icon:'💡',label:'推荐',title:'每日推荐'},
-{id:'report',icon:'📑',label:'研报',title:'研报分析'},
-{id:'policy',icon:'📜',label:'政策',title:'政策分析'},
+{id:'recommend',icon:'💡',label:'推荐',title:'每日推荐',roles:['trader','admin']},
+{id:'report',icon:'📑',label:'研报',title:'研报分析',roles:['analyst','admin']},
+{id:'policy',icon:'📜',label:'政策',title:'政策分析',roles:['analyst','admin']},
 {id:'follows',icon:'⭐',label:'我的关注',title:'我的关注'},
 {id:'alert',icon:'🔔',label:'预警',title:'智能预警'},
-{id:'portfolio',icon:'💼',label:'组合',title:'虚拟组合'},
-{id:'investment',icon:'💰',label:'投融资',title:'投融资数据'},
+{id:'portfolio',icon:'💼',label:'组合',title:'虚拟组合',roles:['trader','viewer','admin']},
+{id:'investment',icon:'💰',label:'投融资',title:'投融资数据',roles:['analyst','admin']},
 {id:'_div2'},
-{id:'strategy-discover',icon:'🔍',label:'策略发现',title:'策略发现'},
-{id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心'},
-{id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略'},
-{id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',role:'admin'},
+{id:'strategy-discover',icon:'🔍',label:'策略发现',title:'策略发现',roles:['trader','admin']},
+{id:'backtest',icon:'🔬',label:'回测中心',title:'回测中心',roles:['trader','admin']},
+{id:'my-strategy',icon:'📌',label:'我的策略',title:'我的策略',roles:['trader','admin']},
+{id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',roles:['admin']},
 // [DISABLED] {id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
-{id:"chanlun-czsc",icon:"🧪",label:"缠论(czsc)",title:"缠论czsc引擎"},
+{id:"chanlun-czsc",icon:"🧪",label:"缠论(czsc)",title:"缠论czsc引擎",roles:['trader','viewer','admin']},
 {id:'macro',icon:'🌐',label:'宏观仪表盘',title:'宏观仪表盘'},
 {id:'_div'},
-{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',role:'editor'},
-{id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',role:'admin'},
+{id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',roles:['editor','admin']},
+{id:'monitor',icon:'📡',label:'运行监控',title:'运行监控',roles:['admin']},
 {id:'_div'},
-{id:'settings',icon:'🔧',label:'设置',title:'系统设置',role:'admin'},
+{id:'settings',icon:'🔧',label:'设置',title:'系统设置',roles:['admin']},
 ];
 let curPage=(location.pathname.replace('/',''))||'dashboard',userRole='viewer';
 
@@ -401,6 +402,7 @@ nav.innerHTML=PAGES.map(p=>{
 if(p.id==='_div'||p.id==='_div2')return'<div class="divider"></div>';
 if(p.role==='admin'&&userRole!=='admin')return'';
 if(p.role==='editor'&&userRole==='viewer')return'';
+if(p.roles&&p.roles.indexOf(userRole)<0)return'';
 if(p.href)return`<a href="${p.href}">${p.icon} <span>${p.label}</span></a>`;
 return`<a href="#" data-p="${p.id}" class="${p.id===curPage?'active':''}" style="position:relative">${p.icon} <span>${p.label}</span>${p.id==='alert'?'<span class="alert-badge" id="alertBadge"></span>':''}</a>`;
 }).join('');
@@ -436,6 +438,8 @@ function freqToLabel(f){if(!f)return'-';const m={daily:'每日',weekly:'每周',
 // === 页面加载 ===
 function loadPage(id){
 const area=document.getElementById('contentArea');
+var _pg=PAGES.find(function(p){return p.id===id});
+if(_pg&&_pg.roles&&_pg.roles.indexOf(userRole)<0){area.innerHTML='<div class="empty">⛔ 该版面对当前角色不可见</div>';return;}
 var _rd=document.getElementById('riskDisclosure');
 if(_rd)_rd.style.display=(id==='recommend'||id==='chanlun-czsc'||id==='backtest')?'block':'none';
 const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc,macro:loadMacro};
@@ -2339,7 +2343,7 @@ async function init(){
 window.viewAll = (localStorage.getItem('d8q_view_mode') || 'mine') === 'all';
 try{const me=await api('/api/auth/me');
 document.getElementById('uName').textContent=me.username||'-';
-document.getElementById('uRole').textContent=({admin:'管理员',editor:'编辑',viewer:'只读'}[me.role])||me.role;
+document.getElementById('uRole').textContent=({admin:'管理员',editor:'编辑',viewer:'只读',analyst:'投研分析师',trader:'交易员'}[me.role])||me.role;
 userRole=me.role||'viewer';
 if(userRole==='admin'){
 const vt=document.getElementById('viewToggle');
@@ -3147,7 +3151,7 @@ async function loadRecStocks(){
       html+='</div>';
       el.innerHTML=html;
     }else{
-      el.innerHTML='<div class="card" style="padding:24px;text-align:center"><div style="font-size:16px;color:#999;margin-bottom:12px">暂无推荐数据</div><div style="font-size:13px;color:#bbb">推荐引擎需要股票基础数据，请确保 compass 服务已同步数据</div></div>';
+      el.innerHTML='<div class="card" style="padding:24px;text-align:center"><div style="font-size:16px;color:#999;margin-bottom:12px">暂无推荐数据</div><div style="font-size:13px;color:#bbb">推荐数据准备中，每个交易日 16:00 后自动更新</div></div>';
     }
   }catch(e){
     el.innerHTML='<div class="empty">加载失败: '+e.message+'</div>';

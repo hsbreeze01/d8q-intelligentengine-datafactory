@@ -13,6 +13,8 @@ USERS_PATH = os.path.join(DATA_DIR, "users.json")
 ROLE_PERMS = {
     "viewer": {"read", "write", "execute"},  # viewer需能操作模拟交易(写组合/持仓)
     "editor": {"read", "write", "execute"},
+    "analyst": {"read", "write", "execute"},  # 投研分析师(资讯人格版面)
+    "trader": {"read", "write", "execute"},   # 交易员(交易人格版面)
     "admin":  {"read", "write", "execute", "admin"},
 }
 
