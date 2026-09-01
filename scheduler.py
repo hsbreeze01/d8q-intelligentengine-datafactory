@@ -956,7 +956,7 @@ def _tick():
         # 纪律化策略扫描(15:37, 独立入口)
         # [DISABLED 2026-08-04] _run_disciplined_scan()
 
-        # czsc新引擎扫描(15:40, 灰度并行)
+        # czsc新引擎扫描(15:40, 生产唯一路径)
         _run_czsc_scan()
 
         # 信号复盘回填(16:00)
@@ -966,7 +966,12 @@ def _tick():
         _run_weekly_review()
 
         # 实验组灰度扫描(15:42)
-        _run_experimental_scan()
+        # [DISABLED 2026-09-02] _run_experimental_scan()
+        # 停用原因: experimental 与 default 用同一套 czsc_scan 代码, 而 profile 参数
+        # (止损/背驰阈值/成交额门槛/空头过滤等)从未被 scan() 读取 -> 两组产出完全相同
+        # (实测 buy 5日窗 n=110 两组胜率/期望逐位一致), 是带 bug 的重复记账而非真实A/B。
+        # 它不推送、不进前端, 仅向共享 czsc_signal_history 写重复行污染复盘。
+        # 消除并行, 只保留 default 生产路径。profile 参数接入见 czsc_scan.scan() 修复。
 
         # 每日自选股评分计算(08:30)
         daily_score_calculation()
