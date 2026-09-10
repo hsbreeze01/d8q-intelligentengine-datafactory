@@ -332,6 +332,7 @@ body{font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;backg
 <script>
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
 </script>
+<script src="/static/d8q-console-module.js?v=04d586f5"></script>
 </body>
 </html>
 <script>
@@ -387,6 +388,7 @@ const PAGES=[
 {id:'strategy-admin',icon:'📋',label:'策略管理',title:'策略管理',roles:['admin']},
 // [DISABLED] {id:'chanlun',icon:'📐',label:'缠论',title:'缠论信号'},
 {id:"chanlun-czsc",icon:"🧪",label:"缠论(czsc)",title:"缠论czsc引擎",roles:['trader','viewer','admin']},
+{id:"factor-console",icon:"🎛️",label:"因子中心",title:"因子配置中心",roles:["admin","trader"]},
 {id:'macro',icon:'🌐',label:'宏观仪表盘',title:'宏观仪表盘'},
 {id:'_div'},
 {id:'tasks',icon:'⚙️',label:'任务',title:'任务管理',roles:['editor','admin']},
@@ -441,8 +443,9 @@ const area=document.getElementById('contentArea');
 var _pg=PAGES.find(function(p){return p.id===id});
 if(_pg&&_pg.roles&&_pg.roles.indexOf(userRole)<0){area.innerHTML='<div class="empty">⛔ 该版面对当前角色不可见</div>';return;}
 var _rd=document.getElementById('riskDisclosure');
-if(_rd)_rd.style.display=(id==='recommend'||id==='chanlun-czsc'||id==='backtest')?'block':'none';
-const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc,macro:loadMacro};
+if(_rd)_rd.style.display=(id==='recommend'||id==='chanlun-czsc'||id==='backtest'||id==='factor-console')?'block':'none';
+const loaders={dashboard:loadDashboard,track:loadTrack,feed:loadFeed,weekly:loadWeekly,stock:loadStock,recommend:loadRecommend,report:loadReport,tasks:loadTasks,monitor:loadMonitor,settings:loadSettings,policy:loadPolicy,follows:loadFollows,alert:loadAlert,portfolio:loadPortfolio,investment:loadInvestment,'strategy-discover':loadStrategyDiscover,'backtest':loadBacktest,'my-strategy':loadMyStrategy,'strategy-admin':loadStrategyAdmin,'chanlun-czsc':loadChanlunCzsc,
+'factor-console':loadFactorConsole,macro:loadMacro};
 if(loaders[id])loaders[id](area);
 else area.innerHTML='<div class="empty">页面开发中...</div>';
 }

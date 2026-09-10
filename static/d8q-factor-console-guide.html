@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>d8q 因子中心 · 配置管理指南 v2.0</title>
+<style>
+/* d8q 因子中心 设计规范 */
+:root{
+  --primary:#1890ff; --primary-hover:#40a9ff; --primary-bg:#e6f7ff;
+  --good:#52c41a; --good-bg:#f6ffed; --good-border:#b7eb8f;
+  --warn:#fa8c16; --warn-bg:#fff7e6; --warn2:#faad14;
+  --bad:#ff4d4f; --bad-bg:#fff2f0; --bad-border:#ffccc7;
+  --purple:#722ed1; --purple-bg:#f9f0ff;
+  --text:#333; --text2:#666; --text3:#999;
+  --bg:#f0f2f5; --card:#fff;
+  --border:#e8e8e8; --divider:#f5f5f5; --thead:#fafafa; --thead-line:#f0f0f0; --input-border:#d9d9d9;
+  --code-bg:#f5f5f5; --code-text:#c7254e;
+  --shadow:0 1px 3px rgba(0,0,0,.06); --shadow-hover:0 4px 12px rgba(0,0,0,.1);
+  --radius:8px; --toc-w:236px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px; line-height:1.75;
+}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary-hover)}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.86em;background:var(--primary-bg);color:#0e6bb8;border-radius:4px;padding:1px 6px;word-break:break-all}
+pre{background:var(--code-bg);border:1px solid var(--divider);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0}
+pre code{background:none;border:none;padding:0;color:var(--code-text)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);width:0%;z-index:99;transition:width .1s}
+#toc-toggle{display:none;position:fixed;right:18px;bottom:18px;z-index:98;background:var(--primary);color:#fff;border:none;border-radius:999px;width:52px;height:52px;font-size:22px;cursor:pointer;box-shadow:var(--shadow-hover)}
+aside#toc{position:fixed;top:0;left:0;bottom:0;width:var(--toc-w);background:#001529;color:rgba(255,255,255,.65);display:flex;flex-direction:column;z-index:90}
+aside#toc .logo{padding:16px 20px;font-size:17px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,.1)}
+aside#toc .logo span{font-size:11px;opacity:.5;font-weight:400;margin-left:4px}
+aside#toc .docmeta{padding:10px 20px;font-size:11.5px;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.08);line-height:1.6}
+aside#toc nav{flex:1;padding:8px 0;overflow-y:auto}
+aside#toc nav a{display:flex;align-items:center;gap:8px;padding:8px 20px;color:rgba(255,255,255,.65);text-decoration:none;font-size:13px;border-left:3px solid transparent;transition:all .15s;line-height:1.45}
+aside#toc nav a.l2{padding-left:38px;font-size:12.5px}
+aside#toc nav a:hover{color:#fff;background:rgba(255,255,255,.05)}
+aside#toc nav a.active{color:#fff;background:rgba(24,144,255,.15);border-left-color:#1890ff}
+aside#toc .user-box{padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);font-size:12px}
+aside#toc .user-box .name{color:#fff;font-size:13px;font-weight:500}
+aside#toc .user-box .role{color:rgba(255,255,255,.45);margin-top:2px}
+main{margin-left:var(--toc-w);min-height:100vh}
+.topbar{position:sticky;top:0;z-index:80;height:48px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.topbar .title{font-size:15px;font-weight:600}
+.topbar .title em{font-style:normal;color:var(--primary);font-size:12px;font-weight:400;margin-left:8px}
+.topbar .fresh{font-size:12px;color:var(--text3)}
+.wrap{padding:24px;max-width:1080px}
+section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 26px;margin-bottom:16px;scroll-margin-top:62px}
+h1{font-size:24px;color:var(--text);margin-bottom:4px;line-height:1.4}
+h1+ .subtitle{color:var(--text2);font-size:13.5px;margin-bottom:16px}
+h2{font-size:17px;color:var(--text);border-bottom:1px solid var(--divider);padding-bottom:10px;margin-bottom:16px;font-weight:600}
+h2 .no{color:var(--primary);margin-right:8px;font-family:Menlo,monospace;font-size:.85em}
+h3{font-size:15px;color:var(--text);margin:20px 0 10px;font-weight:600}
+h3::before{content:"";display:inline-block;width:3px;height:12px;background:var(--primary);border-radius:2px;margin-right:8px;vertical-align:-1px}
+h4{font-size:14px;color:var(--text);margin:16px 0 8px;font-weight:600}
+p{margin:8px 0}
+ul,ol{margin:8px 0 8px 22px}
+li{margin:4px 0}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;line-height:1.65}
+th{text-align:left;padding:9px 12px;background:var(--thead);color:var(--text2);font-weight:500;border-bottom:1px solid var(--thead-line);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--divider);vertical-align:top;color:var(--text)}
+tr:hover td{background:rgba(24,144,255,.025)}
+.table-wrap{overflow-x:auto;margin:12px 0}
+.table-wrap table{min-width:700px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap;vertical-align:1px}
+.b-adj{background:var(--primary-bg);color:var(--primary)}
+.b-ro{background:#f0f0f0;color:var(--text2)}
+.b-sys{background:var(--purple-bg);color:var(--purple)}
+.b-high{background:var(--bad-bg);color:var(--bad)}
+.b-sell{background:var(--good-bg);color:var(--good)}
+.b-entry{background:var(--warn-bg);color:var(--warn)}
+.callout{border-radius:6px;padding:12px 16px;margin:12px 0;font-size:13.5px;border:1px solid}
+.c-warn{background:var(--warn-bg);border-color:#ffd591}
+.c-danger{background:var(--bad-bg);border-color:var(--bad-border)}
+.c-info{background:var(--primary-bg);border-color:#91d5ff}
+.c-ok{background:var(--good-bg);border-color:var(--good-border)}
+.callout b:first-child{display:block;margin-bottom:4px}
+.meta{color:var(--text3);font-size:12.5px}
+hr{border:none;border-top:1px solid var(--divider);margin:20px 0}
+.footer-note{color:var(--text3);font-size:12px;margin:20px 0 30px;text-align:center}
+.mc-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:14px 0}
+.mc{background:#fff;border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--primary)}
+.mc .label{font-size:12.5px;color:var(--text3);margin-bottom:6px}
+.mc .value{font-size:24px;font-weight:700;color:var(--primary)}
+.mc .sub{font-size:12px;margin-top:4px;color:var(--text2)}
+/* 四要素块 */
+.four{display:grid;gap:12px;margin:14px 0}
+.ele{border-radius:8px;padding:14px 18px;border:1px solid var(--divider);background:#fff}
+.ele .eh{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ele.scene{border-left:4px solid var(--primary);background:var(--primary-bg);border-color:#91d5ff}
+.ele.factor{border-left:4px solid var(--warn)}
+.ele.func{border-left:4px solid var(--good)}
+.ele.conf{border-left:4px solid var(--purple)}
+.ele .eh .k{font-size:11px;color:#fff;background:var(--text3);border-radius:4px;padding:1px 8px;font-weight:500}
+.ele.scene .eh .k{background:var(--primary)}
+.ele.factor .eh .k{background:var(--warn)}
+.ele.func .eh .k{background:var(--good)}
+.ele.conf .eh .k{background:var(--purple)}
+.steps{counter-reset:st;margin:6px 0}
+.steps li{list-style:none;position:relative;padding:6px 0 6px 38px;margin:0}
+.steps li::before{counter-increment:st;content:counter(st);position:absolute;left:0;top:8px;width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+@media (max-width:1080px){
+  #toc-toggle{display:block}
+  aside#toc{transform:translateX(-100%);transition:transform .25s}
+  aside#toc.open{transform:none;box-shadow:8px 0 30px rgba(0,0,0,.35)}
+  main{margin-left:0}
+  .wrap{padding:14px}
+  .mc-row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<button id="toc-toggle" aria-label="目录">☰</button>
+<aside id="toc">
+  <div class="logo">🎛️ d8q 因子中心<span>配置指南 v2.0</span></div>
+  <div class="docmeta">面向使用者的配置管理说明<br>四要素：场景 · 因子 · 功能 · 配置说明</div>
+  <nav id="toc-nav"></nav>
+  <div class="user-box">
+    <div class="name">策略管理者</div>
+    <div class="role">查看 · 调整 · 留痕</div>
+  </div>
+</aside>
+<main>
+<div class="topbar">
+  <div class="title">d8q 因子中心 · 配置管理指南 <em>看懂因子 · 安全调整 · 全程留痕</em></div>
+  <div class="fresh">适用版本 v2.0 · 2026-09-10</div>
+</div>
+<div class="wrap">
+
+<section id="s1">
+<h2><span class="no">01</span>关于本指南</h2>
+<p>因子中心是 d8q 模拟交易系统的统一配置管理界面。在这里，你可以<b>看到</b>策略当前使用的全部因子与实时风险状态，<b>读懂</b>每个因子的含义，<b>安全地调整</b>可配置项，并且每一次调整都会<b>自动留痕</b>。</p>
+<h3>本指南怎么用</h3>
+<p>指南围绕八个常见使用场景组织。每个场景都按<b>四要素</b>展开，你可以按需直达：</p>
+<div class="mc-row">
+  <div class="mc"><div class="label">🎬 场景</div><div class="value" style="font-size:16px">什么时候需要它</div><div class="sub">触发情境与想达成的目标</div></div>
+  <div class="mc"><div class="label">📊 因子</div><div class="value" style="font-size:16px">涉及哪些因子</div><div class="sub">该场景相关的配置项清单</div></div>
+  <div class="mc"><div class="label">🖱️ 功能</div><div class="value" style="font-size:16px">界面能做什么</div><div class="sub">一步一步的操作指引</div></div>
+  <div class="mc"><div class="label">⚙️ 配置说明</div><div class="value" style="font-size:16px">每项怎么理解</div><div class="sub">含义 / 调整影响 / 生效时机 / 注意事项</div></div>
+</div>
+<h3>标识说明</h3>
+<p>
+<span class="badge b-adj">可调整</span> 你可以直接修改的配置项　
+<span class="badge b-ro">仅展示</span> 由系统实时计算、只能查看的指标　
+<span class="badge b-sys">系统规则</span> 交易纪律性规则，不开放调整　
+<span class="badge b-high">高影响</span> 调整前需二次确认的配置项
+</p>
+<div class="callout c-info"><b>一句话原则</b>所有配置项都遵循"客观规则、不接受临场主观改写"的治理约定——调整必须留理由、留记录，并建议在积累足够交易样本（约 30 笔完整买卖）后再动风险类参数。</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">02</span>快速上手</h2>
+<h3>界面总览</h3>
+<div class="table-wrap"><table>
+<tr><th>区域</th><th>位置</th><th>作用</th></tr>
+<tr><td>导航栏</td><td>左侧深蓝色区域</td><td>在 概览 / 因子配置（五大类） / 调整历史 之间切换</td></tr>
+<tr><td>顶栏</td><td>顶部白色条</td><td>当前页面标题 + 搜索框（输入名称或关键词找因子）+ 数据时间</td></tr>
+<tr><td>指标卡区</td><td>概览页顶部</td><td>八张核心资金与风险指标卡，实时刷新</td></tr>
+<tr><td>因子列表</td><td>配置页主体</td><td>按类分组的配置项清单，可筛选"可调整 / 仅展示"</td></tr>
+<tr><td>详情抽屉</td><td>点击任一因子后右侧滑出</td><td>该因子的完整说明与（若可调）编辑入口</td></tr>
+</table></div>
+<h3>五分钟完成一次调整（最短路径）</h3>
+<ol class="steps">
+<li>在顶栏搜索框输入配置项名称（如"持仓时间"）</li>
+<li>点击搜索结果，右侧滑出详情抽屉，先读完"调整影响"</li>
+<li>点击"调整"，输入新值——系统即时检查是否在允许范围</li>
+<li>填写调整理由（必填，至少 10 个字），生成调整单</li>
+<li>按调整单上的"应用指引"在维护时段生效，回到界面确认新值已生效</li>
+</ol>
+</section>
+
+<section id="s3">
+<h2><span class="no">03</span>核心概念速览</h2>
+<div class="table-wrap"><table>
+<tr><th>概念</th><th>通俗解释</th></tr>
+<tr><td>因子</td><td>影响策略行为的可度量参数或规则，分两类：<b>配置项</b>（可调整的数值/开关）与<b>派生指标</b>（系统根据配置和行情实时算出的结果，仅展示）</td></tr>
+<tr><td>初始本金 A</td><td>本轮资金周期（"纪元"）开始时投入的 5 万元本金，是所有收益率与风险线的基准</td></tr>
+<tr><td>可运营资金 D</td><td>当前真正可用于开新仓的资金池：亏了按亏损全额缩水；赚了只按一半放大（另一半作为保护储备）</td></tr>
+<tr><td>生存净值 E</td><td>本金 + 已实现盈亏 + 按保守价估算的持仓浮盈亏——衡量"还剩多少家底"</td></tr>
+<tr><td>高水位 H / 回撤</td><td>历史最好的净值高点，与当前净值的差距就是回撤。回撤越深，系统越保守</td></tr>
+<tr><td>开放风险</td><td>所有持仓"从买入价跌到止损价"会损失的钱的总和——衡量最坏情况下的在险金额</td></tr>
+<tr><td>风险状态</td><td>五档健康度：正常 → 警惕 → 防守 → 只减仓 → 终局止损。状态由回撤深度自动判定，档位越深、能开的新仓越少</td></tr>
+<tr><td>调整单</td><td>每次调整自动生成的凭证：调整前后值、理由、生效方式、时间。系统自动留档，不可修改删除</td></tr>
+<tr><td>生效时机</td><td>调整不会即时改变盘中行为，需按调整单指引在维护时段应用；生效后<b>已持有的仓位仍按原规则执行</b>，新规则从下一次评估开始适用</td></tr>
+</table></div>
+<div class="callout c-warn"><b>重要：调整为什么不立即生效？</b>为了让规则在一天之内保持一致、避免"盘中改规则导致同一笔交易前后标准不同"，所有调整在应用并生效前，系统继续按原规则执行。调整单上会写清每一项的具体生效时点（下一轮买入评估 / 下一轮卖出检查 / 次日开盘）。</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">04</span>场景一 · 盘中风险巡检</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候看这个页面</div>
+<p>交易日盘中，随时想确认"现在系统健康吗、还能不能开新仓、行情数据是否正常"。整个场景<b>只看不改</b>，30 秒完成。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>涉及的派生指标（全部<span class="badge b-ro">仅展示</span>）</div>
+<div class="table-wrap"><table>
+<tr><th>指标</th><th>看什么</th><th>健康参考</th></tr>
+<tr><td>本金生存率</td><td>家底相对本金的余量</td><td>≥ 100% 为佳；接近 60% 即触发生存底线</td></tr>
+<tr><td>回撤幅度</td><td>距离历史高点的回落深度</td><td>&lt;10% 正常；越深越保守</td></tr>
+<tr><td>风险状态</td><td>五档健康度当前档位</td><td>"正常"档可正常开新仓</td></tr>
+<tr><td>行情完整度</td><td>持仓股行情是否齐全且新鲜</td><td>应显示"完整"；缺失会自动降级为"只减仓"</td></tr>
+<tr><td>行业占用 / 风险占用</td><td>组合集中度与在险金额用了多少额度</td><td>占用条未顶格即有余量</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>打开因子中心，默认进入"概览"页</li>
+<li>看顶栏"数据时间"——确认是最近一分钟内的数据</li>
+<li>扫一眼八张指标卡的颜色（绿=健康，黄/橙=注意，红=告警）</li>
+<li>查看风险状态条当前档位与行业/风险占用条</li>
+<li>（可选）点击任一指标卡查看它的计算口径与当前代入值</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>状态降级是什么意思</div>
+<p>当行情数据缺失、超过时效（默认要求 120 秒内）或数据异常时，系统会自动进入"<b>只减仓</b>"状态：不开新仓、只允许卖出。这不是故障，而是数据不可信时的自我保护。数据恢复后自动回到正常档。</p></div>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">05</span>场景二 · 复盘时理解一个因子</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>复盘时想弄清楚："当前单笔风险上限到底是多少？为什么是这个数？改了它会怎样？"——不用翻代码，详情抽屉里都有。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>全部五类因子均可查</div>
+<p>缠论策略 / 信号准入 / 买入执行 / 资金与风险 / 卖出纪律，共 45+ 项。列表支持按类筛选、按"可调整性"筛选、按名称关键词搜索。</p></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入对应类别的配置页，或在顶栏搜索框输入关键词</li>
+<li>点击因子行，右侧滑出详情抽屉</li>
+<li>依次阅读六个区块：<b>这是什么 → 计算方式 → 默认值与范围 → 系统检查规则 → 调整影响 → 关联关系</b></li>
+<li>"关联关系"里的联动因子可以点击跳转（例如从"可运营资金"跳到"盈利再投入比例"）</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>详情里的关键信息怎么读</div>
+<ul>
+<li><b>调整影响</b>分"调大会怎样 / 调小会怎样"两个方向说明，并给出一个具体数字例子</li>
+<li><b>生效时机</b>告诉你这项调整从什么时候开始起作用、对已持仓的仓位是否有影响</li>
+<li><b>系统检查</b>用通俗语言列出约束（如"三档回撤线必须依次增大"），改到不合理组合时会被拦截</li>
+<li>标有 <span class="badge b-sys">系统规则</span> 的因子（如卖出优先级、T+1）说明"为什么不开放调整"，这些是交易纪律本身</li>
+</ul></div>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">06</span>场景三 · 调整进攻尺度（买入与仓位）</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>觉得开仓太密/太疏、单注太大/太小，想调整"每次买多少、一共持多少、一天开几只"这类进攻性参数。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>本场景配置项</div>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认值</th><th>标识</th><th>一句话说明</th></tr>
+<tr><td>单笔买入预算</td><td>20,000 元</td><td><span class="badge b-adj">可调整</span></td><td>单只新仓的资金上限（还会受风险余量进一步压缩）</td></tr>
+<tr><td>每日最多新开仓</td><td>5 只</td><td><span class="badge b-adj">可调整</span></td><td>每个交易日早晨最多新开几只，按信号质量择优</td></tr>
+<tr><td>组合最多持仓</td><td>5 只</td><td><span class="badge b-adj">可调整</span></td><td>同时在场的股票数上限</td></tr>
+<tr><td>单股最多仓位份数</td><td>2 份</td><td><span class="badge b-adj">可调整</span></td><td>同一只股票最多分几次建仓（每份独立止损/目标）</td></tr>
+<tr><td>最少买入手数</td><td>2 手</td><td><span class="badge b-adj">可调整</span></td><td>单笔至少买 2 手（200 股），保证能分批；隐含股价不高于预算÷200</td></tr>
+<tr><td>买入截止时间</td><td>10:00</td><td><span class="badge b-adj">可调整</span></td><td>开盘 30 分钟后不再新开仓（当前处于宽松模式，截止不生效）</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入"买入执行"配置页（或搜索配置项名）</li>
+<li>逐项打开详情，确认"调整影响"与自己的意图一致</li>
+<li>点击"调整"输入新值——例如把"组合最多持仓"从 5 改为 3</li>
+<li>系统检查范围与组合合理性（如与"单笔预算"叠加后是否矛盾）</li>
+<li>填写理由，生成调整单；按指引在维护时段应用</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>逐项说明</div>
+<ul>
+<li><b>单笔买入预算</b>：调大→单股集中度上升、组合变"重仓少股"；调小→每注更轻但高价股可能买不够 2 手。生效于<b>下一次买入评估</b>，已持仓不受影响。</li>
+<li><b>每日最多新开仓 / 组合最多持仓</b>：控制组合宽度与节奏。两者同时调小会让资金利用率下降，调大则分散度下降。生效于<b>次日开盘</b>。</li>
+<li><b>最少买入手数</b>：这是"颗粒度闸门"——保证一份仓位至少能拆成两手，避免一手占满预算无法分批。调小到 1 会失去这层保护。</li>
+<li><b>买入截止时间</b>：避免尾盘冲动开仓。注意当前"宽松模式"下该限制不生效，如需启用请联系说明中的方式开启严格模式。</li>
+</ul>
+<div class="callout c-info"><b>数字感</b>当前默认下：5 万元资金池、单笔预算 2 万、最多 5 只——理论上限约 4 只满额新仓 + 若干小额补仓；实际能开多少还取决于风险余量与行业额度（见场景四）。</div>
+</div>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">07</span>场景四 · 收紧风险防线（资金与风控）</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>回撤变深想主动降风险、觉得单一行业太集中、想控制"最坏情况总共亏多少"，或者想调整系统的自我保护底线。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>本场景配置项（风控核心）</div>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认值</th><th>标识</th><th>一句话说明</th></tr>
+<tr><td>单笔风险上限</td><td>0.75%</td><td><span class="badge b-adj">可调整</span></td><td>单次买入允许承担的最大在险金额（占资金池比例）</td></tr>
+<tr><td>组合风险上限</td><td>3%</td><td><span class="badge b-adj">可调整</span></td><td>全部持仓在最坏情况下（同时跌到止损价）的总损失上限</td></tr>
+<tr><td>行业集中度上限</td><td>25% / 20% / 15%</td><td><span class="badge b-adj">可调整</span></td><td>同一行业最多占资金池的比例（三档风险状态各一档）</td></tr>
+<tr><td>现金缓冲</td><td>10%</td><td><span class="badge b-adj">可调整</span></td><td>始终留在手上不投入的现金垫</td></tr>
+<tr><td>回撤警戒线（三档）</td><td>10% / 20% / 30%</td><td><span class="badge b-adj">可调整</span></td><td>回撤到多少分别进入 警惕 / 防守 / 只减仓</td></tr>
+<tr><td>风险收缩力度（两档）</td><td>75% / 50%</td><td><span class="badge b-adj">可调整</span></td><td>进入警惕/防守后，各类上限打几折</td></tr>
+<tr><td>盈利再投入比例</td><td>50%</td><td><span class="badge b-adj">可调整</span> <span class="badge b-high">高影响</span></td><td>赚到的钱拿多少继续滚动投入</td></tr>
+<tr><td>生存底线</td><td>60%</td><td><span class="badge b-adj">可调整</span> <span class="badge b-high">高影响</span></td><td>家底亏到本金的六成即触发终局止损（不可逆）</td></tr>
+<tr><td>底线确认次数</td><td>2 次</td><td><span class="badge b-adj">可调整</span></td><td>连续两次独立观测触及底线才终局止损，防止单次行情误伤</td></tr>
+<tr><td>行情时效要求</td><td>120 秒</td><td><span class="badge b-adj">可调整</span></td><td>持仓股行情超过这个时长未更新即视为不可信</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入"资金与风险"配置页</li>
+<li>先在概览页看清当前回撤与风险状态，判断要调哪一层</li>
+<li>调整对应配置项；<b>调整"生存底线"或"盈利再投入比例"时系统会弹出高影响确认</b>，需勾选"我理解此变更的影响"</li>
+<li>注意组合检查：三档回撤线必须依次增大、警惕档收缩力度不得小于防守档、单笔风险不得大于组合风险——不满足会拦截并指出冲突项</li>
+<li>生成调整单并在维护时段应用</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>重点说明</div>
+<ul>
+<li><b>单笔风险 0.75% 与组合风险 3%</b>是一对"最坏情况"约束：止损越宽的信号能买的股数越少；组合上限 ÷ 单笔上限 ≈ 同时可持有的"满风险仓"数量（当前约 4 份）。生效于<b>下一次买入评估</b>。</li>
+<li><b>行业集中度</b>按申万一级行业计算，分子用<b>当前市值</b>——股价上涨会让占比被动上升；超限的行业不会被强平，但<b>不能再加仓</b>，按卖出纪律自然收敛。当前示例：两只汽车股已占满汽车行业额度。</li>
+<li><b>回撤三档 + 收缩力度</b>构成自动降档机制：例如回撤过 10% 进入警惕，所有上限×75%。调窄警戒线=更早刹车；调宽=更晚介入、波动容忍更大。</li>
+<li><b>盈利再投入比例 50%</b>：赚 1000 只拿 500 滚动，其余作储备——"赢要赢一半，输要输得起"。调高进攻性增强但回撤基数变大。<b>建议积累约 30 笔完整交易后再评估调整</b>。</li>
+<li><b>生存底线 60%</b>是最终保险丝（5 万本金 → 净值 3 万即触发）：触发后系统进入<b>终局止损</b>——不再开新仓、按纪律有序清仓、且<b>不会因净值反弹自动恢复</b>，必须由人工开启新一轮资金周期。调高=更早熔断，调低=容忍更深亏损。</li>
+</ul>
+<div class="callout c-danger"><b>高影响提示</b>"生存底线"与"盈利再投入比例"直接改变系统的自我保护边界，调整时系统强制二次确认，并在调整单中附加专项说明。请务必先读详情页的数字示例再操作。</div>
+</div>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">08</span>场景五 · 设定盈利管理方式（卖出纪律）</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>想改变"拿多久、赚多少走、亏到哪走"的节奏：持仓时间限制、分批止盈方式、保本机制、结构破位退出。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>本场景配置项</div>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认值</th><th>标识</th><th>一句话说明</th></tr>
+<tr><td>持仓时间上限</td><td>10 天</td><td><span class="badge b-adj">可调整</span></td><td>买入后一直没盈利的仓位，最多拿 10 个自然日后主动退出</td></tr>
+<tr><td>保本止损</td><td>开启 / 0.5%</td><td><span class="badge b-adj">可调整</span></td><td>首批止盈成交后，剩余仓位的止损自动上移到成本价上方 0.5%</td></tr>
+<tr><td>阶梯止盈</td><td>开启</td><td><span class="badge b-adj">可调整</span></td><td>达目标价先卖一部分、再涨 6% 又卖一部分，而不是一次清仓</td></tr>
+<tr><td>阶梯最小手数</td><td>3 手</td><td><span class="badge b-adj">可调整</span></td><td>仓位至少 3 手才分三批，否则退化为两批</td></tr>
+<tr><td>二档目标倍数</td><td>1.06 倍</td><td><span class="badge b-adj">可调整</span></td><td>第二笔止盈在目标价再涨 6% 时触发</td></tr>
+<tr><td>破位退出缓冲</td><td>2%</td><td><span class="badge b-adj">可调整</span></td><td>跌破近期中枢下沿 2% 才认定有效破位并退出</td></tr>
+<tr><td>破位认定时效</td><td>30 天</td><td><span class="badge b-adj">可调整</span></td><td>只有 30 天内形成的新中枢才作为破位参照（旧中枢豁免）</td></tr>
+<tr><td>卖出优先级</td><td>固定顺序</td><td><span class="badge b-sys">系统规则</span></td><td>破止损 &gt; 达目标 &gt; 缠论卖点 &gt; 破中枢 &gt; 时间止损，纪律不开放调整</td></tr>
+<tr><td>T+1</td><td>制度</td><td><span class="badge b-sys">系统规则</span></td><td>当日买入的仓位当日不可卖（A股制度）</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入"卖出纪律"配置页</li>
+<li>选择要调整的项（如把"持仓时间上限"从 10 天改为 7 天）</li>
+<li>阅读调整影响——例：改短后僵尸仓更快出清，但可能错过慢热股的主升</li>
+<li>输入新值、填理由、生成调整单</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>重点说明</div>
+<ul>
+<li><b>持仓时间上限</b>治理"僵尸仓"（占着资金不干活）：满 10 天且从未止盈 → 全量退出；<b>已经止盈过的仓位豁免</b>（交给保本止损跟踪）。生效于<b>下一轮卖出检查</b>，从生效时点起重新计算已持有天数。</li>
+<li><b>阶梯止盈节奏</b>：达目标价卖约 1/3 → 保本止损上移锁定"不亏" → 再涨 6% 卖剩余一半 → 尾仓交给止损/卖点/破位。手数不足 3 手时自动退化为"对半卖"。关闭阶梯止盈=回到"到价一次清仓"。</li>
+<li><b>保本止损只上移不下移</b>：首批止盈后，最坏结果从"盈转亏"变为"约打平"。</li>
+<li><b>破位退出</b>的两个防护：①只参照 30 天内的新中枢（下跌途中的旧中枢不触发，避免误杀底部买入）；②要求入场价在中枢内（中枢下方抄底逻辑豁免）。</li>
+<li>卖出优先级与 T+1 属于<b>交易纪律本身</b>，不开放调整——这是"客观执行、不接受临场改写"的基石。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<section id="s9">
+<h2><span class="no">09</span>场景六 · 筛选信号准入标准</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>信号太多/太少、质量参差，想调整"什么样的信号才值得买"：类型、评分、盈亏比、追高限制。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>本场景配置项</div>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认值</th><th>标识</th><th>一句话说明</th></tr>
+<tr><td>入场信号类型</td><td>一买/二买/三买</td><td><span class="badge b-adj">可调整</span></td><td>允许开仓的缠论买点类型白名单</td></tr>
+<tr><td>最低信号评分</td><td>60 分</td><td><span class="badge b-adj">可调整</span></td><td>信号综合评分低于此值不买</td></tr>
+<tr><td>最低盈亏比</td><td>2.0</td><td><span class="badge b-adj">可调整</span></td><td>预期收益÷预期风险，低于此值不买</td></tr>
+<tr><td>追高上限</td><td>3%</td><td><span class="badge b-adj">可调整</span></td><td>现价高出信号价 3% 视为追高，放弃</td></tr>
+<tr><td>买入溢价上限</td><td>2%</td><td><span class="badge b-adj">可调整</span></td><td>挂单最多比信号价高 2% 成交</td></tr>
+<tr><td>创业板解锁线</td><td>50 万</td><td><span class="badge b-adj">可调整</span></td><td>总资产达标后自动解锁创业板股票</td></tr>
+<tr><td>板块准入</td><td>主板/创业板/科创</td><td><span class="badge b-sys">系统规则</span></td><td>主板始终可买；创业板达标解锁；科创板不参与</td></tr>
+<tr><td>缠论评分结构</td><td>固定权重</td><td><span class="badge b-ro">仅展示</span></td><td>类型/环境/周线/背驰/止损五维评分构成，可查看不可改</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入"信号准入"配置页</li>
+<li>调整门槛值；收窄白名单（如仅三买）会显著减少信号量，详情页会提示预期影响</li>
+<li>生成调整单、维护时段应用</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>重点说明</div>
+<ul>
+<li><b>最低评分 60 / 盈亏比 2.0</b>是信号质量的硬闸门。注意盈亏比对"无目标价的三买信号"自动豁免（其退出依赖止损与结构失效）。另外：旧中枢降级后的买点盈亏比会回落到约 1.4，被此门槛拦下属于<b>预期保护行为</b>，不是故障。</li>
+<li><b>追高上限</b>：现价已高出信号价 3% 说明错过了入场窗口，宁可放弃。历史上曾因设 1% 导致开盘全跳过，后放宽至 3%——调整前建议先看详情页里的这段案例。</li>
+<li><b>信号生成端的参数</b>（评分权重、选股池、策略侧中枢规则）属于策略研究范畴，本期<b>仅展示不开放调整</b>，列表中已逐一标注；其中个别项历史上存在"配置不生效"的已知问题，也做了醒目标识。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<section id="s10">
+<h2><span class="no">10</span>场景七 · 应对特殊状态</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候会遇到</div>
+<p>三种情况：①行情数据异常、页面提示降级；②风险状态深降到"只减仓"；③最严重——触发生存底线进入终局止损。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>相关状态与指标（均<span class="badge b-ro">仅展示</span>）</div>
+<div class="table-wrap"><table>
+<tr><th>状态/指标</th><th>含义</th><th>你该做什么</th></tr>
+<tr><td>行情不完整</td><td>某持仓股行情缺失或超 120 秒未更新</td><td>不必操作：系统自动进入只减仓，行情恢复自动回到原档</td></tr>
+<tr><td>只减仓</td><td>回撤≥30% 或行情异常或首次触及底线</td><td>观察即可；想改变触发条件参考场景四</td></tr>
+<tr><td>终局止损</td><td>连续两次独立观测家底≤本金 60%</td><td>按页面指引执行资金周期重置流程（人工操作，系统不会自动恢复）</td></tr>
+</table></div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>页面行为</div>
+<ul>
+<li>终局止损触发后，页面顶部出现<b>红色横幅</b>，显示触发时间、触发时净值与原因；同时<b>所有编辑入口自动关闭</b>，防止在终局状态下改规则</li>
+<li>横幅下方给出"开启新一轮资金周期"的操作指引文案（此为治理动作，不在界面上直接执行）</li>
+<li>行情降级时，指标卡显示"不可用"而不是 0，并标注缺失的股票</li>
+</ul></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>为什么终局止损不可自动恢复</div>
+<p>设计哲学：亏到 60% 说明本轮策略与环境不适配，"自动恢复"等于装作没发生过。重置资金周期意味着开一个全新的账本（旧周期数据完整保留供复盘），这是需要人冷静决策的动作，因此刻意不提供一键恢复。历史净值创新高后回落、又反弹的波动<b>不会</b>误触发——高水位只升不降，且需连续两次独立观测确认。</p></div>
+</div>
+</section>
+
+<section id="s11">
+<h2><span class="no">11</span>场景八 · 查看调整历史</h2>
+<div class="four">
+<div class="ele scene"><div class="eh"><span class="k">场景</span>什么时候需要它</div>
+<p>复盘时想回答"这个参数是什么时候改的、为什么改、改之前是多少"；或排查某天行为变化的原因。</p></div>
+<div class="ele factor"><div class="eh"><span class="k">因子</span>不涉及配置项，查看对象是调整单</div></div>
+<div class="ele func"><div class="eh"><span class="k">功能</span>操作步骤</div>
+<ol class="steps">
+<li>进入"调整历史"页，按时间倒序浏览全部调整单</li>
+<li>按配置项名称、状态（已应用/已放弃/应用异常）、时间范围筛选</li>
+<li>点开调整单查看明细：每项的前后值、调整理由、生效方式</li>
+<li>在任一因子的详情页可看该因子的<b>专属时间线</b>（历次变更一目了然）</li>
+</ol></div>
+<div class="ele conf"><div class="eh"><span class="k">配置说明</span>记录规则</div>
+<ul>
+<li>调整单一经生成<b>内容不可修改</b>，只能整体作废重开——保证历史可信</li>
+<li>应用后需回填结果：已生效（附验证方式）/ 应用异常（附回退指引）/ 已放弃（必填原因）</li>
+<li>每张调整单有唯一编号，与因子详情页时间线互相链接</li>
+</ul></div>
+</div>
+</section>
+
+<section id="s12">
+<h2><span class="no">12</span>通用流程 · 修改一个配置项</h2>
+<h3>完整流程（所有可调整项通用）</h3>
+<ol class="steps">
+<li><b>找到</b>：搜索或分类浏览，点开详情抽屉</li>
+<li><b>读懂</b>：确认"调整影响"与预期一致，注意"生效时机"</li>
+<li><b>修改</b>：点击"调整"输入新值；系统即时检查类型、范围、精度</li>
+<li><b>组合检查</b>：与本次草稿中其他修改项做整体合理性检查（如三档回撤线依次增大），冲突会标出关联项</li>
+<li><b>高影响确认</b>（仅限标记项）：阅读影响说明并勾选确认</li>
+<li><b>留理由</b>：填写至少 10 个字的调整理由</li>
+<li><b>生成调整单</b>：预览前后值对比、应用指引、注意事项；可复制或下载存档</li>
+<li><b>应用</b>：按指引在维护时段（建议非交易时段）应用生效</li>
+<li><b>回填</b>：回到界面确认新值已生效并回填结果；若应用异常按回退指引恢复原值</li>
+</ol>
+<h3>系统自动检查的约束（通俗版）</h3>
+<div class="table-wrap"><table>
+<tr><th>约束</th><th>说明</th></tr>
+<tr><td>比例类 0–100%</td><td>所有百分比项必须在 0% 到 100% 之间</td></tr>
+<tr><td>回撤三档依次增大</td><td>警惕线 &lt; 防守线 &lt; 只减仓线（如 10% &lt; 20% &lt; 30%）</td></tr>
+<tr><td>收缩力度不回弹</td><td>警惕档力度 ≥ 防守档力度（越危险收得越紧）</td></tr>
+<tr><td>行业额度越险越紧</td><td>正常档 ≥ 警惕档 ≥ 防守档</td></tr>
+<tr><td>单笔 ≤ 组合</td><td>单笔风险上限不能超过组合风险上限</td></tr>
+<tr><td>底线确认 ≥ 2 次</td><td>终局止损必须至少两次确认（防误伤的最低要求）</td></tr>
+<tr><td>行情时效 &gt; 0</td><td>必须为正的秒数</td></tr>
+</table></div>
+<div class="callout c-ok"><b>放心改的两层保障</b>① 界面在保存前拦截一切不合理的组合；② 即便跳过界面直接应用，系统在生效时还有最后一道同样的检查——不合理会让应用失败并保持原值，不会出现"带病生效"。</div>
+</section>
+
+<section id="s13">
+<h2><span class="no">13</span>配置项总表（速查）</h2>
+<h3>买入与仓位</h3>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认</th><th>范围</th><th>生效时机</th><th>标识</th></tr>
+<tr><td>单笔买入预算</td><td>20,000 元</td><td>&gt;0</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>每日最多新开仓</td><td>5 只</td><td>≥1</td><td>次日开盘</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>组合最多持仓</td><td>5 只</td><td>≥1</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>单股最多仓位份数</td><td>2 份</td><td>≥1</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>最少买入手数</td><td>2 手</td><td>≥1</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>买入截止时间</td><td>10:00</td><td>—</td><td>次日开盘（宽松模式下不生效）</td><td><span class="badge b-adj">可调整</span></td></tr>
+</table></div>
+<h3>资金与风险</h3>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认</th><th>范围</th><th>生效时机</th><th>标识</th></tr>
+<tr><td>单笔风险上限</td><td>0.75%</td><td>0–100%</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>组合风险上限</td><td>3%</td><td>0–100%，≥单笔</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>行业集中度上限（三档）</td><td>25/20/15%</td><td>依次收紧</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>现金缓冲</td><td>10%</td><td>0–100%</td><td>下一次买入评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>回撤警戒线（三档）</td><td>10/20/30%</td><td>依次增大</td><td>下一轮状态评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>风险收缩力度（两档）</td><td>75%/50%</td><td>依次收紧</td><td>下一轮状态评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>盈利再投入比例</td><td>50%</td><td>0–100%</td><td>下一轮资金计算</td><td><span class="badge b-adj">可调整</span> <span class="badge b-high">高影响</span></td></tr>
+<tr><td>生存底线</td><td>60%</td><td>0–100%</td><td>下一轮状态评估</td><td><span class="badge b-adj">可调整</span> <span class="badge b-high">高影响</span></td></tr>
+<tr><td>底线确认次数</td><td>2 次</td><td>≥2</td><td>下一轮状态评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>行情时效要求</td><td>120 秒</td><td>&gt;0</td><td>下一轮行情评估</td><td><span class="badge b-adj">可调整</span></td></tr>
+</table></div>
+<h3>卖出纪律</h3>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认</th><th>范围</th><th>生效时机</th><th>标识</th></tr>
+<tr><td>持仓时间上限</td><td>10 天</td><td>≥1</td><td>下一轮卖出检查</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>保本止损</td><td>开 / 0.5%</td><td>—</td><td>下一次止盈成交后</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>阶梯止盈</td><td>开</td><td>—</td><td>下一次达目标时</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>阶梯最小手数</td><td>3 手</td><td>≥1</td><td>下一次分批时</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>二档目标倍数</td><td>1.06</td><td>&gt;1</td><td>下一次二档判定</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>破位退出缓冲</td><td>2%</td><td>&gt;0</td><td>下一轮卖出检查</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>破位认定时效</td><td>30 天</td><td>≥1</td><td>下一轮卖出检查</td><td><span class="badge b-adj">可调整</span></td></tr>
+</table></div>
+<h3>信号准入</h3>
+<div class="table-wrap"><table>
+<tr><th>配置项</th><th>默认</th><th>范围</th><th>生效时机</th><th>标识</th></tr>
+<tr><td>入场信号类型</td><td>一买/二买/三买</td><td>类型白名单</td><td>次日买入</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>最低信号评分</td><td>60 分</td><td>0–100</td><td>次日买入</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>最低盈亏比</td><td>2.0</td><td>&gt;0</td><td>次日买入</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>追高上限</td><td>3%</td><td>&gt;0</td><td>次日买入</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>买入溢价上限</td><td>2%</td><td>&gt;0</td><td>次日买入</td><td><span class="badge b-adj">可调整</span></td></tr>
+<tr><td>创业板解锁线</td><td>50 万</td><td>&gt;0</td><td>下一轮资金计算</td><td><span class="badge b-adj">可调整</span></td></tr>
+</table></div>
+<h3>系统规则与仅展示项（不可调整）</h3>
+<div class="table-wrap"><table>
+<tr><th>项目</th><th>当前值</th><th>说明</th></tr>
+<tr><td>卖出优先级</td><td>固定顺序</td><td><span class="badge b-sys">系统规则</span> 破止损 &gt; 达目标 &gt; 缠论卖点 &gt; 破中枢 &gt; 时间止损</td></tr>
+<tr><td>T+1 限制</td><td>当日不可卖</td><td><span class="badge b-sys">系统规则</span> A股交易制度</td></tr>
+<tr><td>板块准入</td><td>主板/创业板/科创</td><td><span class="badge b-sys">系统规则</span> 科创板不参与、创业板达标解锁</td></tr>
+<tr><td>初始本金</td><td>50,000 元</td><td><span class="badge b-high">治理动作</span> 变更等同开启新一轮资金周期，不作为日常配置</td></tr>
+<tr><td>核心派生指标</td><td>实时计算</td><td><span class="badge b-ro">仅展示</span> 生存净值 / 可运营资金 / 回撤 / 高水位 / 本金生存率 / 风险状态 等</td></tr>
+<tr><td>缠论评分结构</td><td>固定权重</td><td><span class="badge b-ro">仅展示</span> 五维评分构成与策略端规则，供研究参考</td></tr>
+</table></div>
+</section>
+
+<section id="s14">
+<h2><span class="no">14</span>常见问题</h2>
+<div class="table-wrap"><table>
+<tr><th style="width:38%">问题</th><th>解答</th></tr>
+<tr><td>调整保存后为什么没立刻变？</td><td>调整需在维护时段按调整单应用后才生效；生效前系统继续执行原规则。这样保证同一天内规则一致。</td></tr>
+<tr><td>为什么有些项不能改？</td><td>标 <span class="badge b-sys">系统规则</span> 的是交易纪律与制度（卖出优先级、T+1、板块准入），标 <span class="badge b-ro">仅展示</span> 的是系统实时算出的结果——它们不是"设置"，是"事实"。</td></tr>
+<tr><td>提交时提示两项冲突怎么办？</td><td>界面会高亮冲突的双方并解释约束（如"单笔风险不得超过组合风险"）。把关联项一起改成满足约束的组合即可；例如三档回撤线要整体规划。</td></tr>
+<tr><td>风险状态显示"只减仓"是出问题了吗？</td><td>不一定是坏事。三种情况都会进入只减仓：回撤超过 30%、行情数据异常、首次触及生存底线。前两类在条件恢复后自动回到正常档；查看概览页的行情完整度即可分辨。</td></tr>
+<tr><td>触发生存底线后会怎样？</td><td>系统停止开新仓、按卖出纪律有序清仓（T+1 与跌停受限的仓位会持续跟进），清仓完成后冻结。净值反弹不会自动恢复，需人工开启新一轮资金周期——这是刻意的保护设计。</td></tr>
+<tr><td>行情缺失时看到的数据可信吗？</td><td>页面会明确标注缺失的股票与降级状态；涉及估值的指标显示"不可用"而非沿用旧值，不会误导。历史指标（已实现盈亏等）不受影响。</td></tr>
+<tr><td>调整错了怎么退回？</td><td>在调整单未应用前直接作废；已应用且回填"应用异常"的，按单内回退指引恢复原值。每次调整单都完整保留调整前的值，随时可查。</td></tr>
+<tr><td>百分比输入 0.3 是 0.3% 还是 30%？</td><td>界面按百分数显示（输入 30 即 30%）。若检测到输入了小数，会弹确认询问"是否意为 0.3%"，避免歧义。</td></tr>
+</table></div>
+</section>
+
+<section id="s15">
+<h2><span class="no">15</span>术语表</h2>
+<div class="table-wrap"><table>
+<tr><th>术语</th><th>定义</th></tr>
+<tr><td>资金周期（纪元）</td><td>以某日开始的一轮独立核算期。本轮起点 2026-08-31，初始本金 5 万元；此前的仓位单独核算，不占用本轮额度</td></tr>
+<tr><td>已实现盈亏 R</td><td>本轮内已平仓交易的净盈亏（卖出收入 − 对应买入成本 − 已记录费用）</td></tr>
+<tr><td>浮动盈亏 U</td><td>未平仓持仓按<b>保守可成交价</b>（现价打 0.2% 折扣）估算的盈亏——比按现价估算更悲观、更安全</td></tr>
+<tr><td>生存净值 E</td><td>初始本金 + 已实现盈亏 + 浮动盈亏，即"现在全部按保守价清盘能拿回多少"</td></tr>
+<tr><td>可运营资金 D</td><td>可用于开新仓的资金池：亏损全额扣减；盈利只按设定比例（默认一半）放大</td></tr>
+<tr><td>高水位 H</td><td>历史最高的生存净值，只升不降——用来衡量"从最好时刻回撤了多少"</td></tr>
+<tr><td>回撤</td><td>（高水位 − 当前净值）÷ 高水位</td></tr>
+<tr><td>本金生存率</td><td>生存净值 ÷ 初始本金；跌到 60% 触发生存底线</td></tr>
+<tr><td>开放风险</td><td>所有持仓若都跌到各自止损价的合计损失（含未成交买单的计划风险）</td></tr>
+<tr><td>风险状态五档</td><td>正常 / 警惕（回撤≥10%）/ 防守（≥20%）/ 只减仓（≥30% 或异常）/ 终局止损（生存率≤60% 两次确认）</td></tr>
+<tr><td>行业集中度</td><td>同一申万一级行业持仓的当前市值占可运营资金的比例</td></tr>
+<tr><td>调整单</td><td>每次调整的正式凭证：前后值、理由、生效方式、状态与编号，自动留档不可篡改</td></tr>
+<tr><td>僵尸仓</td><td>长期不盈利也不触发出场的持仓，占用资金但不产生价值——由"持仓时间上限"治理</td></tr>
+<tr><td>一买/二买/三买</td><td>缠论体系的三类买点信号（buy1/buy2/buy3），确定性与位置特征不同</td></tr>
+</table></div>
+<div class="callout c-info"><b>数据口径说明</b>所有指标均来自系统统一计算口径，与实际下单执行使用同一套规则；持仓与成交以券商模拟账户为最终事实依据。当前成交费用暂按零费记（模拟环境限制），已实现盈亏可能小幅高估。</div>
+</section>
+
+<p class="footer-note">d8q 因子中心 · 配置管理指南 v2.0 · 2026-09-10 · 按"场景 · 因子 · 功能 · 配置说明"四要素组织 · 调整有痕，风险有界</p>
+</div>
+</main>
+
+<script>
+(function(){
+  var sections=[].slice.call(document.querySelectorAll('main section'));
+  var nav=document.getElementById('toc-nav');
+  var icons={'s1':'📖','s2':'🚀','s3':'💡','s4':'👀','s5':'🔍','s6':'⚖️','s7':'🛡️','s8':'💰','s9':'🎚️','s10':'🚨','s11':'🕘','s12':'🧭','s13':'📋','s14':'❓','s15':'📗'};
+  var tocData=[];
+  sections.forEach(function(sec){
+    var h2=sec.querySelector('h2'); if(!h2) return;
+    var title=h2.textContent.replace(/^\d+/,'').trim();
+    tocData.push({id:sec.id,title:(icons[sec.id]||'📄')+' '+title,level:1});
+    [].slice.call(sec.querySelectorAll('h3')).forEach(function(h3,i){
+      var sid=sec.id+'-h'+i; h3.id=sid;
+      tocData.push({id:sid,title:h3.textContent.trim(),level:2});
+    });
+  });
+  tocData.forEach(function(item){
+    var a=document.createElement('a');
+    a.href='#'+item.id; a.textContent=item.title;
+    if(item.level===2)a.className='l2';
+    nav.appendChild(a);
+  });
+  var links=[].slice.call(nav.querySelectorAll('a'));
+  function onScroll(){
+    var doc=document.documentElement;
+    var pct=doc.scrollTop/(doc.scrollHeight-doc.clientHeight)*100;
+    document.getElementById('progress').style.width=pct+'%';
+    var activeId=null;
+    sections.forEach(function(sec){
+      if(sec.getBoundingClientRect().top<160) activeId=sec.id;
+    });
+    if(activeId){
+      [].slice.call(document.querySelectorAll('#'+activeId+' h3')).forEach(function(h3){
+        if(h3.getBoundingClientRect().top<160) activeId=h3.id;
+      });
+      links.forEach(function(a){a.classList.remove('active');});
+      var link=links.filter(function(a){return a.getAttribute('href')==='#'+activeId;})[0];
+      if(link){link.classList.add('active');}
+    }
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+  document.getElementById('toc-toggle').addEventListener('click',function(){
+    document.getElementById('toc').classList.toggle('open');
+  });
+  nav.addEventListener('click',function(){
+    if(window.innerWidth<=1080) document.getElementById('toc').classList.remove('open');
+  });
+})();
+</script>
+</body>
+</html>
