@@ -841,8 +841,13 @@ def resolve_stock(input_str):
 # --- Stock Analysis API (proxy to StockShark) ---
 @app.route("/api/stock/comprehensive", methods=["POST"])
 def stock_comprehensive():
-    data, code = shark_request("POST", "/api/analysis/stock/comprehensive", request.json)
-    return jsonify(data), code
+    payload = dict(request.json or {})
+    raw_code = str(payload.get("stock_code") or payload.get("symbol") or "").strip()
+    code, _ = resolve_stock(raw_code)
+    if code:
+        payload["stock_code"] = code
+    data, status = shark_request("POST", "/api/analysis/stock/comprehensive", payload)
+    return jsonify(data), status
 
 
 @app.route("/api/stock/announcements", methods=["GET"])
@@ -886,6 +891,56 @@ def stock_quote():
     code, _ = resolve_stock(symbol)
     data, status = shark_request("GET", "/api/analysis/stock/quote?symbol=" + code)
     return jsonify(data), status
+
+
+
+def _kline_rows_to_bars(rows):
+    """DB rows (date,open,close,high,low,volume) in date DESC -> chronological bars."""
+    bars = []
+    for r in reversed(list(rows)):
+        d = r[0]
+        bars.append({
+            "date": d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d),
+            "open": float(r[1]), "close": float(r[2]), "high": float(r[3]),
+            "low": float(r[4]), "volume": int(r[5]),
+        })
+    return bars
+
+
+@app.route("/api/stock/kline", methods=["GET"])
+def stock_kline():
+    """个股日K线 — 本地 stock_data_daily 权威数据源（个股详情 行情/技术分析 tab）"""
+    symbol = request.args.get("symbol", "")
+    period = request.args.get("period", "daily")
+    try:
+        count = int(request.args.get("count", "60"))
+    except ValueError:
+        count = 60
+    count = max(1, min(count, 500))
+    if period != "daily":
+        return jsonify({"success": False, "error": "unsupported period: %s" % period}), 400
+    code, _ = resolve_stock(symbol)
+    if not code:
+        return jsonify({"success": False, "error": "missing symbol"}), 400
+    import pymysql
+    DB = {"host": "127.0.0.1", "port": 3306, "user": "root", "password": "password",
+          "database": "stock_analysis_system", "charset": "utf8mb4"}
+    try:
+        conn = pymysql.connect(**DB)
+    except Exception as e:
+        return jsonify({"success": False, "error": "db unavailable: %s" % e}), 502
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT date, open, close, high, low, volume FROM stock_data_daily "
+                "WHERE stock_code = %s ORDER BY date DESC LIMIT %s", (code, count))
+            rows = cur.fetchall()
+    except Exception as e:
+        return jsonify({"success": False, "error": "db query failed: %s" % e}), 502
+    finally:
+        conn.close()
+    return jsonify({"success": True, "code": code, "period": period,
+                    "count": len(rows), "data": _kline_rows_to_bars(rows)})
 
 
 

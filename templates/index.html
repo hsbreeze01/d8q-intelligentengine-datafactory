@@ -2934,20 +2934,29 @@ function evalTechSignals(closes,highs,lows){
 async function loadSDAI(el){
   el.innerHTML='<div class="card"><h3>AI 综合分析</h3><div id="aiContent" style="min-height:200px"><div class="empty">正在分析中...</div></div></div>';
   try{
-    const d=await api('/api/stock/comprehensive','POST',{symbol:_stockDetailCode});
+    const d=await api('/api/stock/comprehensive',{method:'POST',body:JSON.stringify({stock_code:_stockDetailCode,scope:'all'})});
     var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
-    if(d&&d.data){
-      var r=d.data;
-      if(r.score!==undefined) html+='<div class="card" style="text-align:center"><div style="font-size:12px;color:#999">综合评分</div><div style="font-size:42px;font-weight:700;color:'+(r.score>=70?'#52c41a':r.score>=40?'#faad14':'#ff4d4f')+'">'+r.score+'</div><div style="font-size:12px;color:#999">/100</div></div>';
-      if(r.recommendation) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">操作建议</div><div style="font-size:18px;font-weight:600;color:#333">'+r.recommendation+'</div></div>';
-      if(r.risk_level) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">风险等级</div><div style="font-size:18px;font-weight:600;color:'+(r.risk_level==='high'?'#ff4d4f':r.risk_level==='low'?'#52c41a':'#faad14')+'">'+({high:'高风险',medium:'中风险',low:'低风险'}[r.risk_level]||r.risk_level)+'</div></div>';
-      if(r.trend) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">趋势判断</div><div style="font-size:18px;font-weight:600;color:#333">'+r.trend+'</div></div>';
+    if(d&&!d.error){
+      var RISK_C={high:'#ff4d4f',medium:'#faad14',low:'#52c41a','高':'#ff4d4f','中':'#faad14','低':'#52c41a'};
+      var RISK_L={high:'高风险',medium:'中风险',low:'低风险','高':'高风险','中':'中风险','低':'低风险'};
+      if(d.score!==undefined) html+='<div class="card" style="text-align:center"><div style="font-size:12px;color:#999">综合评分</div><div style="font-size:42px;font-weight:700;color:'+(d.score>=70?'#52c41a':d.score>=40?'#faad14':'#ff4d4f')+'">'+d.score+'</div><div style="font-size:12px;color:#999">/100</div></div>';
+      if(d.risk_level) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">风险等级</div><div style="font-size:18px;font-weight:600;color:'+(RISK_C[d.risk_level]||'#faad14')+'">'+(RISK_L[d.risk_level]||d.risk_level)+'</div></div>';
+      if(d.stock_name) html+='<div class="card"><div style="font-size:12px;color:#999;margin-bottom:8px">标的</div><div style="font-size:16px;font-weight:600;color:#333">'+esc(d.stock_name)+' ('+esc(d.stock_code||_stockDetailCode)+')</div></div>';
     }
     html+='</div>';
-    if(d&&d.data&&d.data.analysis){
-      html+='<div class="card" style="margin-top:16px"><h4 style="margin-bottom:12px">详细分析</h4><div style="font-size:14px;line-height:1.8;color:#555;white-space:pre-wrap">'+d.data.analysis+'</div></div>';
+    if(d&&d.summary) html+='<div class="card" style="margin-top:16px"><h4 style="margin-bottom:12px">核心结论</h4><div style="font-size:14px;line-height:1.8;color:#555">'+esc(d.summary)+'</div></div>';
+    var terms=[['short_term','短期(1-4周)'],['mid_term','中期(1-6月)'],['long_term','长期(1-3年)']];
+    for(var i=0;i<terms.length;i++){
+      var t=d?d[terms[i][0]]:null;
+      if(!t)continue;
+      var sig=String(t.signal||'-');
+      var sigc=sig.indexOf('多')>=0||sig==='bullish'?'#52c41a':(sig.indexOf('空')>=0||sig.indexOf('跌')>=0||sig==='bearish'?'#ff4d4f':'#999');
+      html+='<div class="card" style="margin-top:12px"><h4 style="margin-bottom:8px">'+terms[i][1]+' <span style="font-size:12px;color:'+sigc+'">'+esc(sig)+'</span></h4><div style="font-size:13px;color:#555;line-height:1.7">'+(t.outlook?esc(t.outlook):'')+'</div>'+(t.key_factors&&t.key_factors.length?'<ul style="margin:8px 0 0 18px;font-size:13px;color:#666;line-height:1.8">'+t.key_factors.map(function(f){return '<li>'+esc(f)+'</li>'}).join('')+'</ul>':'')+'</div>';
     }
-    if(!d||!d.data||d.error) html='<div class="empty">暂无分析数据 — 请确认stockshark服务正常运行</div>';
+    if(d&&d.risk_alerts&&d.risk_alerts.length){
+      html+='<div class="card" style="margin-top:12px"><h4 style="margin-bottom:8px">⚠ 风险提示</h4><ul style="margin:0 0 0 18px;font-size:13px;color:#c0392b;line-height:1.8">'+d.risk_alerts.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul></div>';
+    }
+    if(!d||d.error) html='<div class="empty">'+(d&&d.error?('❌ '+esc(d.error)):'暂无分析数据 — 请确认stockshark服务正常运行')+'</div>';
     document.getElementById('aiContent').innerHTML=html;
   }catch(e){
     document.getElementById('aiContent').innerHTML='<div class="empty">AI分析请求失败: '+e.message+'</div>';
