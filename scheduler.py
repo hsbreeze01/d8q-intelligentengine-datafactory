@@ -307,7 +307,7 @@ def daily_score_calculation():
     if _score_calc_last_run == today:
         return
     now = datetime.now()
-    if now.hour != 8 or now.minute < 30 or now.minute > 35:
+    if now.hour != 17 or now.minute < 0 or now.minute > 5:
         return
     _score_calc_last_run = today
 
@@ -350,10 +350,10 @@ def daily_score_calculation():
                 signal = short_signal or mid_signal or long_signal
                 conn = sqlite3.connect(DB_PATH)
                 conn.execute(
-                    "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level, short_signal, mid_signal, long_signal) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (code, name or data.get("stock_name", code), today, total_score, None,
-                     None, None, None, signal, data.get("risk_level"))
+                     None, None, None, signal, data.get("risk_level"), short_signal, mid_signal, long_signal)
                 )
                 conn.commit()
                 conn.close()

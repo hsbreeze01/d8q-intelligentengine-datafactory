@@ -319,6 +319,13 @@ def _init_score_history_table():
         )
         conn.commit()
 
+        # Expand schema: add signal columns if missing (idempotent)
+        for _col in ['short_signal', 'mid_signal', 'long_signal']:
+            try:
+                conn.execute(f"ALTER TABLE score_history ADD COLUMN {_col} TEXT")
+            except Exception:
+                pass
+
 
 def _init_portfolio_tables():
     with get_db_ctx() as conn:
@@ -2753,13 +2760,13 @@ def watchlist_daily_report():
 
             # 今日评分
             t = conn.execute(
-                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level "
+                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level, short_signal, mid_signal, long_signal "
                 "FROM score_history WHERE stock_code=? AND date=?", (code, today)
             ).fetchone()
 
             # 昨日评分
             y = conn.execute(
-                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level "
+                "SELECT total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level, short_signal, mid_signal, long_signal "
                 "FROM score_history WHERE stock_code=? AND date=?", (code, yesterday)
             ).fetchone()
 
@@ -2771,10 +2778,14 @@ def watchlist_daily_report():
             if today_data and yesterday_data and today_data.get("total_score") is not None and yesterday_data.get("total_score") is not None:
                 change = round(today_data["total_score"] - yesterday_data["total_score"], 2)
                 dimensions = {
-                    "technical_change": round((today_data.get("technical_score") or 0) - (yesterday_data.get("technical_score") or 0), 2),
-                    "trend_change": round((today_data.get("trend_score") or 0) - (yesterday_data.get("trend_score") or 0), 2),
-                    "fundamental_change": round((today_data.get("fundamental_score") or 0) - (yesterday_data.get("fundamental_score") or 0), 2),
-                    "volume_change": round((today_data.get("volume_score") or 0) - (yesterday_data.get("volume_score") or 0), 2),
+                    "short_signal": today_data.get("short_signal") or "",
+                    "short_signal_yesterday": yesterday_data.get("short_signal") or "",
+                    "mid_signal": today_data.get("mid_signal") or "",
+                    "mid_signal_yesterday": yesterday_data.get("mid_signal") or "",
+                    "long_signal": today_data.get("long_signal") or "",
+                    "long_signal_yesterday": yesterday_data.get("long_signal") or "",
+                    "risk_level": today_data.get("risk_level") or "",
+                    "risk_level_yesterday": yesterday_data.get("risk_level") or "",
                 }
                 if change > 0:
                     improved += 1
@@ -2887,10 +2898,10 @@ def watchlist_recalculate():
                 signal = short_signal or mid_signal or long_signal
                 with get_db_ctx() as conn:
                     conn.execute(
-                        "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR REPLACE INTO score_history (stock_code, stock_name, date, total_score, technical_score, trend_score, fundamental_score, volume_score, signal, risk_level, short_signal, mid_signal, long_signal) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (code, name or data.get("stock_name", code), today, total_score, None,
-                         None, None, None, signal, data.get("risk_level"))
+                         None, None, None, signal, data.get("risk_level"), short_signal, mid_signal, long_signal)
                     )
                     conn.commit()
                 calculated += 1

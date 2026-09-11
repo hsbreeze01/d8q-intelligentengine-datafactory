@@ -1317,42 +1317,66 @@ var modal=document.getElementById('taskModal');
 modal.style.display='flex';
 var today=stock.today||{};
 var yesterday=stock.yesterday||{};
-var dims=[
-{label:'\u6280\u672f\u9762',key:'technical'},
-{label:'\u8d8b\u52bf\u9762',key:'trend'},
-{label:'\u57fa\u672c\u9762',key:'fundamental'},
-{label:'\u91cf\u80fd',key:'volume'}
-];
-var maxAbsChange=0,maxKey='';
-dims.forEach(function(d){
-var chg=(stock.dimensions&&stock.dimensions[d.key+'_change'])||0;
-if(Math.abs(chg)>maxAbsChange){maxAbsChange=Math.abs(chg);maxKey=d.key}
-});
+var dims=stock.dimensions||{};
+
 var html='<div class="card" style="max-width:500px;width:100%;max-height:85vh;overflow-y:auto">';
 html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
 html+='<h3 style="margin:0">\u{1f4ca} \u8bc4\u5206\u5f52\u56e0 - '+esc(stock.stock_name||stock.stock_code)+'</h3>';
 html+='<button onclick="closeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#999">&times;</button></div>';
-html+='<div style="text-align:center;margin-bottom:20px">';
+
+// Score section
 var scoreColor=(today.total_score||0)>=70?'#52c41a':(today.total_score||0)>=40?'#faad14':'#ff4d4f';
 var chg=stock.change||0;
 var chgCls=chg>0?'change-up':chg<0?'change-down':'change-zero';
 var chgTxt=chg>0?'+'+chg+'\u2191':chg<0?chg+'\u2193':'0';
+html+='<div style="text-align:center;margin-bottom:20px">';
 html+='<div style="font-size:36px;font-weight:700;color:'+scoreColor+'">'+(today.total_score||'-')+'</div>';
-html+='<div class="'+chgCls+'" style="font-size:14px;margin-top:4px">\u8f83\u6628\u65e5 '+chgTxt+'</div>';
+if(stock.change!==null&&stock.change!==undefined){
+  html+='<div class="'+chgCls+'" style="font-size:14px;margin-top:4px">\u8f83\u6628\u65e5 '+chgTxt+'</div>';
+}else{
+  html+='<div style="font-size:14px;margin-top:4px;color:#999">\u8f83\u6628\u65e5 -</div>';
+}
 html+='</div>';
-dims.forEach(function(d){
-var todayVal=today[d.key+'_score']||today[d.key]||'-';
-var yestVal=yesterday[d.key+'_score']||yesterday[d.key]||'-';
-var dimChg=(stock.dimensions&&stock.dimensions[d.key+'_change'])||0;
-var isMain=d.key===maxKey&&maxAbsChange>0;
-var dimChgCls=dimChg>0?'change-up':dimChg<0?'change-down':'change-zero';
-var dimChgTxt=dimChg>0?'+'+dimChg:''+dimChg;
-html+='<div class="attr-modal-dim'+(isMain?' main-factor':'')+'">';
-html+='<span class="dim-label">'+d.label+'</span>';
-html+='<span class="dim-values">'+yestVal+' \u2192 '+todayVal+'</span>';
-html+='<span class="dim-change '+dimChgCls+'">('+dimChgTxt+')</span>';
-html+='</div>';
+
+// Signal cards
+var signalDefs=[
+  {label:'\u77ed\u671f\u4fe1\u53f7',key:'short_signal'},
+  {label:'\u4e2d\u671f\u4fe1\u53f7',key:'mid_signal'},
+  {label:'\u957f\u671f\u4fe1\u53f7',key:'long_signal'}
+];
+var signalColors={'\u770b\u591a':'#52c41a','\u4e2d\u6027':'#faad14','\u770b\u7a7a':'#ff4d4f'};
+
+signalDefs.forEach(function(s){
+  var todayVal=dims[s.key]||'\u65e0\u6570\u636e';
+  var yestVal=dims[s.key+'_yesterday']||'';
+  var sigColor=signalColors[todayVal]||'#999';
+  var arrow='',arrowCls='';
+  if(yestVal&&todayVal&&yestVal!==todayVal){
+    var improved=(todayVal==='\u770b\u591a'&&yestVal!=='\u770b\u591a')||(todayVal==='\u4e2d\u6027'&&yestVal==='\u770b\u7a7a');
+    arrow=improved?'\u2191':'\u2193';
+    arrowCls=improved?'change-up':'change-down';
+  }else if(yestVal&&todayVal&&yestVal===todayVal){
+    arrow='=';arrowCls='change-zero';
+  }
+  html+='<div class="attr-modal-dim">';
+  html+='<span class="dim-label">'+s.label+'</span>';
+  html+='<span class="dim-values" style="color:'+sigColor+';font-weight:600">'+todayVal+'</span>';
+  if(arrow){
+    html+='<span class="dim-change '+arrowCls+'">'+arrow+'</span>';
+  }
+  html+='</div>';
 });
+
+// Risk level
+var riskLevel=dims.risk_level||'\u65e0\u6570\u636e';
+var riskColors={'\u9ad8':'#ff4d4f','\u4e2d':'#faad14','\u4f4e':'#52c41a'};
+var riskColor=riskColors[riskLevel]||'#999';
+html+='<div class="attr-modal-dim">';
+html+='<span class="dim-label">\u98ce\u9669\u7b49\u7ea7</span>';
+html+='<span class="dim-values" style="color:'+riskColor+';font-weight:600">'+riskLevel+'</span>';
+html+='</div>';
+
+// Footer
 html+='<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #f0f0f0;margin-top:16px">';
 html+='<button class="btn-ghost" onclick="closeModal()">\u5173\u95ed</button>';
 html+='<button class="btn" onclick="closeModal();showStockDetail(\''+stock.stock_code+'\')">\u67e5\u770b\u8be6\u7ec6\u5206\u6790</button>';
@@ -2700,32 +2724,50 @@ async function loadStockHeader(code){
     const el=document.getElementById('stockHeaderArea');
     const bc=document.getElementById('bcStockName');
     if(d.error){el.innerHTML='<div class="card"><div class="empty">❌ '+esc(d.error)+'</div></div>';return}
-    const name=d.name||d.stock_name||code;
-    const price=d.price||d.current||0;
-    const change=d.change||0;const pct=d.change_pct||d.pct_chg||0;
+    const q=d.data||d; // shark 契约: 行情字段嵌套在 data 内 (loadSDSupply 同款口径)
+    const name=q.name||d.name||d.stock_name||code;
+    const price=q.price||q.current||0;
+    const change=q.change||0;const pct=q.change_pct||q.pct_chg||0;
     const cls=change>=0?'up':'dn';const sg=change>=0?'+':'';
     if(bc)bc.textContent=name+' ('+code+')';
     document.getElementById('drawerTitle').textContent=name+' ('+code+')';
-    el.innerHTML='<div style="position:relative;z-index:1"><div style="font-size:20px;font-weight:700">'+esc(name)+'<span style="font-size:13px;color:#999;margin-left:8px">'+esc(code)+'</span></div><div style="font-size:28px;font-weight:700;margin:8px 0">'+parseFloat(price).toFixed(2)+'<span class="sh-change '+cls+'" style="font-size:16px;margin-left:8px">'+sg+parseFloat(change).toFixed(2)+' ('+sg+parseFloat(pct).toFixed(2)+'%)</span></div><div class="sh-metrics">'+(d.open?'<div class="sh-metric"><div class="label">开盘</div><div class="value">'+parseFloat(d.open).toFixed(2)+'</div></div>':'')+(d.high?'<div class="sh-metric"><div class="label">最高</div><div class="value">'+parseFloat(d.high).toFixed(2)+'</div></div>':'')+(d.low?'<div class="sh-metric"><div class="label">最低</div><div class="value">'+parseFloat(d.low).toFixed(2)+'</div></div>':'')+(d.volume?'<div class="sh-metric"><div class="label">成交量</div><div class="value">'+esc(String(d.volume))+'</div></div>':'')+'<div class="sh-metric"><div class="label">PE</div><div class="value">'+(d.pe?parseFloat(d.pe).toFixed(1):'-')+'</div></div><div class="sh-metric"><div class="label">PB</div><div class="value">'+(d.pb?parseFloat(d.pb).toFixed(1):'-')+'</div></div></div></div>';
+    var pe=null,pb=null;
+    try{
+      const v=await api('/api/stock/valuation?symbol='+encodeURIComponent(code));
+      const vd=(v&&v.data)||{};
+      pe=vd.pe_ttm||null;pb=vd.pb||null;
+    }catch(e){}
+    el.innerHTML='<div style="position:relative;z-index:1"><div style="font-size:20px;font-weight:700">'+esc(name)+'<span style="font-size:13px;color:#999;margin-left:8px">'+esc(code)+'</span></div><div style="font-size:28px;font-weight:700;margin:8px 0">'+parseFloat(price).toFixed(2)+'<span class="sh-change '+cls+'" style="font-size:16px;margin-left:8px">'+sg+parseFloat(change).toFixed(2)+' ('+sg+parseFloat(pct).toFixed(2)+'%)</span></div><div class="sh-metrics">'+(q.open?'<div class="sh-metric"><div class="label">开盘</div><div class="value">'+parseFloat(q.open).toFixed(2)+'</div></div>':'')+(q.high?'<div class="sh-metric"><div class="label">最高</div><div class="value">'+parseFloat(q.high).toFixed(2)+'</div></div>':'')+(q.low?'<div class="sh-metric"><div class="label">最低</div><div class="value">'+parseFloat(q.low).toFixed(2)+'</div></div>':'')+(q.volume?'<div class="sh-metric"><div class="label">成交量</div><div class="value">'+esc(String(q.volume))+'</div></div>':'')+'<div class="sh-metric"><div class="label">PE</div><div class="value">'+(pe?parseFloat(pe).toFixed(1):'-')+'</div></div><div class="sh-metric"><div class="label">PB</div><div class="value">'+(pb?parseFloat(pb).toFixed(1):'-')+'</div></div></div></div>';
   }catch(e){document.getElementById('stockHeaderArea').innerHTML='<div class="card"><div class="empty">加载失败: '+esc(e.message)+'</div></div>'}
 }
 
 async function loadSDQuote(el){
   el.innerHTML='<div class="card"><h3>K线走势</h3><div id="klineChart" style="height:350px;background:#fafafa;border-radius:8px"></div></div><div class="card"><h3>核心指标</h3><div id="sdIndicators" class="tech-indicators" style="display:grid;gap:12px"></div></div>';
+  var quote={};
   try{
     const d=await api('/api/stock/quote?symbol='+encodeURIComponent(_stockDetailCode));
-    if(!d.error){
-      const ind=document.getElementById('sdIndicators');
-      const items=[['MA5',d.ma5],['MA20',d.ma20],['MACD',d.macd],['KDJ',d.kdj],['RSI',d.rsi],['换手率',d.turnover_rate],['量比',d.volume_ratio]];
-      ind.innerHTML=items.filter(i=>i[1]).map(i=>'<div style="background:#f8f9fa;border-radius:8px;padding:14px 16px;border:1px solid #f0f0f0"><div style="font-size:12px;color:#999;margin-bottom:6px">'+i[0]+'</div><div style="font-size:20px;font-weight:700">'+i[1]+'</div></div>').join('');
-    }
+    quote=((d&&d.data)||d||{}); // shark 契约: 行情字段嵌套在 data 内
   }catch(e){}
+  var ma5=null,ma20=null;
   if(typeof echarts!=='undefined'&&document.getElementById('klineChart')){
     try{
       const kd=await api('/api/stock/kline?symbol='+encodeURIComponent(_stockDetailCode)+'&period=daily&count=60');
-      if(kd&&!kd.error&&kd.data){drawKline(kd.data)}else{drawMockKline()}
+      if(kd&&!kd.error&&kd.data&&kd.data.length){
+        drawKline(kd.data);
+        var closes=kd.data.map(function(b){return parseFloat(b.close)});
+        if(closes.length>=5){ma5=(closes.slice(-5).reduce(function(a,b){return a+b},0)/5).toFixed(2)}
+        if(closes.length>=20){ma20=(closes.slice(-20).reduce(function(a,b){return a+b},0)/20).toFixed(2)}
+      }else{drawMockKline()}
     }catch(e){drawMockKline()}
   }
+  try{
+    const ind=document.getElementById('sdIndicators');
+    if(ind){
+      // MACD/KDJ/RSI/量比无数据源(shark quote 不返回), 移除常空项; MA5/MA20 由本地 kline 收盘价计算
+      const items=[['MA5',ma5],['MA20',ma20],['换手率',quote.turnover_rate?quote.turnover_rate+'%':null],['振幅',quote.amplitude?quote.amplitude+'%':null],['成交额',quote.amount?(quote.amount/1e8).toFixed(2)+'亿':null],['昨收',quote.previous_close||null]];
+      ind.innerHTML=items.filter(i=>i[1]).map(i=>'<div style="background:#f8f9fa;border-radius:8px;padding:14px 16px;border:1px solid #f0f0f0"><div style="font-size:12px;color:#999;margin-bottom:6px">'+i[0]+'</div><div style="font-size:20px;font-weight:700">'+i[1]+'</div></div>').join('');
+    }
+  }catch(e){}
 }
 
 function drawKline(data){
