@@ -46,7 +46,7 @@ def render_news_brief(subject, news_list, date_str):
         lines.append("*来源: %s | %s*" % (src, t))
         lines.append("")
     lines.append("---")
-    lines.append("*由 D8Q 智能资讯工厂自动生成*")
+    lines.append("*由 D8Q 智能投顾平台自动生成*")
     return "\n".join(lines)
 
 
@@ -89,7 +89,7 @@ def render_deep_analysis(subject, news_list, date_str):
         lines.append("")
 
     lines.append("---")
-    lines.append("*由 D8Q 智能资讯工厂自动生成*")
+    lines.append("*由 D8Q 智能投顾平台自动生成*")
     return "\n".join(lines)
 
 
@@ -120,7 +120,7 @@ def render_investment_weekly(subject, news_list, date_str):
             i, n["title"], n.get("source", ""), (n.get("publish_time") or "")[:10]))
     lines.append("")
     lines.append("---")
-    lines.append("*由 D8Q 智能资讯工厂自动生成*")
+    lines.append("*由 D8Q 智能投顾平台自动生成*")
     return "\n".join(lines)
 
 

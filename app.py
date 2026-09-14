@@ -1,4 +1,4 @@
-"""D8Q 智能资讯工厂 - 前后端一体 Web 应用 v2 (含任务管理)"""
+"""D8Q 智能投顾平台 - 前后端一体 Web 应用 v2 (含任务管理)"""
 import json
 import re
 import logging
