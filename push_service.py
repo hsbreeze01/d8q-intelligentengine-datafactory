@@ -100,7 +100,7 @@ def send_daily_brief():
 {heat_rows}</table>
 <h3 style="margin-top:16px">今日要闻</h3>
 <ol style="font-size:14px;line-height:1.8">{news_items}</ol>
-<p style="color:#999;font-size:12px;margin-top:20px">—— D8Q 智能资讯平台</p></div>"""
+<p style="color:#999;font-size:12px;margin-top:20px">—— D8Q 智能投顾平台</p></div>"""
 
     configs = _get_push_configs()
     sent = 0
@@ -118,7 +118,7 @@ def send_heat_alert(track_name, score, change):
     html = f"""<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
 <h2 style="color:#fa8c16">🔥 热度异动提醒</h2>
 <p style="font-size:16px">赛道「<b>{track_name}</b>」热度指数 <b>{score}</b>，较昨日上升 <b style="color:#ff4d4f">{change:.1f}%</b></p>
-<p style="color:#999;font-size:12px;margin-top:20px">—— D8Q 智能资讯平台</p></div>"""
+<p style="color:#999;font-size:12px;margin-top:20px">—— D8Q 智能投顾平台</p></div>"""
 
     configs = _get_push_configs()
     sent = 0
