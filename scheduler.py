@@ -28,6 +28,19 @@ LOCK_PATH = "/tmp/d8q_scheduler.lock"
 _RUN_MARKER_DIR = "/tmp/d8q_scheduler_markers"
 os.makedirs(_RUN_MARKER_DIR, exist_ok=True)
 
+# 2026 A 股休市日(交易所公告)。休市工作日(_is_czsc_scan_ok 要求 data_date==scan_date
+# 永远不成立)若不拦截, 18:10-22:00 会每 15 分钟重试 --push 重复推同一信号集
+# (2026-09-25 中秋事故: 8+ 次重复企微推送)。
+HOLIDAYS_2026 = frozenset(
+    ["2026-01-01", "2026-01-02", "2026-01-03"]
+    + [f"2026-02-{d:02d}" for d in range(15, 24)]
+    + ["2026-04-04", "2026-04-05", "2026-04-06"]
+    + [f"2026-05-{d:02d}" for d in range(1, 6)]
+    + ["2026-06-19", "2026-06-20", "2026-06-21"]
+    + ["2026-09-25", "2026-09-26", "2026-09-27"]
+    + [f"2026-10-{d:02d}" for d in range(1, 8)]
+)
+
 def _already_ran_today(task_name):
     """File-based dedup: prevents same task running twice across multiple workers."""
     from datetime import datetime
@@ -494,6 +507,8 @@ def _run_czsc_scan():
         if now.hour < 8 or now.hour >= 12:
             return
         fri = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        if fri in HOLIDAYS_2026:
+            return  # 休市的周五没有数据, 无可补跑
         fri_marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{fri}")
         today_marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{today}")
         if os.path.exists(fri_marker) or os.path.exists(today_marker):
@@ -504,6 +519,17 @@ def _run_czsc_scan():
     elif now.weekday() >= 6:  # Sunday
         return
     else:
+        # 休市工作日: 直接落 done marker, 不进扫描窗口(见 HOLIDAYS_2026 注释)
+        if today in HOLIDAYS_2026:
+            marker = os.path.join(_RUN_MARKER_DIR, f"czsc_scan_done_{today}")
+            if not os.path.exists(marker):
+                try:
+                    with open(marker, 'w') as f:
+                        f.write("holiday")
+                    logger.info("休市日 %s: 不执行 czsc 扫描, 已写 done marker", today)
+                except Exception as e:
+                    logger.warning("休市日 marker 写入失败 %s: %s", marker, e)
+            return
         # Weekday window: 18:10 - 22:00 (daily data pipeline starts at 18:00
         # and finishes ~20:30-21:00; attempts before that always hit stale
         # T-1 data and must retry until data_date == target trading day)
