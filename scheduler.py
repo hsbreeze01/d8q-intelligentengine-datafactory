@@ -483,6 +483,30 @@ def _run_disciplined_scan():
 
 # _czsc_scan_last_run replaced by file-based _already_ran_today
 
+
+def _parse_czsc_signal_count(output):
+    """Parse the count only from an explicit successful scan marker.
+
+    The old parser searched the first number on any line containing
+    ``signal`` and ``count``. A marker containing ``data_date=2026-...``
+    was therefore recorded as 2026 signals. Only a complete machine-readable
+    success marker is authoritative. When multiple markers are present the
+    last valid one wins, matching normal append-only process output.
+    """
+    import re as _re
+    marker = _re.compile(
+        r'^\s*czsc_scan:\s+reason=ok\s+'
+        r'data_date=\d{4}-\d{2}-\d{2}\s+'
+        r'signal_count=(\d+)\s*$'
+    )
+    count = None
+    for line in (output or '').splitlines():
+        match = marker.match(line)
+        if match:
+            count = int(match.group(1))
+    return count
+
+
 def _is_czsc_scan_ok(output, scan_date, returncode):
     # 2026-08-18: strict success check - scan counts as done only when it ran
     # on the target trading day data (reason=ok AND data_date==scan_date);
@@ -614,20 +638,14 @@ def _run_czsc_scan():
                            f"扫描异常(第{retry_count}次): {result.stderr[:200]}")
             return
 
-        # Parse signal count from output
-        sig_count = 0
-        try:
-            for line in output.split("\n"):
-                if "signal" in line.lower() and "count" in line.lower():
-                    import re
-                    m = re.search(r'(\d+)', line)
-                    if m:
-                        sig_count = int(m.group(1))
-        except Exception:
-            pass
+        # Parse only the explicit machine-readable success marker. Missing
+        # count is unavailable (JSON null), never a fabricated zero.
+        sig_count = _parse_czsc_signal_count(output)
+        sig_count_label = str(sig_count) if sig_count is not None else 'unavailable'
 
         # Success!
-        logger.info("czsc扫描成功: %s 信号数=%d (第%d次尝试)", scan_date, sig_count, attempt_num)
+        logger.info("czsc扫描成功: %s 信号数=%s (第%d次尝试)",
+                    scan_date, sig_count_label, attempt_num)
         try:
             with open(status_file, "w") as f:
                 json.dump({"last_run": now_str, "last_attempt": now_str,
@@ -638,7 +656,7 @@ def _run_czsc_scan():
         except Exception:
             pass
         _log_event("scan_success", "czsc_scan", "info",
-                   f"扫描完成({scan_date}): {sig_count}个信号, 第{attempt_num}次尝试成功",
+                   f"扫描完成({scan_date}): 信号数={sig_count_label}, 第{attempt_num}次尝试成功",
                    {"signal_count": sig_count, "attempts": attempt_num})
         # Mark as done
         with open(done_marker, "w") as f:
