@@ -12,7 +12,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt pytest
+      - run: pip install -r requirements.txt pytest Markdown==3.9
+      - run: sudo install -d -o "lancer.zhang" -g "lancer.zhang" /var/log/d8q
       - run: pytest tests/d8q/ -q
   lint:
     runs-on: ubuntu-latest
