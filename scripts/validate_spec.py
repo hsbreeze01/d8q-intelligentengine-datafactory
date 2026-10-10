@@ -3,7 +3,6 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
-import json
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -272,7 +271,7 @@ def validate_spec_workflow_specs():
         # Validate tasks.md
         tasks_valid, tasks_errors = validate_tasks_md(spec_name)
         if tasks_valid:
-            info(f"  ✓ tasks.md is valid")
+            info("  ✓ tasks.md is valid")
         else:
             for error in tasks_errors:
                 warn(f"  ⚠ tasks.md error: {error}")
@@ -280,7 +279,7 @@ def validate_spec_workflow_specs():
         # Validate implementation logs
         logs_valid, logs_warnings = validate_implementation_logs(spec_name)
         if logs_valid:
-            info(f"  ✓ Implementation logs OK")
+            info("  ✓ Implementation logs OK")
         else:
             for warning in logs_warnings:
                 warn(f"  ⚠ Implementation logs warning: {warning}")

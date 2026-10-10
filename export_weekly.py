@@ -1,5 +1,6 @@
 """周报导出 - PDF/Word"""
-import io, markdown, tempfile
+import io
+import markdown
 from flask import Blueprint, request, jsonify, send_file
 
 export_bp = Blueprint("export", __name__)
@@ -36,7 +37,6 @@ def weekly_export():
 
     elif fmt == "docx":
         from docx import Document
-        from docx.shared import Pt
         doc = Document()
         doc.add_heading(title, level=0)
         for line in content_md.split("\n"):

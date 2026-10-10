@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """初始化 admin 账户"""
-import json, os, sys, bcrypt
+import json
+import os
+import sys
+import bcrypt
 from datetime import datetime
 
 USERS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "users.json")
@@ -8,7 +11,8 @@ USERS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "u
 def main():
     password = sys.argv[1] if len(sys.argv) > 1 else "admin123!"
     if len(password) < 8:
-        print("密码至少8位"); return
+        print("密码至少8位")
+        return
 
     os.makedirs(os.path.dirname(USERS_PATH), exist_ok=True)
     users = []
