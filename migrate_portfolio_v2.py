@@ -18,7 +18,9 @@
 4. 创建 trades -> journal_id 外键，支持每笔交易写笔记
 5. 记录迁移版本号，重复执行安全跳过
 """
-import os, sys, json, sqlite3
+import os
+import sys
+import sqlite3
 from datetime import datetime
 
 DB_FALLBACK_CANDIDATES = [

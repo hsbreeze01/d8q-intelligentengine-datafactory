@@ -7,7 +7,6 @@ import secrets
 import sys
 import urllib.request
 import urllib.parse
-from contextlib import contextmanager
 from datetime import timedelta
 import smtplib
 from email.mime.text import MIMEText
@@ -141,7 +140,8 @@ except Exception as _pv2e:
     print(f"[portfolio_v2] blueprint import skipped: {_pv2e}")
 # 启动时幂等执行迁移
 try:
-    import threading, migrate_portfolio_v2 as _mpv2
+    import threading
+    import migrate_portfolio_v2 as _mpv2
     def _run():
         try:
             _mpv2.run_migrate()
@@ -156,7 +156,7 @@ COMPASS_API = "http://localhost:8087"
 PUBLISHER_API = "http://49.234.48.221:8089"
 TMPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
-from datafactory.infrastructure.db_utils import DB_PATH, get_db_ctx  # noqa: E402
+from datafactory.infrastructure.db_utils import get_db_ctx  # noqa: E402
 
 
 # === 用户行为事件采集 ===
@@ -1413,7 +1413,6 @@ def update_push_config():
 @app.route("/api/service-status")
 def service_status():
     """实时检测所有微服务状态"""
-    import subprocess
     services = {}
 
     # HTTP 健康检查的服务
@@ -1993,7 +1992,6 @@ def monitor_status():
                     alert_count += 1
                 rule_results.append({"rule_id": rule["id"], "name": rule["name"], "type": rule["type"],
                     "severity": rule["severity"], "status": status, "message": message, "checked_at": checked_at, "raw_data": detail or {}})
-    import subprocess
     services = {}
     http_svcs = {"agent":{"host":"localhost","port":8000,"path":"/api/health"},
         "stockshark":{"host":"49.234.48.221","port":5000,"path":"/health"},
@@ -2033,8 +2031,8 @@ def monitor_status():
     try:
         import subprocess as _sp
         ps_r = _sp.run(['ps','aux'], capture_output=True, text=True, timeout=5)
-        daemon_alive = any('pipeline.py' in l and '--mode daemon' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        daily_running = any('pipeline.py' in l and '--mode daily' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
+        daemon_alive = any('pipeline.py' in line and '--mode daemon' in line and 'grep' not in line for line in ps_r.stdout.split('\n'))
+        daily_running = any('pipeline.py' in line and '--mode daily' in line and 'grep' not in line for line in ps_r.stdout.split('\n'))
         pipeline_status = {'daemon_alive': daemon_alive, 'daily_running': daily_running}
     except Exception:
         pipeline_status = {'error': 'check failed'}
@@ -2917,7 +2915,7 @@ def watchlist_recalculate():
 
 
 # === 虚拟组合 API ===
-from datetime import date as _dt_date, datetime as _dt_datetime
+from datetime import date as _dt_date  # noqa: E402
 
 @app.route("/api/portfolios", methods=["GET"])
 def list_portfolios():
@@ -3527,7 +3525,6 @@ def rec_backfill_trigger():
     if not username:
         return jsonify({"error": "未登录"}), 401
     from datetime import date, timedelta
-    today = date.today().isoformat()
     filled = 0
     with get_db_ctx() as conn:
         for offset, col_price, col_ret in [(1,"price_t1","return_t1"),(3,"price_t3","return_t3"),(5,"price_t5","return_t5"),(10,"price_t10","return_t10")]:
@@ -3599,8 +3596,8 @@ def pipeline_status_public():
     # 1. Pipeline daemon status
     try:
         ps_r = _sp.run(['ps','aux'], capture_output=True, text=True, timeout=5)
-        daemon_alive = any('pipeline.py' in l and '--mode daemon' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
-        daily_running = any('pipeline.py' in l and '--mode daily' in l and 'grep' not in l for l in ps_r.stdout.split('\n'))
+        daemon_alive = any('pipeline.py' in line and '--mode daemon' in line and 'grep' not in line for line in ps_r.stdout.split('\n'))
+        daily_running = any('pipeline.py' in line and '--mode daily' in line and 'grep' not in line for line in ps_r.stdout.split('\n'))
         result["pipeline"] = {"daemon_alive": daemon_alive, "daily_running": daily_running}
     except Exception:
         result["pipeline"] = {"error": "check failed"}
@@ -3636,7 +3633,7 @@ def pipeline_status_public():
             'FROM system_events WHERE created_at >= ? ORDER BY id DESC LIMIT 20', (since,)).fetchall()]
         conn.close()
         result["events"] = rows
-    except Exception as e:
+    except Exception:
         result["events"] = []
 
     # 5. Today's signal count
@@ -3753,7 +3750,8 @@ def chanlun_disciplined():
 
 @app.route("/api/chanlun/czsc", methods=["GET"])
 def chanlun_czsc():
-    import json as _json, os as _os
+    import json as _json
+    import os as _os
     path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signals_cache_czsc.json"
     try:
         if _os.path.exists(path):
@@ -3768,7 +3766,8 @@ def chanlun_czsc():
 
 @app.route("/api/chanlun/czsc/<stock_code>", methods=["GET"])
 def chanlun_czsc_detail(stock_code):
-    import subprocess, json as _json
+    import subprocess
+    import json as _json
     try:
         cmd = ["/home/ecs-assist-user/d8q-intelligentengine-stockcompass/venv/bin/python",
                "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/czsc_detail_cli.py",
@@ -3784,7 +3783,8 @@ def chanlun_czsc_detail(stock_code):
 @app.route("/api/chanlun/review", methods=["GET"])
 def chanlun_review():
     """复盘统计API"""
-    import json as _json, os as _os
+    import json as _json
+    import os as _os
     path = "/home/ecs-assist-user/d8q-intelligentengine-stockcompass/chanlun/strategy/signal_review_stats.json"
     try:
         if _os.path.exists(path):

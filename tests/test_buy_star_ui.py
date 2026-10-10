@@ -6,11 +6,6 @@ Verifies:
 2. Templates contain the new render functions (no old star logic)
 3. Template content validates correct function usage
 """
-import json
-import re
-import sqlite3
-import tempfile
-import os
 import pytest
 
 
@@ -47,19 +42,26 @@ class TestDecodeBuyStarLogic:
         c = code
         tags = []
         if c >= 300000000:
-            tags.append("BOLL中轨"); c -= 300000000
+            tags.append("BOLL中轨")
+            c -= 300000000
         if c >= 20000000:
-            tags.append("MA20支撑"); c -= 20000000
+            tags.append("MA20支撑")
+            c -= 20000000
         if c >= 1000000:
-            tags.append("3日MA5"); c -= 1000000
+            tags.append("3日MA5")
+            c -= 1000000
         if c >= 100000:
-            tags.append("2日MA5"); c -= 100000
+            tags.append("2日MA5")
+            c -= 100000
         if c >= 10000:
-            tags.append("MA5支撑"); c -= 10000
+            tags.append("MA5支撑")
+            c -= 10000
         if c >= 1000:
-            tags.append("低位反转"); c -= 1000
+            tags.append("低位反转")
+            c -= 1000
         if c >= 10:
-            tags.append("KDJ底部"); c -= 10
+            tags.append("KDJ底部")
+            c -= 10
         if c >= 1:
             tags.append("金叉")
         return {"signalCount": len(tags), "tags": tags, "cls": "signal"}

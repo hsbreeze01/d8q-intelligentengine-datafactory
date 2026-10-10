@@ -133,12 +133,14 @@ def get_account(conn, aid):
 def _account_detail(conn, aid, r):
     p_list = conn.execute("SELECT id, name, initial_capital, cash, strategy_id, journal_id, allocated_capital FROM portfolios WHERE account_id=?", (aid,)).fetchall()
     portfolios = []
-    cash = 0.0; mv = 0.0
+    cash = 0.0
+    mv = 0.0
     for p in p_list:
         positions = conn.execute(
             "SELECT quantity, current_price FROM positions WHERE portfolio_id=? AND quantity>0", (p["id"],)).fetchall()
         pmv = sum(pos["quantity"] * pos["current_price"] for pos in positions)
-        cash += (p["cash"] or 0); mv += pmv
+        cash += (p["cash"] or 0)
+        mv += pmv
         strategy = conn.execute("SELECT id, name, strategy_type FROM strategies WHERE id=?", (p["strategy_id"],)).fetchone() if p["strategy_id"] else None
         journal = conn.execute("SELECT id, name FROM trade_journals WHERE id=?", (p["journal_id"],)).fetchone() if p["journal_id"] else None
         portfolios.append({

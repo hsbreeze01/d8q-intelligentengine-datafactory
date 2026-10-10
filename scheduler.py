@@ -51,12 +51,11 @@ def _already_ran_today(task_name):
     with open(marker, 'w') as f:
         f.write(datetime.now().isoformat())
     # Clean old markers (>2 days)
-    import glob
     for old in glob.glob(os.path.join(_RUN_MARKER_DIR, f"{task_name}_*")):
         if old != marker:
             try:
                 os.remove(old)
-            except:
+            except Exception:
                 pass
     return False
 
@@ -457,7 +456,6 @@ def _run_disciplined_scan():
     """每日15:37执行：纪律化策略独立扫描+推送（晚于原chanlun_scan 2分钟）"""
     import subprocess
     now = datetime.now()
-    today = now.strftime("%Y-%m-%d")
     if _already_ran_today("disciplined_scan"):
         return
     if now.weekday() > 4:
@@ -782,7 +780,7 @@ def _check_pipeline_health():
 
     import subprocess
     daemon_alive = False
-    daily_running = False
+    _daily_running = False
     try:
         ps_result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5)
         for line in ps_result.stdout.split("\n"):
@@ -790,7 +788,7 @@ def _check_pipeline_health():
                 if "--mode daemon" in line:
                     daemon_alive = True
                 if "--mode daily" in line:
-                    daily_running = True
+                    _daily_running = True
     except Exception:
         pass
 
@@ -951,7 +949,7 @@ def _log_event(event_type, component, severity, message, detail=None):
         req = urllib.request.Request("http://127.0.0.1:8088/api/monitor/events",
                                     data=body, method="POST",
                                     headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=5):
             pass
     except Exception:
         # Fallback: write directly to SQLite

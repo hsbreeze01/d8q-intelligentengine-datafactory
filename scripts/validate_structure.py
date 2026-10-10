@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import List, Set
+from typing import Set
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -195,10 +195,10 @@ def validate_agent_file():
     
     agent_file = PROJECT_ROOT / "AGENT.md"
     if agent_file.exists():
-        info(f"✓ Found AGENT.md file")
+        info("✓ Found AGENT.md file")
         return True
     else:
-        fail(f"Missing required AGENT.md file")
+        fail("Missing required AGENT.md file")
 
 
 # =========================

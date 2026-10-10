@@ -4,7 +4,7 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from ...domain.models.news import NewsItem
 

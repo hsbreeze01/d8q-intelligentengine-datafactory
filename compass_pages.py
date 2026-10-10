@@ -289,7 +289,7 @@ def strategy_admin_run(group_id):
 @compass_bp.route("/strategy/backtest-report/")
 def strategy_backtest_report():
     """展示短期+中期选股策略回测结果"""
-    import json, os
+    import json
     from datetime import datetime
     report_path = '/home/ecs-assist-user/stock_strategy/output/backtest_result.json'
 
@@ -329,7 +329,7 @@ def strategy_backtest_report():
 @compass_bp.route("/strategy/backtest-chart/")
 def strategy_backtest_chart():
     """净值曲线可视化"""
-    import json, os
+    import json
     report_path = '/home/ecs-assist-user/stock_strategy/output/backtest_nav.json'
     dates, nav_data, bench_data = [], [], []
     if os.path.exists(report_path):
